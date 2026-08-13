@@ -1,0 +1,79 @@
+.about-sheerwood {
+  grid-template-columns: minmax(280px, 0.88fr) minmax(300px, 1.12fr);
+  align-items: center;
+  gap: clamp(40px, 8vw, 135px);
+  padding-block: 72px;
+  background: #f1f3f3;
+}
+
+.about-image-wrap {
+  min-height: 420px;
+  overflow: hidden;
+  box-shadow: 0 14px 30px #22382b1c;
+}
+
+.about-image-wrap img {
+  width: 100%;
+  height: 100%;
+  min-height: 420px;
+  display: block;
+  object-fit: cover;
+}
+
+.about-story .label {
+  color: var(--home-green);
+}
+
+.about-story h2 {
+  margin: 16px 0 42px;
+  color: var(--home-green);
+  font: 600 clamp(38px, 4.1vw, 58px)/1 Georgia;
+  letter-spacing: -1.5px;
+}
+
+.about-story p {
+  max-width: 720px;
+  margin: 0 0 17px;
+  color: #5e625f;
+  font-size: clamp(15px, 1.34vw, 19px);
+  line-height: 1.72;
+}
+
+.about-story > a {
+  display: inline-flex;
+  gap: 10px;
+  align-items: center;
+  padding: 13px 20px;
+  margin-top: 15px;
+  border: 1px solid var(--home-green);
+  color: var(--home-green);
+  font-size: 13px;
+  font-weight: 800;
+  transition: color .2s ease, background .2s ease;
+}
+
+.about-story > a:hover {
+  color: #fff;
+  background: var(--home-green);
+}
+
+@media (max-width: 850px) {
+  .about-sheerwood {
+    gap: 32px;
+    padding-block: 58px;
+  }
+
+  .about-image-wrap,
+  .about-image-wrap img {
+    min-height: 330px;
+  }
+
+  .about-story h2 { margin-bottom: 24px; }
+}
+
+@media (max-width: 600px) {
+  .about-sheerwood { padding: 48px 22px; }
+  .about-image-wrap,
+  .about-image-wrap img { min-height: 255px; }
+  .about-story p { font-size: 15px; }
+}

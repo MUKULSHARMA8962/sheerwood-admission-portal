@@ -1,0 +1,7 @@
+.journey-panel-header { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+.journey-panel-header h2 { margin: 0; }
+.journey-panel-header small { display: block; margin-top: 5px; color: #718078; font-size: 9px; }
+.journey-panel-header button { padding: 9px 11px; border: 0; border-radius: 7px; color: #fff; background: #08783f; font-size: 9px; font-weight: 800; cursor: pointer; }
+.journey-panel-header button:hover { background: #03492b; }
+
+@media (max-width: 500px) { .journey-panel-header { align-items: flex-start; flex-direction: column; }.journey-panel-header button { width: 100%; } }

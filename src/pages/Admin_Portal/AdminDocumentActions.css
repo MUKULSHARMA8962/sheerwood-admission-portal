@@ -1,0 +1,10 @@
+.document-review-actions { display: flex; gap: 7px; justify-self: end; }
+.document-review-actions button { padding: 7px 8px; border: 1px solid #b9ddc2; border-radius: 6px; color: #1e7540; background: #fff; font-size: 9px; font-weight: 800; white-space: nowrap; cursor: pointer; }
+.document-review-actions button:hover { color: #fff; background: #08783f; }
+.document-review-actions button.request { border-color: #e5beb8; color: #ad5147; }
+.document-review-actions button.request:hover { background: #b75247; }
+.document-table em.re-upload-required { color: #ad5147; background: #ffebe8; }
+
+@media (max-width: 480px) {
+  .document-review-actions { grid-column: 2; justify-self: start; }
+}

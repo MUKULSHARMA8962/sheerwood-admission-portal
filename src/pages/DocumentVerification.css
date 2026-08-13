@@ -1,0 +1,91 @@
+.new-document-card {
+  margin-top: 20px;
+  padding: 24px;
+  border: 1px solid #dce9df;
+  border-radius: 15px;
+  background: #fff;
+  box-shadow: 0 7px 20px #174b2a08;
+}
+
+.new-document-card header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+}
+
+.new-document-card header p {
+  margin: 0 0 6px;
+  color: #4f9169;
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 1.2px;
+}
+
+.new-document-card h2 {
+  margin: 0;
+  color: #173d2d;
+  font: 600 21px Georgia;
+}
+
+.new-document-card header > span {
+  padding: 8px 10px;
+  border-radius: 99px;
+  color: #8d621b;
+  background: #fff3dc;
+  font-size: 10px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.new-document-card > p {
+  margin: 9px 0 17px;
+  color: #718078;
+  font-size: 11px;
+}
+
+.new-document-list {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 9px;
+}
+
+.new-document-list article {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  min-width: 0;
+  padding: 11px;
+  border: 1px solid #e1ece3;
+  border-radius: 8px;
+}
+
+.new-document-list i {
+  width: 23px;
+  height: 23px;
+  display: grid;
+  place-items: center;
+  flex: none;
+  border-radius: 50%;
+  color: #fff;
+  background: #1b974d;
+  font-size: 10px;
+  font-style: normal;
+  font-weight: 800;
+}
+
+.new-document-list article.status-under-verification i,
+.new-document-list article.status-pending i { color: #9d6c1e; background: #fff1d9; }
+.new-document-list article.status-re-upload-required i { color: #ba4c42; background: #ffebe8; }
+.new-document-list span { min-width: 0; display: grid; gap: 3px; }
+.new-document-list b { overflow: hidden; color: #365342; font-size: 10px; text-overflow: ellipsis; white-space: nowrap; }
+.new-document-list small { color: #248147; font-size: 9px; font-weight: 800; }
+.new-document-list .status-under-verification small,.new-document-list .status-pending small { color: #9d6c1e; }
+.new-document-list .status-re-upload-required small { color: #ba4c42; }
+.new-document-list em { overflow: hidden; color: #9e5548; font-size: 8px; font-style: normal; text-overflow: ellipsis; white-space: nowrap; }
+
+@media (max-width: 650px) {
+  .new-document-card { padding: 19px; }
+  .new-document-card header { align-items: flex-start; flex-direction: column; gap: 10px; }
+  .new-document-list { grid-template-columns: 1fr; }
+}

@@ -1,0 +1,122 @@
+.home-principal-events {
+  display: grid;
+  grid-template-columns: minmax(0, 1.7fr) minmax(290px, .82fr);
+  gap: 30px;
+  background: #f2f6f5;
+}
+
+.principal-desk-card,
+.home-events-card,
+.home-post-card {
+  border: 1px solid #dce7e0;
+  background: #fff;
+  box-shadow: 0 16px 40px rgba(15, 68, 41, .08);
+}
+
+.principal-desk-card {
+  display: grid;
+  grid-template-columns: minmax(220px, .72fr) minmax(0, 1.28fr);
+  min-height: 450px;
+}
+
+.principal-portrait {
+  min-height: 100%;
+  overflow: hidden;
+}
+
+.principal-portrait img { display: block; width: 100%; height: 100%; min-height: 450px; object-fit: cover; object-position: center top; }
+
+.principal-desk-copy { padding: clamp(30px, 4vw, 58px); }
+.principal-desk-copy h2,
+.home-updates-heading h2,
+.home-posts-header h2 {
+  margin: 10px 0 22px;
+  color: #203d30;
+  font: 500 clamp(30px, 3vw, 45px)/1.08 Georgia, serif;
+  letter-spacing: -1.5px;
+}
+
+.principal-desk-copy h2 em,
+.home-updates-heading h2 em,
+.home-posts-header h2 em { color: var(--home-green); }
+.principal-desk-copy > p { margin: 0; color: #61746a; font-size: 16px; line-height: 1.85; }
+.principal-desk-copy .principal-more { margin-top: 14px; }
+.principal-desk-copy b,
+.principal-desk-copy small { display: block; }
+.principal-desk-copy b { margin-top: 26px; color: #223d31; font-size: 17px; }
+.principal-desk-copy small { margin-top: 5px; color: #74847c; }
+
+.principal-read-more,
+.view-calendar {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 26px;
+  border: 0;
+  color: var(--home-green);
+  background: transparent;
+  cursor: pointer;
+  font-weight: 800;
+}
+
+.principal-read-more:hover,
+.view-calendar:hover { color: var(--home-deep); }
+.principal-read-more span,
+.view-calendar span { font-size: 19px; transition: transform .2s ease; }
+.principal-read-more:hover span,
+.view-calendar:hover span { transform: translateX(3px); }
+
+.home-events-card { padding: 30px; }
+.home-updates-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 15px; border-bottom: 1px solid #dbe3de; }
+.home-updates-heading .label { font-size: 10px; }
+.home-updates-heading h2 { margin-bottom: 18px; font-size: 30px; }
+.calendar-icon { display: grid; width: 38px; height: 38px; place-items: center; border-radius: 11px; color: #fff; background: var(--home-green); }
+
+.home-update-tabs { display: inline-flex; gap: 5px; padding: 4px; border-radius: 10px; background: #edf3ee; }
+.home-events-card .home-update-tabs { margin: 21px 0 5px; }
+.home-update-tabs button { padding: 8px 13px; border: 0; border-radius: 7px; color: #667a6e; background: transparent; cursor: pointer; font-size: 13px; font-weight: 800; }
+.home-update-tabs button.active { color: #fff; background: var(--home-green); box-shadow: 0 4px 9px rgba(8, 120, 63, .2); }
+
+.event-list { display: grid; }
+.event-item { display: grid; grid-template-columns: 66px 1fr; gap: 13px; padding: 22px 0; border-bottom: 1px solid #e4ebe6; }
+.event-item time { align-self: start; color: var(--home-green); font-size: 12px; font-weight: 800; line-height: 1.35; }
+.event-item h3 { margin: 0; color: #284236; font: 600 16px/1.35 Georgia, serif; }
+.event-item p { margin: 7px 0 0; color: #7a8b81; font-size: 12px; }
+.view-calendar { margin-top: 20px; }
+
+.home-posts { padding-top: 74px; padding-bottom: 96px; }
+.home-posts-header { display: flex; align-items: end; justify-content: space-between; gap: 25px; margin-bottom: 28px; }
+.home-posts-header h2 { margin-bottom: 0; }
+.home-social-feed { display: grid; max-width: 860px; gap: 14px; margin: 0 auto; }
+.home-post-card { display: flex; gap: 15px; padding: 22px 25px; border-radius: 17px; transition: transform .2s ease, box-shadow .2s ease; }
+.home-post-card:hover { transform: translateY(-3px); box-shadow: 0 22px 45px rgba(15, 68, 41, .13); }
+.home-post-avatar { width: 48px; height: 48px; flex: 0 0 auto; display: grid; place-items: center; border-radius: 50%; color: #fff; background: var(--home-green); box-shadow: inset 0 0 0 4px #d9f0df; font: 700 24px Georgia, serif; }
+.home-post-body { min-width: 0; flex: 1; }
+.home-post-body > header { display: flex; align-items: center; gap: 6px; color: #78887e; font-size: 13px; }
+.home-post-body > header strong { overflow: hidden; color: #243f31; font-size: 15px; text-overflow: ellipsis; white-space: nowrap; }
+.post-verified { display: grid; width: 16px; height: 16px; flex: 0 0 auto; place-items: center; border-radius: 50%; color: #fff; background: var(--home-green); font-size: 10px; font-weight: 900; }
+.home-post-body > header button { margin-left: auto; padding: 0 0 4px; border: 0; color: #728278; background: transparent; cursor: pointer; font-weight: 900; letter-spacing: 1px; }
+.home-post-body > p { margin: 9px 0 0; color: #42594d; font-size: 15px; line-height: 1.62; }
+.home-post-category { display: inline-block; margin-right: 8px; color: var(--home-green); font-size: 10px; font-weight: 900; letter-spacing: 1.2px; text-transform: uppercase; }
+.home-post-body > a { display: inline-flex; gap: 5px; margin-top: 10px; color: var(--home-green); font-size: 13px; font-weight: 800; }
+.home-post-actions { display: grid; grid-template-columns: repeat(4, 1fr); max-width: 390px; margin-top: 17px; color: #708177; font-size: 13px; }
+.home-post-actions span { display: inline-flex; align-items: center; gap: 4px; }
+
+@media (max-width: 900px) {
+  .home-principal-events { grid-template-columns: 1fr; }
+  .principal-desk-card { grid-template-columns: minmax(210px, .62fr) minmax(0, 1.38fr); }
+}
+
+@media (max-width: 650px) {
+  .home-principal-events { padding: 48px 22px; gap: 20px; }
+  .principal-desk-card { grid-template-columns: 1fr; }
+  .principal-portrait { min-height: 265px; }
+  .principal-portrait img { min-height: 265px; max-height: 370px; }
+  .principal-desk-copy { padding: 30px 25px; }
+  .home-events-card { padding: 25px; }
+  .home-posts { padding-top: 54px; padding-bottom: 66px; }
+  .home-posts-header { align-items: flex-start; flex-direction: column; margin-bottom: 22px; }
+  .home-post-card { padding: 22px; }
+  .home-post-body > header { gap: 5px; }
+  .home-post-body > header > span:last-of-type { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+}

@@ -1,0 +1,64 @@
+.alumni-testimonial {
+  display: grid;
+  grid-template-columns: 260px minmax(0, 1fr);
+  gap: clamp(45px, 8vw, 135px);
+  align-items: end;
+  padding: 62px 7% 70px;
+  color: #fff;
+  background: #9ca0b0;
+}
+
+.testimonial-person img {
+  width: 203px;
+  height: 232px;
+  display: block;
+  border: 4px solid #fff;
+  border-radius: 12px;
+  object-fit: cover;
+  object-position: center top;
+  box-shadow: 0 8px 17px #272b393d;
+}
+
+.testimonial-person h2 {
+  margin: 17px 0 5px;
+  color: #fff;
+  font: 600 clamp(27px, 2.4vw, 37px) Georgia;
+}
+
+.testimonial-person p {
+  margin: 0;
+  color: #e5e6ea;
+  font-size: 16px;
+  font-style: italic;
+}
+
+.alumni-testimonial blockquote {
+  max-width: 1080px;
+  padding: 0;
+  margin: 0 0 3px;
+  color: #fafafa;
+  font: 400 clamp(18px, 1.7vw, 25px)/1.75 Arial, sans-serif;
+}
+
+@media (max-width: 750px) {
+  .alumni-testimonial {
+    grid-template-columns: 1fr;
+    gap: 30px;
+    align-items: start;
+    padding: 45px 22px 50px;
+  }
+
+  .testimonial-person {
+    display: flex;
+    gap: 18px;
+    align-items: center;
+  }
+
+  .testimonial-person img {
+    width: 116px;
+    height: 138px;
+  }
+
+  .testimonial-person h2 { margin: 0 0 5px; }
+  .alumni-testimonial blockquote { font-size: 17px; }
+}

@@ -1,0 +1,89 @@
+.about-sheerwood {
+  display: grid;
+  grid-template-columns: 0.72fr 1.28fr;
+  align-items: center;
+  gap: clamp(35px, 8vw, 110px);
+  background: #f1f7f1;
+}
+
+.about-art {
+  min-height: 370px;
+  display: grid;
+  place-content: center;
+  position: relative;
+  overflow: hidden;
+  border-radius: 180px 180px 24px 24px;
+  color: #fff;
+  background: linear-gradient(145deg, #0c7543, #034528);
+  text-align: center;
+}
+
+.about-art::before,
+.about-art::after {
+  width: 250px;
+  height: 250px;
+  position: absolute;
+  border: 1px solid #b9e4c6;
+  border-radius: 50%;
+  content: "";
+  opacity: 0.42;
+}
+
+.about-art::before { transform: translate(-47px, -58px); }
+.about-art::after { transform: translate(52px, 75px); }
+.about-art span,
+.about-art strong,
+.about-art i { position: relative; z-index: 1; }
+.about-art span { font-size: 15px; font-weight: 800; letter-spacing: 3px; text-transform: uppercase; }
+.about-art strong { margin: 8px 0; font: 700 clamp(62px, 7vw, 94px) Georgia; }
+.about-art i { color: #c9efcf; font-size: 31px; font-style: normal; }
+.about-content h2 { margin: 15px 0 20px; color: #173b2a; font: 500 clamp(39px, 4.2vw, 63px)/1.06 Georgia; letter-spacing: -2px; }
+.about-content h2 em { color: var(--home-green); }
+.about-content > p { max-width: 700px; margin: 0 0 14px; color: #5a7164; font-size: 17px; line-height: 1.72; }
+.about-values { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-top: 27px; }
+.about-values span { display: grid; gap: 5px; padding-top: 11px; border-top: 1px solid #c9ddd0; color: #315542; font-size: 12px; font-weight: 800; }
+.about-values b { color: var(--home-green); font: 600 20px Georgia; }
+
+.follow-us { padding: 62px 7% 55px; background: #fff; text-align: center; }
+.follow-us h2 { margin: 0 0 37px; color: var(--home-green); font: 500 38px Georgia; }
+.follow-us > div { display: grid; grid-template-columns: repeat(5, minmax(100px, 1fr)); gap: clamp(13px, 5vw, 85px); max-width: 1180px; margin: auto; }
+.follow-us button { height: 54px; border: 0; color: #fff; background: #15824c; font: 800 21px Arial; cursor: pointer; transition: transform .2s ease, filter .2s ease; }
+.follow-us button:nth-child(2) { background: #0e6b3a; }
+.follow-us button:nth-child(3) { background: #23935a; }
+.follow-us button:nth-child(4) { background: #07552f; font-size: 16px; }
+.follow-us button:nth-child(5) { background: #0b7a41; font-size: 17px; }
+.follow-us button:hover { filter: brightness(.9); transform: translateY(-3px); }
+
+.school-footer { display: grid; grid-template-columns: 2fr repeat(3, 1fr); gap: 45px; padding: 56px 7% 0; color: #dff2e5; background: linear-gradient(135deg, #043b24, #08783f); }
+.footer-brand { display: flex; align-items: center; gap: 13px; color: #fff; }
+.footer-crest { width: 55px; height: 63px; display: grid; place-items: center; flex: none; border: 1px solid #c8ead2; color: #f0fff4; font: 700 28px Georgia; clip-path: polygon(50% 0,93% 15%,83% 78%,50% 100%,17% 78%,7% 15%); background: #033b22; }
+.footer-brand strong,.footer-brand small { display: block; }
+.footer-brand strong { font: 600 30px Georgia; }
+.footer-brand small { margin-top: 4px; font-size: 10px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; }
+.footer-overview > p { max-width: 340px; margin: 18px 0; color: #d5eddd; font-size: 13px; line-height: 1.6; }
+.school-footer address { color: #dcefe2; font-size: 13px; font-style: normal; line-height: 1.7; }
+.school-footer h3 { padding-bottom: 18px; margin: 8px 0 19px; border-bottom: 2px solid #a8d8b8; color: #fff; font: 500 22px Georgia; }
+.school-footer section:not(.footer-overview) { display: flex; flex-direction: column; align-items: flex-start; }
+.school-footer a { margin: 0 0 13px; color: #dff2e5; font-size: 13px; }
+.school-footer a::before { margin-right: 7px; content: "✓"; font-weight: 800; }
+.school-footer a:hover { color: #fff; text-decoration: underline; }
+.footer-bottom { grid-column: 1 / -1; display: flex; justify-content: space-between; padding: 19px 0; margin-top: 8px; border-top: 1px solid #9fd2af; color: #d0ead8; font-size: 11px; }
+
+@media (max-width: 850px) {
+  .about-sheerwood { grid-template-columns: 1fr; }
+  .about-art { min-height: 280px; }
+  .school-footer { grid-template-columns: repeat(2, 1fr); gap: 35px; }
+  .footer-overview { grid-column: 1 / -1; }
+}
+
+@media (max-width: 600px) {
+  .about-values { grid-template-columns: 1fr; }
+  .follow-us { padding: 45px 20px; }
+  .follow-us h2 { margin-bottom: 24px; font-size: 32px; }
+  .follow-us > div { grid-template-columns: repeat(2, 1fr); gap: 12px; }
+  .follow-us button:last-child { grid-column: span 2; }
+  .school-footer { grid-template-columns: 1fr; padding: 43px 22px 0; }
+  .footer-overview { grid-column: auto; }
+  .school-footer h3 { margin-top: 0; }
+  .footer-bottom { flex-direction: column; gap: 8px; font-size: 9px; }
+}
