@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import "./Student_Information.css";
 
@@ -19,7 +19,7 @@ const initialForm = {
   middleName: "Kumar",
   lastName: "Sharma",
   birthDate: "2020-01-10",
-  gender: "Female",
+  gender: "Girl",
   bloodGroup: "B+",
   nationality: "Indian",
   religion: "Hindu",
@@ -33,6 +33,10 @@ export default function StudentInformation() {
   const [photo, setPhoto] = useState("");
   const [message, setMessage] = useState("");
 
+  useEffect(() => () => {
+    if (photo) URL.revokeObjectURL(photo);
+  }, [photo]);
+
   function update(event) {
     const { name, value } = event.target;
     setForm((current) => ({ ...current, [name]: value }));
@@ -41,6 +45,12 @@ export default function StudentInformation() {
   function selectPhoto(event) {
     const file = event.target.files?.[0];
     if (!file) return;
+
+    if (!["image/jpeg", "image/png"].includes(file.type) || file.size > 5 * 1024 * 1024) {
+      setMessage("Please choose a JPG or PNG image that is no larger than 5 MB.");
+      event.target.value = "";
+      return;
+    }
     setPhoto(URL.createObjectURL(file));
     setMessage("Student photo updated successfully.");
   }
@@ -74,14 +84,14 @@ export default function StudentInformation() {
               <label>Middle Name<input name="middleName" value={form.middleName} onChange={update} /></label>
               <label>Last Name <em>*</em><input name="lastName" value={form.lastName} onChange={update} required /></label>
               <label>Date of Birth <em>*</em><input name="birthDate" type="date" value={form.birthDate} onChange={update} required /></label>
-              <label>Gender <em>*</em><select name="gender" value={form.gender} onChange={update}><option>Female</option><option>Male</option><option>Prefer not to say</option></select></label>
+              <label>Gender <em>*</em><select name="gender" value={form.gender} onChange={update}><option>Girl</option><option>Boy</option></select></label>
               <label>Blood Group<input name="bloodGroup" value={form.bloodGroup} onChange={update} placeholder="e.g. B+" /></label>
               <label>Nationality <em>*</em><select name="nationality" value={form.nationality} onChange={update}><option>Indian</option><option>Other</option></select></label>
               <label>Religion<select name="religion" value={form.religion} onChange={update}><option>Hindu</option><option>Muslim</option><option>Christian</option><option>Sikh</option><option>Other</option></select></label>
               <label>Aadhaar Number<input name="aadhaar" value={form.aadhaar} onChange={update} inputMode="numeric" /></label>
             </div>
 
-            <div className="student-photo-row"><div><span>Student Photo</span><small>JPG or PNG, maximum 5 MB</small></div><div className="student-photo">{photo ? <img src={photo} alt="Selected student" /> : <span>{form.firstName.slice(0, 1)}{form.lastName.slice(0, 1)}</span>}</div><input ref={uploadRef} type="file" accept="image/png,image/jpeg" onChange={selectPhoto} hidden /><button type="button" className="change-photo" onClick={() => uploadRef.current?.click()}>● Change Photo</button></div>
+            <div className="student-photo-row"><div><span>Student Photo</span><small>JPG or PNG, maximum 5 MB</small></div><div className="student-photo">{photo ? <img src={photo} alt="Student photo preview" /> : <span>{form.firstName.slice(0, 1)}{form.lastName.slice(0, 1)}</span>}</div><input ref={uploadRef} type="file" accept="image/png,image/jpeg" onChange={selectPhoto} hidden /><button type="button" className="change-photo" onClick={() => uploadRef.current?.click()}>{photo ? "● Change Photo" : "● Upload Photo"}</button></div>
 
             <div className="student-actions"><button type="button" className="student-back" onClick={() => navigate("/admission-details")}>← Back</button><button className="student-next" type="submit">Save &amp; Next <span>→</span></button></div>
           </form>

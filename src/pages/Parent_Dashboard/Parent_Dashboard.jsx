@@ -23,7 +23,6 @@ const initialForm = {
   currentClass: "",
   board: "Select board",
   medium: "English",
-  hostel: "No",
   transport: "Yes",
 };
 
@@ -83,7 +82,6 @@ export default function ParentDashboard() {
             <label>Board<select name="board" value={form.board} onChange={update}><option disabled>Select board</option><option>CBSE</option><option>ICSE</option><option>State Board</option><option>IB</option><option>Other</option></select></label>
             <label>Medium<select name="medium" value={form.medium} onChange={update}><option>English</option><option>Hindi</option><option>Other</option></select></label>
             <label>Transport Requirement<select name="transport" value={form.transport} onChange={update}><option>Yes</option><option>No</option></select></label>
-            <label>Hostel Requirement<select name="hostel" value={form.hostel} onChange={update}><option>No</option><option>Yes</option></select></label>
             <div className="form-actions"><button type="button" className="save-draft" onClick={saveDraft}>Save Draft</button><button className="next-step" type="submit">Next <span>→</span></button></div>
           </form>
         </div>
