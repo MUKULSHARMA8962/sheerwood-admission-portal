@@ -1,5 +1,23 @@
 /* Shared mobile fixes for the admission application flow. */
+.map-card button {
+  padding: 7px 10px;
+  border: 1px solid #8fc8a0;
+  border-radius: 6px;
+  color: #08783f;
+  background: #fff;
+  font: 700 10px Arial, sans-serif;
+  cursor: pointer;
+}
+
+.map-card button:hover {
+  background: #eaf7ed;
+}
+
 @media (max-width: 700px) {
+  .admission-form label:nth-child(3) {
+    grid-column: auto;
+  }
+
   .application-steps,
   .student-steps,
   .guardian-steps,

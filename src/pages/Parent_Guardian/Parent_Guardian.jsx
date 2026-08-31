@@ -5,12 +5,11 @@ import "./Parent_Guardian.css";
 const steps = ["Admission Details", "Student Information", "Parent / Guardian", "Residential Background", "Academic Background", "Documents", "Review & Submit"];
 
 const families = {
-  Father: { fullName: "Rajesh Sharma", occupation: "Software Engineer", organization: "TCS", income: "₹ 18,00,000", mobile: "9876543210", email: "rajesh.sharma@example.com" },
-  Mother: { fullName: "Priya Sharma", occupation: "Teacher", organization: "Sheerwood Public School", income: "₹ 9,60,000", mobile: "9876543211", email: "priya.sharma@example.com" },
-  Guardian: { fullName: "", occupation: "", organization: "", income: "", mobile: "", email: "" },
+  Father: { fullName: "Rajesh Sharma", organization: "TCS", mobile: "9876543210", email: "rajesh.sharma@example.com" },
+  Mother: { fullName: "Priya Sharma", organization: "Sheerwood Public School", mobile: "9876543211", email: "priya.sharma@example.com" },
 };
 
-const fieldLabels = [["fullName", "Full Name"], ["occupation", "Occupation"], ["organization", "Organization"], ["income", "Annual Income"], ["mobile", "Mobile Number"], ["email", "Email Address"]];
+const fieldLabels = [["fullName", "Full Name"], ["organization", "Organization"], ["mobile", "Mobile Number"], ["email", "Email Address"]];
 
 export default function ParentGuardian() {
   const navigate = useNavigate();
@@ -88,14 +87,14 @@ export default function ParentGuardian() {
 
           <form className="guardian-form" onSubmit={saveAndContinue}>
             <div className="guardian-fields">
-              {fieldLabels.map(([name, label]) => <label key={name}>{label} {(name === "fullName" || name === "occupation" || name === "mobile" || name === "email") && <em>*</em>}<input name={name} type={name === "email" ? "email" : "text"} inputMode={name === "mobile" ? "numeric" : undefined} value={current[name]} onChange={update} required={name === "fullName" || name === "mobile" || name === "email"} /></label>)}
+              {fieldLabels.map(([name, label]) => <label key={name}>{label} {(name === "fullName" || name === "mobile" || name === "email") && <em>*</em>}<input name={name} type={name === "email" ? "email" : "text"} inputMode={name === "mobile" ? "numeric" : undefined} value={current[name]} onChange={update} required={name === "fullName" || name === "mobile" || name === "email"} /></label>)}
             </div>
-            {activeTab !== "Guardian" && <div className="guardian-photo-row">
+            <div className="guardian-photo-row">
               <div><span>{activeTab}'s Photograph</span><small>JPG or PNG, maximum 5 MB</small></div>
               <div className="guardian-photo">{photo ? <img src={photo} alt={`${activeTab} photo preview`} /> : <span>{current.fullName.split(" ").filter(Boolean).map((name) => name[0]).slice(0, 2).join("") || activeTab[0]}</span>}</div>
               <input ref={activeTab === "Father" ? fatherUploadRef : motherUploadRef} type="file" accept="image/png,image/jpeg" onChange={selectPhoto} hidden />
               <button type="button" className="guardian-change-photo" onClick={() => (activeTab === "Father" ? fatherUploadRef : motherUploadRef).current?.click()}>{photo ? "● Change Photo" : "● Upload Photo"}</button>
-            </div>}
+            </div>
             <div className="guardian-actions"><button type="button" className="guardian-back" onClick={() => navigate("/student-information")}>← Back</button><button className="guardian-next" type="submit">Save &amp; Next <span>→</span></button></div>
           </form>
         </div>
