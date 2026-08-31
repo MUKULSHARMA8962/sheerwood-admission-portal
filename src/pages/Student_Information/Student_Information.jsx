@@ -8,8 +8,6 @@ const steps = [
   "Parent / Guardian",
   "Residential Background",
   "Academic Background",
-  "Medical Information",
-  "Transport & Hostel",
   "Documents",
   "Review & Submit",
 ];
@@ -22,7 +20,9 @@ const initialForm = {
   gender: "Girl",
   bloodGroup: "B+",
   nationality: "Indian",
+  nationalityOther: "",
   religion: "Hindu",
+  religionOther: "",
   aadhaar: "1254 5678 9012",
 };
 
@@ -87,7 +87,9 @@ export default function StudentInformation() {
               <label>Gender <em>*</em><select name="gender" value={form.gender} onChange={update}><option>Girl</option><option>Boy</option></select></label>
               <label>Blood Group<input name="bloodGroup" value={form.bloodGroup} onChange={update} placeholder="e.g. B+" /></label>
               <label>Nationality <em>*</em><select name="nationality" value={form.nationality} onChange={update}><option>Indian</option><option>Other</option></select></label>
+              {form.nationality === "Other" && <label>Specify Nationality <em>*</em><input name="nationalityOther" value={form.nationalityOther} onChange={update} placeholder="Enter nationality" required /></label>}
               <label>Religion<select name="religion" value={form.religion} onChange={update}><option>Hindu</option><option>Muslim</option><option>Christian</option><option>Sikh</option><option>Other</option></select></label>
+              {form.religion === "Other" && <label>Specify Religion <em>*</em><input name="religionOther" value={form.religionOther} onChange={update} placeholder="Enter religion" required /></label>}
               <label>Aadhaar Number<input name="aadhaar" value={form.aadhaar} onChange={update} inputMode="numeric" /></label>
             </div>
 

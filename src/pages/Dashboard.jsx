@@ -46,8 +46,6 @@ const journey = [
   ["Parent / Guardian", "Enter parent or guardian contact details.", "100%", "/parent-guardian", "♟"],
   ["Residential Information", "Provide address and residential details.", "100%", "/application/residential", "⌂"],
   ["Academic Background", "Provide previous academic records and details.", "60%", "/application/academic", "▤"],
-  ["Medical Information", "Provide medical history and health information.", "40%", "/application/medical", "✚"],
-  ["Transport & Hostel", "Provide transport or hostel requirements.", "20%", "/application/transport", "▰"],
   ["Document Upload", "Upload all required documents.", "30%", "/application/documents", "▣"],
   ["Review Application", "Review all details before final submission.", "0%", "/application/review", "▧"],
   ["Fee Payment", "Pay the required admission fees online.", "0%", "/fee-payment", "▥"],
@@ -57,7 +55,6 @@ const documentChecklist = [
   ["✓", "Birth Certificate", "Verified", "verified"],
   ["✓", "Aadhaar Card", "Verified", "verified"],
   ["✓", "Passport Photograph", "Verified", "verified"],
-  ["✓", "Medical Certificate", "Verified", "verified"],
   ["⇧", "Transfer Certificate", "Upload required", "required"],
 ];
 

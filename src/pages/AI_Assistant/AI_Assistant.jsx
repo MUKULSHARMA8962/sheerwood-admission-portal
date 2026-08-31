@@ -3,7 +3,7 @@ import { Link } from "react-router-dom";
 import { askSchoolAI } from "../../services/api";
 import "./AI_Assistant.css";
 
-const defaultMessages = [{ role: "user", text: "What documents are required for Class 1 admission?" }, { role: "assistant", text: "Here is the list of documents required:", items: ["Birth Certificate", "Aadhaar Card", "2 Passport Size Photos", "Previous School Report Card (if any)", "Transfer Certificate (if applicable)", "Medical Certificate"] }];
+const defaultMessages = [{ role: "user", text: "What documents are required for Class 1 admission?" }, { role: "assistant", text: "Here is the list of documents required:", items: ["Birth Certificate", "Aadhaar Card", "2 Passport Size Photos", "Previous School Report Card (if any)", "Transfer Certificate (if applicable)"] }];
 
 export default function AIAssistant() {
   const [messages, setMessages] = useState(defaultMessages);

@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import "./Parent_Guardian.css";
 
-const steps = ["Admission Details", "Student Information", "Parent / Guardian", "Residential Background", "Academic Background", "Medical Information", "Documents", "Review & Submit"];
+const steps = ["Admission Details", "Student Information", "Parent / Guardian", "Residential Background", "Academic Background", "Documents", "Review & Submit"];
 
 const families = {
   Father: { fullName: "Rajesh Sharma", occupation: "Software Engineer", organization: "TCS", income: "₹ 18,00,000", mobile: "9876543210", email: "rajesh.sharma@example.com" },

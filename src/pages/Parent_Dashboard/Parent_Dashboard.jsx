@@ -18,11 +18,11 @@ const initialForm = {
   date: "2027-04-24",
   class: "Select class",
   stream: "Select stream",
-  campus: "Main campus",
   category: "Regular",
   previousSchool: "",
   currentClass: "",
   board: "Select board",
+  boardOther: "",
   medium: "English",
   transport: "Yes",
 };
@@ -77,15 +77,15 @@ export default function ParentDashboard() {
 
           <form className="admission-form" onSubmit={(event) => { event.preventDefault(); continueApplication(); }}>
             <label>Academic Session <em>*</em><select name="session" value={form.session} onChange={update}><option>2027–28</option><option>2028–29</option></select></label>
-            <label>Class Applying For <em>*</em><select name="class" value={form.class} onChange={update} required><option disabled>Select class</option><option>Nursery</option><option>Class 1</option><option>Class 2</option><option>Class 3</option><option>Class 4</option><option>Class 5</option><option>Class 6</option><option>Class 7</option><option>Class 8</option><option>Class 9</option><option>Class 10</option><option>Class 11</option><option>Class 12</option></select></label>
+            <label>Class Applying For <em>*</em><select name="class" value={form.class} onChange={update} required><option disabled>Select class</option><option>Nursery</option><option>Class 1</option><option>Class 2</option><option>Class 3</option><option>Class 4</option><option>Class 5</option><option>Class 6</option><option>Class 7</option><option>Class 8</option><option>Class 9</option><option>Class 11</option></select></label>
             {form.class === "Class 11" && <label>Stream <em>*</em><select name="stream" value={form.stream} onChange={update} required><option disabled>Select stream</option><option>PCMB</option><option>PCM</option><option>PCB</option><option>Commerce with Mathematics</option><option>Commerce without Mathematics</option><option>Humanities</option></select></label>}
-            <label>Campus / Branch <em>*</em><select name="campus" value={form.campus} onChange={update}><option>Main campus</option><option>North campus</option><option>West campus</option></select></label>
             <label>Admission Category <em>*</em><select name="category" value={form.category} onChange={update}><option>Regular</option><option>Transfer</option><option>Sibling</option></select></label>
             <label>Application Date <em>*</em><input name="date" type="date" value={form.date} onChange={update} /></label>
             <label>Application ID<input value={applicationId} readOnly /></label>
             <label>Previous School<input name="previousSchool" value={form.previousSchool} onChange={update} placeholder="Enter previous school name" /></label>
             <label>Current Class<input name="currentClass" value={form.currentClass} onChange={update} placeholder="For example, Class 4" /></label>
             <label>Board<select name="board" value={form.board} onChange={update}><option disabled>Select board</option><option>CBSE</option><option>ICSE</option><option>State Board</option><option>IB</option><option>Other</option></select></label>
+            {form.board === "Other" && <label>Specify Board <em>*</em><input name="boardOther" value={form.boardOther} onChange={update} placeholder="Enter board name" required /></label>}
             <label>Medium<select name="medium" value={form.medium} onChange={update}><option>English</option><option>Hindi</option><option>Other</option></select></label>
             <label>Transport Requirement<select name="transport" value={form.transport} onChange={update}><option>Yes</option><option>No</option></select></label>
             <div className="form-actions"><button type="button" className="save-draft" onClick={saveDraft}>Save Draft</button><button className="next-step" type="submit">Next <span>→</span></button></div>

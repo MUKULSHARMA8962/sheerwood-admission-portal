@@ -1,0 +1,36 @@
+/* Shared mobile fixes for the admission application flow. */
+@media (max-width: 700px) {
+  .application-steps,
+  .student-steps,
+  .guardian-steps,
+  .stage-progress {
+    width: 100%;
+    min-width: 0;
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+    scrollbar-width: thin;
+  }
+
+  .application-steps li,
+  .student-steps li,
+  .guardian-steps li,
+  .stage-progress li {
+    flex: 0 0 92px;
+  }
+}
+
+@media (max-width: 440px) {
+  .form-actions,
+  .student-actions,
+  .guardian-actions,
+  .stage-actions {
+    gap: 12px;
+  }
+
+  .form-actions button,
+  .student-actions button,
+  .guardian-actions button,
+  .stage-actions button {
+    min-width: 0;
+  }
+}

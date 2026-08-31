@@ -21,6 +21,7 @@ import NewUserDashboard from "./pages/NewUserDashboard";
 import StudentDashboard from "./pages/StudentDashboard";
 import SchoolCalendar from "./pages/SchoolCalendar";
 import VirtualTour from "./pages/VirtualTour";
+import "./pages/AdmissionMobile.css";
 
 
 export default function App() {
@@ -39,6 +40,8 @@ export default function App() {
         <Route path="/admission-details" element={<ParentDashboard />} />
         <Route path="/student-information" element={<StudentInformation />} />
         <Route path="/parent-guardian" element={<ParentGuardian />} />
+        <Route path="/application/medical" element={<Navigate to="/application/documents" replace />} />
+        <Route path="/application/transport" element={<Navigate to="/application/documents" replace />} />
         <Route path="/application/:stage" element={<ApplicationStages />} />
         <Route path="/fee-payment" element={<FeePayment />} />
         <Route path="/application-success" element={<SuccessScreen />} />
