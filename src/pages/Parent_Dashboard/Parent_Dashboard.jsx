@@ -13,13 +13,25 @@ const steps = [
   ["7", "Approval", "pending"],
 ];
 
+function getLocalDate() {
+  const date = new Date();
+  return new Date(date.getTime() - date.getTimezoneOffset() * 60_000).toISOString().slice(0, 10);
+}
+
+function getNextAcademicSession() {
+  const year = new Date().getFullYear() + 1;
+  return `${year}–${String(year + 1).slice(-2)}`;
+}
+
+const nextAcademicSession = getNextAcademicSession();
+const classRank = { Nursery: 0, "Class 1": 1, "Class 2": 2, "Class 3": 3, "Class 4": 4, "Class 5": 5, "Class 6": 6, "Class 7": 7, "Class 8": 8, "Class 9": 9, "Class 10": 10, "Class 11": 11 };
+
 const initialForm = {
-  session: "2027–28",
-  date: "2027-04-24",
+  session: nextAcademicSession,
+  date: getLocalDate(),
   class: "Select class",
   stream: "Select stream",
-  category: "Regular",
-  uid: "",
+  penNumber: "",
   previousSchool: "",
   currentClass: "Select current class",
   board: "Select board",
@@ -51,14 +63,22 @@ export default function ParentDashboard() {
       setMessage("Please select a stream for Class 11.");
       return;
     }
-    navigate("/student-information");
+    if (form.currentClass === "Select current class") {
+      setMessage("Please select the student's current class.");
+      return;
+    }
+    if (classRank[form.currentClass] > classRank[form.class]) {
+      setMessage("Current Class must be the same as or lower than Class Applying For.");
+      return;
+    }
+    navigate("/student-information", { state: { applyingClass: form.class, stream: form.stream } });
   }
 
   return (
     <main className="admission-page">
       <header className="admission-header">
         <Link className="admission-brand" to="/new-user-dashboard"><span>S</span><div><strong>Sheerwood</strong><small>International School</small></div></Link>
-        <div className="admission-account"><span>Academic session <b>2027–28</b></span><i>SP</i></div>
+        <div className="admission-account"><span>Academic session <b>{form.session}</b></span><i>SP</i></div>
       </header>
 
       <section className="admission-shell">
@@ -76,16 +96,15 @@ export default function ParentDashboard() {
           {message && <div className="form-message" role="status">{message}<button aria-label="Dismiss notification" onClick={() => setMessage("")}>×</button></div>}
 
           <form className="admission-form" onSubmit={(event) => { event.preventDefault(); continueApplication(); }}>
-            <label>Academic Session <em>*</em><select name="session" value={form.session} onChange={update}><option>2027–28</option><option>2028–29</option></select></label>
-            <label>Class Applying For <em>*</em><select name="class" value={form.class} onChange={update} required><option disabled>Select class</option><option>Nursery</option><option>Class 1</option><option>Class 2</option><option>Class 3</option><option>Class 4</option><option>Class 5</option><option>Class 6</option><option>Class 7</option><option>Class 8</option><option>Class 9</option><option>Class 11</option></select></label>
+            <label>Academic Session<input value={form.session} readOnly /></label>
+            <label>Class Applying For <em>*</em><select name="class" value={form.class} onChange={update} required><option disabled>Select class</option><option>Class 3</option><option>Class 4</option><option>Class 5</option><option>Class 6</option><option>Class 7</option><option>Class 8</option><option>Class 9</option><option>Class 11</option></select></label>
             {form.class === "Class 11" && <label>Stream <em>*</em><select name="stream" value={form.stream} onChange={update} required><option disabled>Select stream</option><option>PCMB</option><option>PCM</option><option>PCB</option><option>Commerce with Mathematics</option><option>Commerce without Mathematics</option><option>Humanities</option></select></label>}
-            <label>Admission Category <em>*</em><select name="category" value={form.category} onChange={update}><option>Regular</option><option>Transfer</option><option>Sibling</option><option>Alumni</option></select></label>
-            <label>Application Date <em>*</em><input name="date" type="date" value={form.date} onChange={update} /></label>
+            <label>Application Date<input name="date" type="date" value={form.date} readOnly /></label>
             <label>Application ID<input value={applicationId} readOnly /></label>
-            <label>UID<input name="uid" value={form.uid} onChange={update} placeholder="Enter UID" /></label>
+            <label>PEN Number (Personal Education Number)<input name="penNumber" value={form.penNumber} onChange={update} placeholder="Enter PEN number" /></label>
             <h2 className="admission-form-section">Academic</h2>
             <label>Previous School<input name="previousSchool" value={form.previousSchool} onChange={update} placeholder="Enter previous school name" /></label>
-            <label>Current Class<select name="currentClass" value={form.currentClass} onChange={update}><option disabled>Select current class</option><option>Pre-Nursery</option><option>Nursery</option><option>Class 1</option><option>Class 2</option><option>Class 3</option><option>Class 4</option><option>Class 5</option><option>Class 6</option><option>Class 7</option><option>Class 8</option><option>Class 9</option><option>Class 10</option></select></label>
+            <label>Current Class <em>*</em><select name="currentClass" value={form.currentClass} onChange={update} required><option disabled>Select current class</option><option>Nursery</option><option>Class 1</option><option>Class 2</option><option>Class 3</option><option>Class 4</option><option>Class 5</option><option>Class 6</option><option>Class 7</option><option>Class 8</option><option>Class 9</option><option>Class 10</option><option>Class 11</option></select></label>
             <label>Board<select name="board" value={form.board} onChange={update}><option disabled>Select board</option><option>CBSE</option><option>ICSE</option><option>State Board</option><option>IB</option><option>Other</option></select></label>
             {form.board === "Other" && <label>Specify Board <em>*</em><input name="boardOther" value={form.boardOther} onChange={update} placeholder="Enter board name" required /></label>}
             <label>Medium<select name="medium" value={form.medium} onChange={update}><option>English</option><option>Hindi</option><option>Other</option></select></label>

@@ -13,6 +13,28 @@
   background: #eaf7ed;
 }
 
+.guardian-parent-section + .guardian-parent-section,
+.residential-address-section + .residential-address-section {
+  padding-top: 28px;
+  margin-top: 28px;
+  border-top: 1px solid #edf2ee;
+}
+
+.guardian-parent-section h2,
+.residential-address-section h2 {
+  margin: 0 0 20px;
+  color: #2a4b3b;
+  font: 600 14px Georgia, serif;
+}
+
+.guardian-parent-section .guardian-photo-row {
+  margin-top: 20px;
+}
+
+.residential-address-section .address-section-fields {
+  padding: 0;
+}
+
 @media (max-width: 700px) {
   .admission-form label:nth-child(3) {
     grid-column: auto;
@@ -34,6 +56,12 @@
   .guardian-steps li,
   .stage-progress li {
     flex: 0 0 92px;
+  }
+
+  .guardian-parent-section + .guardian-parent-section,
+  .residential-address-section + .residential-address-section {
+    padding-top: 22px;
+    margin-top: 22px;
   }
 }
 

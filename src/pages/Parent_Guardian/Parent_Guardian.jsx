@@ -1,38 +1,37 @@
 import { useEffect, useRef, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import "./Parent_Guardian.css";
 
 const steps = ["Admission Details", "Student Information", "Parent / Guardian", "Residential Background", "Academic Background", "Documents", "Review & Submit"];
 
 const families = {
-  Father: { fullName: "Rajesh Sharma", organization: "TCS", mobile: "9876543210", email: "rajesh.sharma@example.com" },
-  Mother: { fullName: "Priya Sharma", organization: "Sheerwood Public School", mobile: "9876543211", email: "priya.sharma@example.com" },
+  Father: { fullName: "Rajesh Sharma", organization: "TCS", mobile: "9876543210", email: "rajesh.sharma@example.com", aadhaar: "" },
+  Mother: { fullName: "Priya Sharma", organization: "Sheerwood Public School", mobile: "9876543211", email: "priya.sharma@example.com", aadhaar: "" },
 };
 
-const fieldLabels = [["fullName", "Full Name"], ["organization", "Organization"], ["mobile", "Mobile Number"], ["email", "Email Address"]];
+const fieldLabels = [["fullName", "Full Name"], ["organization", "Organization"], ["mobile", "Mobile Number"], ["email", "Email Address"], ["aadhaar", "Aadhaar Number"]];
 
 export default function ParentGuardian() {
   const navigate = useNavigate();
-  const [activeTab, setActiveTab] = useState("Father");
+  const location = useLocation();
   const [family, setFamily] = useState(families);
   const [photos, setPhotos] = useState({ Father: "", Mother: "" });
   const [message, setMessage] = useState("");
   const fatherUploadRef = useRef(null);
   const motherUploadRef = useRef(null);
   const photoUrlsRef = useRef(new Set());
-  const current = family[activeTab];
-  const photo = photos[activeTab];
+  const parentTypes = location.state?.singleParent === "Yes" ? [location.state.responsibleParent] : ["Father", "Mother"];
 
   useEffect(() => () => {
     photoUrlsRef.current.forEach((url) => URL.revokeObjectURL(url));
   }, []);
 
-  function update(event) {
+  function update(event, parentType) {
     const { name, value } = event.target;
-    setFamily((details) => ({ ...details, [activeTab]: { ...details[activeTab], [name]: value } }));
+    setFamily((details) => ({ ...details, [parentType]: { ...details[parentType], [name]: value } }));
   }
 
-  function selectPhoto(event) {
+  function selectPhoto(event, parentType) {
     const file = event.target.files?.[0];
     if (!file) return;
 
@@ -44,24 +43,50 @@ export default function ParentGuardian() {
 
     const nextPhotoUrl = URL.createObjectURL(file);
     setPhotos((currentPhotos) => {
-      const previousPhotoUrl = currentPhotos[activeTab];
+      const previousPhotoUrl = currentPhotos[parentType];
       if (previousPhotoUrl) {
         URL.revokeObjectURL(previousPhotoUrl);
         photoUrlsRef.current.delete(previousPhotoUrl);
       }
       photoUrlsRef.current.add(nextPhotoUrl);
-      return { ...currentPhotos, [activeTab]: nextPhotoUrl };
+      return { ...currentPhotos, [parentType]: nextPhotoUrl };
     });
-    setMessage(`${activeTab}'s photograph updated successfully.`);
+    setMessage(`${parentType}'s photograph updated successfully.`);
   }
 
   function saveAndContinue(event) {
     event.preventDefault();
-    if (!current.fullName || !current.mobile || !current.email) {
-      setMessage(`Please complete the required ${activeTab.toLowerCase()} details.`);
-      return;
+    for (const parentType of parentTypes) {
+      const details = family[parentType];
+      if (!details.fullName || !details.mobile || !details.email || !details.aadhaar) {
+        setMessage(`Please complete the required ${parentType.toLowerCase()} details.`);
+        return;
+      }
+      if (details.aadhaar.replace(/\D/g, "").length !== 12) {
+        setMessage(`Please enter a valid 12-digit Aadhaar Number for ${parentType}.`);
+        return;
+      }
     }
     navigate("/application/residential");
+  }
+
+  function renderParentSection(parentType) {
+    const current = family[parentType];
+    const photo = photos[parentType];
+    const uploadRef = parentType === "Father" ? fatherUploadRef : motherUploadRef;
+
+    return <section className="guardian-parent-section" key={parentType}>
+      <h2>{parentType}'s Details</h2>
+      <div className="guardian-fields">
+        {fieldLabels.map(([name, label]) => <label key={name}>{name === "aadhaar" ? `${parentType}'s Aadhaar Number` : label} {(name === "fullName" || name === "mobile" || name === "email" || name === "aadhaar") && <em>*</em>}<input name={name} type={name === "email" ? "email" : "text"} inputMode={name === "mobile" || name === "aadhaar" ? "numeric" : undefined} pattern={name === "aadhaar" ? "[0-9 ]{12,14}" : undefined} value={current[name]} onChange={(event) => update(event, parentType)} required={name === "fullName" || name === "mobile" || name === "email" || name === "aadhaar"} /></label>)}
+      </div>
+      <div className="guardian-photo-row">
+        <div><span>{parentType}'s Photograph</span><small>JPG or PNG, maximum 5 MB</small></div>
+        <div className="guardian-photo">{photo ? <img src={photo} alt={`${parentType} photo preview`} /> : <span>{current.fullName.split(" ").filter(Boolean).map((name) => name[0]).slice(0, 2).join("") || parentType[0]}</span>}</div>
+        <input ref={uploadRef} type="file" accept="image/png,image/jpeg" onChange={(event) => selectPhoto(event, parentType)} hidden />
+        <button type="button" className="guardian-change-photo" onClick={() => uploadRef.current?.click()}>{photo ? "● Change Photo" : "● Upload Photo"}</button>
+      </div>
+    </section>;
   }
 
   return (
@@ -73,28 +98,16 @@ export default function ParentGuardian() {
 
       <section className="guardian-shell">
         <div className="guardian-main">
-          <div className="guardian-title"><div><p className="guardian-kicker">NEW APPLICATION</p><h1>Parent / Guardian Information</h1><p>Please provide the primary contact details for the student.</p></div><button onClick={() => navigate("/dashboard")}>← Back to dashboard</button></div>
+          <div className="guardian-title"><div><p className="guardian-kicker">NEW APPLICATION</p><h1>Parent Information</h1><p>Please provide the parent contact details for the student.</p></div><button onClick={() => navigate("/dashboard")}>← Back to dashboard</button></div>
 
           <ol className="guardian-steps" aria-label="Application progress">
             {steps.map((step, index) => <li className={index === 2 ? "current" : index < 2 ? "complete" : ""} key={step}><span>{index < 2 ? "✓" : index + 1}</span><b>{step}</b></li>)}
           </ol>
 
-          <div className="guardian-tabs" role="tablist" aria-label="Parent information type">
-            {Object.keys(families).map((tab) => <button className={activeTab === tab ? "active" : ""} key={tab} role="tab" aria-selected={activeTab === tab} onClick={() => { setActiveTab(tab); setMessage(""); }}>{tab} Information</button>)}
-          </div>
-
           {message && <div className="guardian-message" role="status">{message}<button aria-label="Dismiss notification" onClick={() => setMessage("")}>×</button></div>}
 
           <form className="guardian-form" onSubmit={saveAndContinue}>
-            <div className="guardian-fields">
-              {fieldLabels.map(([name, label]) => <label key={name}>{label} {(name === "fullName" || name === "mobile" || name === "email") && <em>*</em>}<input name={name} type={name === "email" ? "email" : "text"} inputMode={name === "mobile" ? "numeric" : undefined} value={current[name]} onChange={update} required={name === "fullName" || name === "mobile" || name === "email"} /></label>)}
-            </div>
-            <div className="guardian-photo-row">
-              <div><span>{activeTab}'s Photograph</span><small>JPG or PNG, maximum 5 MB</small></div>
-              <div className="guardian-photo">{photo ? <img src={photo} alt={`${activeTab} photo preview`} /> : <span>{current.fullName.split(" ").filter(Boolean).map((name) => name[0]).slice(0, 2).join("") || activeTab[0]}</span>}</div>
-              <input ref={activeTab === "Father" ? fatherUploadRef : motherUploadRef} type="file" accept="image/png,image/jpeg" onChange={selectPhoto} hidden />
-              <button type="button" className="guardian-change-photo" onClick={() => (activeTab === "Father" ? fatherUploadRef : motherUploadRef).current?.click()}>{photo ? "● Change Photo" : "● Upload Photo"}</button>
-            </div>
+            {parentTypes.map(renderParentSection)}
             <div className="guardian-actions"><button type="button" className="guardian-back" onClick={() => navigate("/student-information")}>← Back</button><button className="guardian-next" type="submit">Save &amp; Next <span>→</span></button></div>
           </form>
         </div>
