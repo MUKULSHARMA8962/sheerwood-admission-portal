@@ -25,6 +25,7 @@ function getNextAcademicSession() {
 
 const nextAcademicSession = getNextAcademicSession();
 const classRank = { Nursery: 0, "Class 1": 1, "Class 2": 2, "Class 3": 3, "Class 4": 4, "Class 5": 5, "Class 6": 6, "Class 7": 7, "Class 8": 8, "Class 9": 9, "Class 10": 10, "Class 11": 11 };
+const currentClassOptions = Object.entries(classRank).filter(([, rank]) => rank >= 2);
 
 const initialForm = {
   session: nextAcademicSession,
@@ -47,7 +48,16 @@ export default function ParentDashboard() {
 
   function update(event) {
     const { name, value } = event.target;
-    setForm((current) => ({ ...current, [name]: value }));
+    setForm((current) => {
+      const next = { ...current, [name]: value };
+
+      if (name === "class") {
+        if (value !== "Class 11") next.stream = "Select stream";
+        if (classRank[current.currentClass] > classRank[value]) next.currentClass = "Select current class";
+      }
+
+      return next;
+    });
   }
 
   function saveDraft() {
@@ -96,25 +106,35 @@ export default function ParentDashboard() {
           {message && <div className="form-message" role="status">{message}<button aria-label="Dismiss notification" onClick={() => setMessage("")}>×</button></div>}
 
           <form className="admission-form" onSubmit={(event) => { event.preventDefault(); continueApplication(); }}>
-            <label>Academic Session<input value={form.session} readOnly /></label>
-            <label>Class Applying For <em>*</em><select name="class" value={form.class} onChange={update} required><option disabled>Select class</option><option>Class 3</option><option>Class 4</option><option>Class 5</option><option>Class 6</option><option>Class 7</option><option>Class 8</option><option>Class 9</option><option>Class 11</option></select></label>
-            {form.class === "Class 11" && <label>Stream <em>*</em><select name="stream" value={form.stream} onChange={update} required><option disabled>Select stream</option><option>PCMB</option><option>PCM</option><option>PCB</option><option>Commerce with Mathematics</option><option>Commerce without Mathematics</option><option>Humanities</option></select></label>}
-            <label>Application Date<input name="date" type="date" value={form.date} readOnly /></label>
-            <label>Application ID<input value={applicationId} readOnly /></label>
-            <label>PEN Number (Personal Education Number)<input name="penNumber" value={form.penNumber} onChange={update} placeholder="Enter PEN number" /></label>
-            <h2 className="admission-form-section">Academic</h2>
-            <label>Previous School<input name="previousSchool" value={form.previousSchool} onChange={update} placeholder="Enter previous school name" /></label>
-            <label>Current Class <em>*</em><select name="currentClass" value={form.currentClass} onChange={update} required><option disabled>Select current class</option><option>Nursery</option><option>Class 1</option><option>Class 2</option><option>Class 3</option><option>Class 4</option><option>Class 5</option><option>Class 6</option><option>Class 7</option><option>Class 8</option><option>Class 9</option><option>Class 10</option><option>Class 11</option></select></label>
-            <label>Board<select name="board" value={form.board} onChange={update}><option disabled>Select board</option><option>CBSE</option><option>ICSE</option><option>State Board</option><option>IB</option><option>Other</option></select></label>
-            {form.board === "Other" && <label>Specify Board <em>*</em><input name="boardOther" value={form.boardOther} onChange={update} placeholder="Enter board name" required /></label>}
-            <label>Medium<select name="medium" value={form.medium} onChange={update}><option>English</option><option>Hindi</option><option>Other</option></select></label>
+            <section className="admission-form-block" aria-labelledby="application-information-heading">
+              <header className="admission-form-block-header"><div><p>APPLICATION INFORMATION</p><h2 id="application-information-heading">Admission application</h2></div><small>Fields marked <em>*</em> are required.</small></header>
+              <div className="admission-fields">
+                <label>Academic Session<input value={form.session} readOnly /></label>
+                <label>Class Applying For <em>*</em><select name="class" value={form.class} onChange={update} required><option disabled>Select class</option><option>Class 3</option><option>Class 4</option><option>Class 5</option><option>Class 6</option><option>Class 7</option><option>Class 8</option><option>Class 9</option><option>Class 11</option></select></label>
+                {form.class === "Class 11" && <label>Stream <em>*</em><select name="stream" value={form.stream} onChange={update} required><option disabled>Select stream</option><option>PCMB</option><option>PCM</option><option>PCB</option><option>Commerce with Mathematics</option><option>Commerce without Mathematics</option><option>Humanities</option></select></label>}
+                <label>Application Date<input name="date" type="date" value={form.date} readOnly /></label>
+                <label>Application ID<input value={applicationId} readOnly /></label>
+                <label>PEN Number <small>(Personal Education Number)</small><input name="penNumber" value={form.penNumber} onChange={update} placeholder="Enter PEN number" /></label>
+              </div>
+            </section>
+
+            <section className="admission-form-block" aria-labelledby="academic-background-heading">
+              <header className="admission-form-block-header"><div><p>ACADEMIC BACKGROUND</p><h2 id="academic-background-heading">Previous school details</h2></div></header>
+              <div className="admission-fields">
+                <label>Previous School<input name="previousSchool" value={form.previousSchool} onChange={update} placeholder="Enter previous school name" /></label>
+                <label>Current Class <em>*</em><select name="currentClass" value={form.currentClass} onChange={update} required><option disabled>Select current class</option>{currentClassOptions.filter(([, rank]) => form.class === "Select class" || rank <= classRank[form.class]).map(([className]) => <option key={className}>{className}</option>)}</select></label>
+                <label>Board<select name="board" value={form.board} onChange={update}><option disabled>Select board</option><option>CBSE</option><option>ICSE</option><option>State Board</option><option>IB</option><option>Other</option></select></label>
+                {form.board === "Other" && <label>Specify Board <em>*</em><input name="boardOther" value={form.boardOther} onChange={update} placeholder="Enter board name" required /></label>}
+                <label>Medium<select name="medium" value={form.medium} onChange={update}><option>English</option><option>Hindi</option><option>Other</option></select></label>
+              </div>
+            </section>
             <div className="form-actions"><button type="button" className="save-draft" onClick={saveDraft}>Save Draft</button><button className="next-step" type="submit">Next <span>→</span></button></div>
           </form>
         </div>
 
         <aside className="admission-help">
           <section className="help-assistant"><div><span>✦</span><p><b>Sheerwood Assistant</b><small><i /> Online</small></p></div><button onClick={() => navigate("/ai-assistant")}>Ask a question →</button></section>
-          <section className="help-card"><h2>Quick Help</h2><button onClick={() => setMessage("You will need the student's birth certificate, passport photograph and previous school records.")}>What documents are required?</button><button onClick={() => setMessage("For Class 1, students should be 5 years old by 31 March of the admission year.")}>What is the age criteria for Class 1?</button><button onClick={() => setMessage("Transport routes can be selected after student information is completed.")}>How do I enroll for transport?</button><button onClick={() => setMessage("Our admissions team can help with sibling applications.")}>Is a sibling facility available?</button></section>
+          <section className="help-card"><h2>Quick Help</h2><button onClick={() => setMessage("Please keep the student's Aadhaar Card, Birth Certificate issued by the Nagar Nigam/Municipal Department, and most recent mark sheet ready. The original Transfer Certificate is submitted after admission is confirmed.")}>What documents are required?</button><button onClick={() => setMessage("For Class 3, the child should be between 7.5 and 8 years old as of the academic year start date.")}>What is the age criteria for Class 3?</button><button onClick={() => setMessage("The entrance test is online, with English and Mathematics papers. Each paper is one hour.")}>How is the entrance test conducted?</button><button onClick={() => setMessage("Admissions close as and when seats are filled. Please contact the admissions team to confirm current availability.")}>When do admissions close?</button></section>
         </aside>
       </section>
     </main>

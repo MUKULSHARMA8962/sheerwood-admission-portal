@@ -13,8 +13,9 @@ const stageConfig = {
 };
 
 const quickAnswers = {
-  "What documents are required?": "Please keep the birth certificate, Aadhaar card, passport photo, previous report card and transfer certificate ready.",
-  "What is the age criteria for Class 1?": "For Class 1, students should be 5 years old by 31 March of the admission year.",
+  "What documents are required?": "Please keep the student's Aadhaar Card, Birth Certificate issued by the Nagar Nigam/Municipal Department, and most recent mark sheet ready. The original Transfer Certificate is submitted after admission is confirmed.",
+  "How is the entrance test conducted?": "The entrance test is online, with English and Mathematics papers. Each paper is one hour. The syllabus, date and time are emailed after registration.",
+  "When do admissions close?": "Admissions close as and when seats are filled. Please contact the admissions team to confirm current availability.",
 };
 
 function PortalHeader() {
@@ -45,9 +46,34 @@ function ResidentialForm({ form, update, useCurrentLocation }) {
 }
 
 function AcademicForm({ setMessage }) {
-  const reportRef = useRef(null);
-  const transferRef = useRef(null);
-  return <div className="stage-fields academic-fields"><div className="upload-group"><b>Upload Academic Documents <em>*</em></b><input ref={reportRef} type="file" hidden onChange={(event) => { if (event.target.files?.[0]) setMessage(`${event.target.files[0].name} uploaded.`); }} /><button type="button" onClick={() => reportRef.current?.click()}>report_card.pdf <span>⇧</span></button><input ref={transferRef} type="file" hidden onChange={(event) => { if (event.target.files?.[0]) setMessage(`${event.target.files[0].name} uploaded.`); }} /><button type="button" onClick={() => transferRef.current?.click()}>transfer_cert.pdf <span>⇧</span></button></div></div>;
+  const fileRef = useRef(null);
+  const selectedDocument = useRef("");
+  const [files, setFiles] = useState({});
+  const documents = [
+    { id: "reportCard", title: "Report Card", required: true },
+    { id: "aadhaarCard", title: "Aadhaar Card", required: true },
+    { id: "birthCertificate", title: "Birth Certificate", required: true },
+    { id: "passport", title: "Passport", required: false },
+    { id: "nationalIdCard", title: "National ID Card", required: false },
+    { id: "other", title: "Other Document", required: false },
+  ];
+
+  function chooseFile(documentId) {
+    selectedDocument.current = documentId;
+    fileRef.current?.click();
+  }
+
+  function uploadFile(event) {
+    const file = event.target.files?.[0];
+    const documentId = selectedDocument.current;
+    if (!file || !documentId) return;
+
+    setFiles((current) => ({ ...current, [documentId]: file.name }));
+    setMessage(`${file.name} uploaded.`);
+    event.target.value = "";
+  }
+
+  return <div className="stage-fields academic-fields"><div className="upload-group"><b>Upload Academic Documents</b>{documents.map((document) => <button type="button" key={document.id} onClick={() => chooseFile(document.id)}><span>{files[document.id] || `Upload ${document.title}`}{document.required && <em> *</em>}</span><span>⇧</span></button>)}<input ref={fileRef} type="file" accept=".pdf,.jpg,.jpeg,.png" hidden onChange={uploadFile} /></div></div>;
 }
 
 function DocumentsForm({ setMessage }) {

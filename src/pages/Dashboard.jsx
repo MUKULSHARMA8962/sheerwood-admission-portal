@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
+import { getSchoolInformationAnswer } from "../services/schoolInformation";
 import "./Dashboard.css";
 import "./DashboardToggle.css";
 import "./AdmissionDashboard.css";
@@ -58,7 +59,7 @@ const documentChecklist = [
   ["⇧", "Transfer Certificate", "Upload required", "required"],
 ];
 
-const suggestions = ["What documents are required?", "How can I apply?", "What is the age criteria?", "Fee structure details", "How can I track my application?"];
+const suggestions = ["What documents are required?", "How can I apply?", "What is the age criteria for Class 3?", "Fee structure details", "What are the boarding and calling rules?"];
 
 function progressClass(value) {
   return value === "100%" ? "complete" : value === "0%" ? "pending" : "working";
@@ -89,7 +90,7 @@ export default function Dashboard() {
     event.preventDefault();
     const typedQuestion = question.trim();
     if (!typedQuestion) return;
-    setAnswer("I can help with admissions, documents, fees and application status. For detailed help, open the full AI Assistant.");
+    setAnswer(getSchoolInformationAnswer(typedQuestion) || "I can help with admissions, documents, fees, boarding and application status. For detailed help, open the full AI Assistant.");
     setQuestion("");
   }
 
@@ -151,14 +152,14 @@ export default function Dashboard() {
           </section>
 
           <aside className="parent-rightbar">
-            <section className="right-ai-card"><header><h2>✦ AI Assistant</h2><span>● Online</span></header><div className="right-ai-content"><div className="right-robot"><i>● ●</i><b>⌣</b></div><p>{answer}</p></div><div className="suggestion-list">{suggestions.map((suggestion) => <button key={suggestion} onClick={() => setAnswer(suggestion === "What documents are required?" ? "You will need a birth certificate, Aadhaar card, passport photos, and school records." : "I can help you with that. Open the full AI Assistant for a detailed answer.")}>{suggestion}</button>)}</div><form onSubmit={ask}><input value={question} onChange={(event) => setQuestion(event.target.value)} placeholder="Type your question..." /><button aria-label="Ask AI">→</button></form></section>
+            <section className="right-ai-card"><header><h2>✦ AI Assistant</h2><span>● Online</span></header><div className="right-ai-content"><div className="right-robot"><i>● ●</i><b>⌣</b></div><p>{answer}</p></div><div className="suggestion-list">{suggestions.map((suggestion) => <button key={suggestion} onClick={() => setAnswer(getSchoolInformationAnswer(suggestion) || "Open the full AI Assistant for detailed help.")}>{suggestion}</button>)}</div><form onSubmit={ask}><input value={question} onChange={(event) => setQuestion(event.target.value)} placeholder="Ask about admissions, fees or boarding..." /><button aria-label="Ask AI">→</button></form></section>
             <section className="right-panel notices"><header><h2>Important Notices</h2><button onClick={() => setNotice("You have viewed all notices.")}>View All</button></header>{[["▣", "Application Deadline Extended", "The last date to submit applications has been extended to 31st May 2025.", "2 hours ago", "red"], ["▣", "Admission Test Schedule", "Admission test for Classes 1 to 8 will be held on 15th June 2025.", "1 day ago", "blue"], ["▣", "New Academic Session", "Academic session 2025–26 will commence from 1st April 2025.", "3 days ago", "green"]].map(([icon, title, details, time, tone]) => <article key={title}><i className={tone}>{icon}</i><div><b>{title}</b><p>{details}</p></div><time>{time}</time></article>)}</section>
             <section className="right-panel support-card"><h2>Need Help?</h2><p>Our support team is here to help you with your admission process.</p><button onClick={() => setNotice("Support request started.")}>♧ Contact Support</button><i>AI</i></section>
             <section className="right-panel overall-progress"><h2>Application Progress</h2><div><div className="overall-donut"><b>60%</b></div><ul><li><i className="completed" />Completed <b>5 / 10</b></li><li><i className="in-progress" />In Progress <b>2 / 10</b></li><li><i className="pending" />Pending <b>3 / 10</b></li></ul></div></section>
           </aside>
         </div>
       </section>
-      {aiFloatingOpen && <section className="parent-ai-floating-popup" role="dialog" aria-modal="false" aria-labelledby="parent-ai-floating-title"><header><div><i>✦</i><span><b id="parent-ai-floating-title">AI Assistant</b><small>● Online</small></span></div><button onClick={() => setAiFloatingOpen(false)} aria-label="Close AI assistant">×</button></header><p>{answer}</p><div>{suggestions.map((suggestion) => <button key={suggestion} onClick={() => setAnswer(suggestion === "What documents are required?" ? "You will need a birth certificate, Aadhaar card, passport photos, and school records." : suggestion === "Fee structure details" ? "The application fee and payment options are available in the Fees section. I can guide you through payment." : suggestion === "How can I track my application?" ? "Open Track Application to view progress, document verification and the admission decision." : "I can help with that. Tell me a little more about your admission question.")}>{suggestion}</button>)}</div><form onSubmit={ask}><input value={question} onChange={(event) => setQuestion(event.target.value)} placeholder="Ask about admissions..." /><button aria-label="Send question">→</button></form></section>}
+      {aiFloatingOpen && <section className="parent-ai-floating-popup" role="dialog" aria-modal="false" aria-labelledby="parent-ai-floating-title"><header><div><i>✦</i><span><b id="parent-ai-floating-title">AI Assistant</b><small>● Online</small></span></div><button onClick={() => setAiFloatingOpen(false)} aria-label="Close AI assistant">×</button></header><p>{answer}</p><div>{suggestions.map((suggestion) => <button key={suggestion} onClick={() => setAnswer(getSchoolInformationAnswer(suggestion) || "Open the full AI Assistant for detailed help.")}>{suggestion}</button>)}</div><form onSubmit={ask}><input value={question} onChange={(event) => setQuestion(event.target.value)} placeholder="Ask about admissions, fees or boarding..." /><button aria-label="Send question">→</button></form></section>}
       <button className="parent-ai-floating-button" onClick={() => setAiFloatingOpen((open) => !open)} aria-expanded={aiFloatingOpen}><span>✦</span> Ask Sheerwood AI</button>
     </main>
   );
