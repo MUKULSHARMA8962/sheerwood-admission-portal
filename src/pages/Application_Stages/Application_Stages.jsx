@@ -1,6 +1,7 @@
 import { useRef, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import "./Application_Stages.css";
+import "./ResidentialAddress.css";
 import "../DocumentUploadStatus.css";
 
 const steps = ["Admission Details", "Student Information", "Parent / Guardian", "Residential", "Academic", "Documents", "Review & Submit"];
@@ -34,15 +35,15 @@ function Field({ label, required, children }) {
   return <label className="stage-field">{label} {required && <em>*</em>}{children}</label>;
 }
 
-function AddressFields({ title, prefix, form, update, useCurrentLocation }) {
+function AddressFields({ title, prefix, form, update, useCurrentLocation, sameAsPermanent, toggleSameAsPermanent }) {
   const isPermanentAddress = prefix === "permanent";
   const fieldName = (field) => `${prefix}${field}`;
 
-  return <section className="residential-address-section"><h2>{title}</h2><div className="stage-fields address-section-fields"><Field label="Address Line 1" required><input name={fieldName("Address1")} value={form[fieldName("Address1")]} onChange={update} required /></Field><Field label="Address Line 2"><input name={fieldName("Address2")} value={form[fieldName("Address2")]} onChange={update} /></Field>{isPermanentAddress && <div className="map-card"><span>●</span><b>Permanent Address</b><small>{form.locationLabel || "Use your device location"}</small><button type="button" onClick={useCurrentLocation}>⌖ Use current location</button></div>}{isPermanentAddress && <Field label="Current Location"><input value={form.locationLabel} placeholder="Tap “Use current location”" readOnly /></Field>}<Field label="City" required><input name={fieldName("City")} value={form[fieldName("City")]} onChange={update} required /></Field><Field label="State" required><select name={fieldName("State")} value={form[fieldName("State")]} onChange={update}><option>Karnataka</option><option>Delhi</option><option>Maharashtra</option></select></Field><Field label="PIN Code" required><input name={fieldName("Pin")} value={form[fieldName("Pin")]} onChange={update} inputMode="numeric" required /></Field><Field label="Country" required><select name={fieldName("Country")} value={form[fieldName("Country")]} onChange={update}><option>India</option><option>Other</option></select></Field>{isPermanentAddress && <Field label="Emergency Contact Number" required><input name="emergency" value={form.emergency} onChange={update} inputMode="numeric" required /></Field>}</div></section>;
+  return <section className="residential-address-section"><h2>{title}</h2>{!isPermanentAddress && <label className="same-address-toggle"><input type="checkbox" checked={sameAsPermanent} onChange={toggleSameAsPermanent} /><span>Correspondence Address is the same as Permanent Address</span></label>}<div className="stage-fields address-section-fields"><Field label="Address Line 1" required><input name={fieldName("Address1")} value={form[fieldName("Address1")]} onChange={update} disabled={sameAsPermanent} required /></Field><Field label="Address Line 2"><input name={fieldName("Address2")} value={form[fieldName("Address2")]} onChange={update} disabled={sameAsPermanent} /></Field>{isPermanentAddress && <div className="map-card"><span>●</span><b>Permanent Address</b><small>{form.locationLabel || "Use your device location"}</small><button type="button" onClick={useCurrentLocation}>⌖ Use current location</button></div>}{isPermanentAddress && <Field label="Current Location"><input value={form.locationLabel} placeholder="Tap “Use current location”" readOnly /></Field>}<Field label="City" required><input name={fieldName("City")} value={form[fieldName("City")]} onChange={update} disabled={sameAsPermanent} required /></Field><Field label="State" required><select name={fieldName("State")} value={form[fieldName("State")]} onChange={update} disabled={sameAsPermanent}><option>Karnataka</option><option>Delhi</option><option>Maharashtra</option></select></Field><Field label="PIN Code" required><input name={fieldName("Pin")} value={form[fieldName("Pin")]} onChange={update} disabled={sameAsPermanent} inputMode="numeric" required /></Field><Field label="Country" required><select name={fieldName("Country")} value={form[fieldName("Country")]} onChange={update} disabled={sameAsPermanent}><option>India</option><option>Other</option></select></Field>{isPermanentAddress && <Field label="Emergency Contact Number" required><input name="emergency" value={form.emergency} onChange={update} inputMode="numeric" required /></Field>}</div></section>;
 }
 
-function ResidentialForm({ form, update, useCurrentLocation }) {
-  return <div className="residential-addresses"><AddressFields title="Permanent Address" prefix="permanent" form={form} update={update} useCurrentLocation={useCurrentLocation} /><AddressFields title="Correspondence Address" prefix="correspondence" form={form} update={update} useCurrentLocation={useCurrentLocation} /></div>;
+function ResidentialForm({ form, update, useCurrentLocation, toggleSameAsPermanent }) {
+  return <div className="residential-addresses"><AddressFields title="Permanent Address" prefix="permanent" form={form} update={update} useCurrentLocation={useCurrentLocation} /><AddressFields title="Correspondence Address" prefix="correspondence" form={form} update={update} useCurrentLocation={useCurrentLocation} sameAsPermanent={form.sameAsPermanent} toggleSameAsPermanent={toggleSameAsPermanent} /></div>;
 }
 
 function AcademicForm({ setMessage }) {
@@ -93,7 +94,8 @@ function ReviewForm({ navigate }) {
   return <><p className="review-intro">Review Your Application</p><div className="review-list">{steps.slice(0, -1).map((step) => <button type="button" key={step} onClick={() => navigate(step === "Admission Details" ? "/admission-details" : step === "Student Information" ? "/student-information" : step === "Parent / Guardian" ? "/parent-guardian" : `/application/${step === "Residential" ? "residential" : step === "Academic" ? "academic" : "documents"}`)}><span>{step}</span><b>✓ Completed</b><i>›</i></button>)}</div></>;
 }
 
-const initialForm = { permanentAddress1: "123, Greenfield Avenue", permanentAddress2: "Near City Center Mall", permanentCity: "Bangalore", permanentState: "Karnataka", permanentPin: "560000", permanentCountry: "India", correspondenceAddress1: "", correspondenceAddress2: "", correspondenceCity: "", correspondenceState: "Karnataka", correspondencePin: "", correspondenceCountry: "India", emergency: "9876543210", locationLabel: "" };
+const addressFieldSuffixes = ["Address1", "Address2", "City", "State", "Pin", "Country"];
+const initialForm = { permanentAddress1: "123, Greenfield Avenue", permanentAddress2: "Near City Center Mall", permanentCity: "Bangalore", permanentState: "Karnataka", permanentPin: "560000", permanentCountry: "India", correspondenceAddress1: "", correspondenceAddress2: "", correspondenceCity: "", correspondenceState: "Karnataka", correspondencePin: "", correspondenceCountry: "India", sameAsPermanent: false, emergency: "9876543210", locationLabel: "" };
 
 export default function ApplicationStages() {
   const { stage } = useParams();
@@ -101,7 +103,20 @@ export default function ApplicationStages() {
   const config = stageConfig[stage] || stageConfig.residential;
   const [form, setForm] = useState(initialForm);
   const [message, setMessage] = useState("");
-  const update = (event) => setForm((current) => ({ ...current, [event.target.name]: event.target.value }));
+  const update = (event) => setForm((current) => {
+    const { name, value } = event.target;
+    const next = { ...current, [name]: value };
+    if (current.sameAsPermanent && name.startsWith("permanent")) {
+      const suffix = name.replace("permanent", "");
+      if (addressFieldSuffixes.includes(suffix)) next[`correspondence${suffix}`] = value;
+    }
+    return next;
+  });
+  const toggleSameAsPermanent = (event) => setForm((current) => {
+    if (!event.target.checked) return { ...current, sameAsPermanent: false };
+    const correspondenceAddress = addressFieldSuffixes.reduce((address, suffix) => ({ ...address, [`correspondence${suffix}`]: current[`permanent${suffix}`] }), {});
+    return { ...current, ...correspondenceAddress, sameAsPermanent: true };
+  });
   const useCurrentLocation = () => {
     if (!navigator.geolocation) {
       setMessage("Your browser does not support location services. Please enter the address manually.");
@@ -122,7 +137,11 @@ export default function ApplicationStages() {
         const addressLine2 = [address.neighbourhood, address.suburb].filter(Boolean).join(", ");
         const city = address.city || address.town || address.village || address.county;
 
-        setForm((current) => ({ ...current, permanentAddress1: addressLine1 || current.permanentAddress1, permanentAddress2: addressLine2 || current.permanentAddress2, permanentCity: city || current.permanentCity, permanentState: address.state || current.permanentState, permanentPin: address.postcode || current.permanentPin, permanentCountry: address.country || current.permanentCountry, locationLabel: displayName ? displayName.split(",").slice(0, 2).join(", ") : coordinates }));
+        setForm((current) => {
+          const permanentAddress = { permanentAddress1: addressLine1 || current.permanentAddress1, permanentAddress2: addressLine2 || current.permanentAddress2, permanentCity: city || current.permanentCity, permanentState: address.state || current.permanentState, permanentPin: address.postcode || current.permanentPin, permanentCountry: address.country || current.permanentCountry };
+          const correspondenceAddress = current.sameAsPermanent ? addressFieldSuffixes.reduce((address, suffix) => ({ ...address, [`correspondence${suffix}`]: permanentAddress[`permanent${suffix}`] }), {}) : {};
+          return { ...current, ...permanentAddress, ...correspondenceAddress, locationLabel: displayName ? displayName.split(",").slice(0, 2).join(", ") : coordinates };
+        });
         setMessage("Current location added to the address fields.");
       } catch {
         setForm((current) => ({ ...current, locationLabel: coordinates }));
@@ -131,6 +150,6 @@ export default function ApplicationStages() {
     }, () => setMessage("Location permission was not granted. Please enter the address manually."), { enableHighAccuracy: true, timeout: 10000, maximumAge: 300000 });
   };
   const save = (event) => { event.preventDefault(); if (stage === "review") { navigate(config.next); return; } navigate(config.next); };
-  const renderForm = () => { if (stage === "academic") return <AcademicForm setMessage={setMessage} />; if (stage === "documents") return <DocumentsForm setMessage={setMessage} />; if (stage === "review") return <ReviewForm navigate={navigate} />; return <ResidentialForm form={form} update={update} useCurrentLocation={useCurrentLocation} />; };
+  const renderForm = () => { if (stage === "academic") return <AcademicForm setMessage={setMessage} />; if (stage === "documents") return <DocumentsForm setMessage={setMessage} />; if (stage === "review") return <ReviewForm navigate={navigate} />; return <ResidentialForm form={form} update={update} useCurrentLocation={useCurrentLocation} toggleSameAsPermanent={toggleSameAsPermanent} />; };
   return <main className="stage-page"><PortalHeader /><section className="stage-shell"><div className="stage-main"><div className="stage-title"><div><p>NEW APPLICATION</p><h1>{config.title}</h1><small>{stage === "review" ? "Review every section before you submit your application." : "Complete this section to continue your admission application."}</small></div><button onClick={() => navigate("/dashboard")}>← Back to dashboard</button></div><Progress index={config.index} />{message && <div className="stage-message" role="status">{message}<button aria-label="Dismiss notification" onClick={() => setMessage("")}>×</button></div>}<form className={`stage-form ${stage}`} onSubmit={save}>{renderForm()}<div className="stage-actions"><button type="button" className="stage-back" onClick={() => navigate(config.previous)}>← Back</button><button className="stage-next" type="submit">{stage === "review" ? "Submit Application" : "Save & Next"} <span>→</span></button></div></form></div><HelpPanel onAsk={setMessage} onOpenAssistant={() => navigate("/ai-assistant")} /></section></main>;
 }

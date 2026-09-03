@@ -1,0 +1,21 @@
+.birth-date-field .birth-date-guideline,
+.birth-date-field .birth-date-error {
+  display: block;
+  margin: -2px 0 0;
+  font-size: 9px;
+  font-weight: 600;
+  line-height: 1.45;
+}
+
+.birth-date-field .birth-date-guideline {
+  color: #62766a;
+}
+
+.birth-date-field .birth-date-error {
+  color: #bf3d35;
+}
+
+.student-fields .birth-date-field.has-error input {
+  border-color: #cf4d43;
+  box-shadow: 0 0 0 3px #fbe6e4;
+}

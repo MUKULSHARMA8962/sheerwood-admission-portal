@@ -5,11 +5,11 @@ import "./Parent_Guardian.css";
 const steps = ["Admission Details", "Student Information", "Parent / Guardian", "Residential Background", "Academic Background", "Documents", "Review & Submit"];
 
 const families = {
-  Father: { fullName: "Rajesh Sharma", organization: "TCS", mobile: "9876543210", email: "rajesh.sharma@example.com", aadhaar: "" },
-  Mother: { fullName: "Priya Sharma", organization: "Sheerwood Public School", mobile: "9876543211", email: "priya.sharma@example.com", aadhaar: "" },
+  Father: { fullName: "Rajesh Sharma", occupation: "TCS", mobile: "9876543210", email: "rajesh.sharma@example.com", aadhaar: "" },
+  Mother: { fullName: "Priya Sharma", occupation: "Sheerwood Public School", mobile: "9876543211", email: "priya.sharma@example.com", aadhaar: "" },
 };
 
-const fieldLabels = [["fullName", "Full Name"], ["organization", "Organization"], ["mobile", "Mobile Number"], ["email", "Email Address"], ["aadhaar", "Aadhaar Number"]];
+const fieldLabels = [["fullName", "Full Name"], ["occupation", "Occupation"], ["mobile", "Mobile Number"], ["email", "Email Address"], ["aadhaar", "Aadhaar Number"]];
 
 export default function ParentGuardian() {
   const navigate = useNavigate();

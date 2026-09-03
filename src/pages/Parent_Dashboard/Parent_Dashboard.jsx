@@ -25,7 +25,8 @@ function getNextAcademicSession() {
 
 const nextAcademicSession = getNextAcademicSession();
 const classRank = { Nursery: 0, "Class 1": 1, "Class 2": 2, "Class 3": 3, "Class 4": 4, "Class 5": 5, "Class 6": 6, "Class 7": 7, "Class 8": 8, "Class 9": 9, "Class 10": 10, "Class 11": 11 };
-const currentClassOptions = Object.entries(classRank).filter(([, rank]) => rank >= 2);
+const admissionClassOptions = Object.entries(classRank).filter(([, rank]) => rank >= 5 && rank !== 10);
+const currentClassOptions = Object.entries(classRank).filter(([, rank]) => rank >= 5);
 
 const initialForm = {
   session: nextAcademicSession,
@@ -81,6 +82,7 @@ export default function ParentDashboard() {
       setMessage("Current Class must be the same as or lower than Class Applying For.");
       return;
     }
+    sessionStorage.setItem("sheerwood-applying-class", form.class);
     navigate("/student-information", { state: { applyingClass: form.class, stream: form.stream } });
   }
 
@@ -93,7 +95,7 @@ export default function ParentDashboard() {
 
       <section className="admission-shell">
         <div className="admission-main">
-          <div className="admission-title"><div><p className="admission-kicker">STEP 2 OF 7 · NEW APPLICATION</p><h1>Admission Details</h1><p>Tell us about the class and school background for this application.</p></div><button onClick={() => navigate("/new-user-dashboard")}>← Back to dashboard</button></div>
+          <div className="admission-title"><div><p className="admission-kicker">STEP 2 OF 7 · NEW APPLICATION</p><h1>Admission Details</h1><p>Tell us about the class and school background for this application.</p></div></div>
 
           <ol className="application-steps" aria-label="Application progress">
             {steps.map(([number, label, status]) => (
@@ -110,7 +112,7 @@ export default function ParentDashboard() {
               <header className="admission-form-block-header"><div><p>APPLICATION INFORMATION</p><h2 id="application-information-heading">Admission application</h2></div><small>Fields marked <em>*</em> are required.</small></header>
               <div className="admission-fields">
                 <label>Academic Session<input value={form.session} readOnly /></label>
-                <label>Class Applying For <em>*</em><select name="class" value={form.class} onChange={update} required><option disabled>Select class</option><option>Class 3</option><option>Class 4</option><option>Class 5</option><option>Class 6</option><option>Class 7</option><option>Class 8</option><option>Class 9</option><option>Class 11</option></select></label>
+                <label>Class Applying For <em>*</em><select name="class" value={form.class} onChange={update} required><option disabled>Select class</option>{admissionClassOptions.map(([className]) => <option key={className}>{className}</option>)}</select></label>
                 {form.class === "Class 11" && <label>Stream <em>*</em><select name="stream" value={form.stream} onChange={update} required><option disabled>Select stream</option><option>PCMB</option><option>PCM</option><option>PCB</option><option>Commerce with Mathematics</option><option>Commerce without Mathematics</option><option>Humanities</option></select></label>}
                 <label>Application Date<input name="date" type="date" value={form.date} readOnly /></label>
                 <label>Application ID<input value={applicationId} readOnly /></label>

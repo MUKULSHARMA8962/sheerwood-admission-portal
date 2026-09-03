@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import "./Student_Information.css";
+import "./StudentBirthDate.css";
 
 const steps = [
   "Admission Details",
@@ -15,6 +16,32 @@ const steps = [
 function getLocalDate() {
   const date = new Date();
   return new Date(date.getTime() - date.getTimezoneOffset() * 60_000).toISOString().slice(0, 10);
+}
+
+function getAcademicYearStart() {
+  return new Date(new Date().getFullYear() + 1, 3, 1);
+}
+
+function getBirthDateGuideline(applyingClass) {
+  const classNumber = Number(applyingClass?.replace("Class ", ""));
+  if (!Number.isInteger(classNumber) || classNumber < 3 || classNumber > 11) return null;
+
+  return {
+    minMonths: classNumber * 12 + 54,
+    maxMonths: classNumber * 12 + 60,
+    ageRange: `${classNumber + 4.5}–${classNumber + 5} years`,
+  };
+}
+
+function ageInMonthsOnDate(birthDate, comparisonDate) {
+  const [year, month, day] = birthDate.split("-").map(Number);
+  let months = (comparisonDate.getFullYear() - year) * 12 + (comparisonDate.getMonth() + 1 - month);
+  if (comparisonDate.getDate() < day) months -= 1;
+  return months;
+}
+
+function formatDate(date) {
+  return new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "long", year: "numeric" }).format(date);
 }
 
 const initialForm = {
@@ -42,10 +69,27 @@ const initialForm = {
 
 export default function StudentInformation() {
   const navigate = useNavigate();
+  const location = useLocation();
   const uploadRef = useRef(null);
   const [form, setForm] = useState(initialForm);
   const [photo, setPhoto] = useState("");
   const [message, setMessage] = useState("");
+  const [birthDateError, setBirthDateError] = useState("");
+  const applyingClass = location.state?.applyingClass || sessionStorage.getItem("sheerwood-applying-class") || "";
+  const birthDateGuideline = getBirthDateGuideline(applyingClass);
+  const academicYearStart = getAcademicYearStart();
+
+  function validateBirthDate(value) {
+    if (!value) return "Please enter the student's Date of Birth.";
+    if (value > getLocalDate()) return "Date of Birth cannot be in the future.";
+    if (!birthDateGuideline) return "Please select Class Applying For first, then return to validate the Date of Birth.";
+
+    const ageInMonths = ageInMonthsOnDate(value, academicYearStart);
+    if (ageInMonths < birthDateGuideline.minMonths || ageInMonths > birthDateGuideline.maxMonths) {
+      return `This Date of Birth is not acceptable for ${applyingClass}.`;
+    }
+    return "";
+  }
 
   useEffect(() => () => {
     if (photo) URL.revokeObjectURL(photo);
@@ -54,6 +98,7 @@ export default function StudentInformation() {
   function update(event) {
     const { name, value } = event.target;
     setForm((current) => ({ ...current, [name]: value }));
+    if (name === "birthDate") setBirthDateError(validateBirthDate(value));
   }
 
   function selectPhoto(event) {
@@ -71,8 +116,38 @@ export default function StudentInformation() {
 
   function saveAndContinue(event) {
     event.preventDefault();
-    if (form.birthDate > getLocalDate()) {
-      setMessage("Date of Birth cannot be in the future.");
+    const dateValidationMessage = validateBirthDate(form.birthDate);
+    setBirthDateError(dateValidationMessage);
+    if (dateValidationMessage) {
+      setMessage("Please correct the Date of Birth as per the age guideline.");
+      return;
+    }
+    const requiredFields = [
+      ["firstName", "First Name"],
+      ["lastName", "Last Name"],
+      ["placeOfBirth", "Place of Birth"],
+      ["motherTongue", "Mother Tongue"],
+      ["howHeard", "How did you come to know about our School?"],
+    ];
+    const missingField = requiredFields.find(([field]) => !form[field].trim());
+    if (missingField) {
+      setMessage(`Please complete ${missingField[1]}.`);
+      return;
+    }
+    if (form.nationality === "Other" && !form.nationalityOther.trim()) {
+      setMessage("Please specify the student's nationality.");
+      return;
+    }
+    if (form.religion === "Other" && !form.religionOther.trim()) {
+      setMessage("Please specify the student's religion.");
+      return;
+    }
+    if (form.singleParent === "Yes" && !form.responsibleParent) {
+      setMessage("Please select the responsible parent.");
+      return;
+    }
+    if (form.howHeard === "Others" && !form.howHeardOther.trim()) {
+      setMessage("Please specify how you heard about the school.");
       return;
     }
     if (form.aadhaar.replace(/\D/g, "").length !== 12) {
@@ -99,13 +174,13 @@ export default function StudentInformation() {
 
           {message && <div className="student-message" role="status">{message}<button aria-label="Dismiss notification" onClick={() => setMessage("")}>×</button></div>}
 
-          <form className="student-form" onSubmit={saveAndContinue}>
+          <form className="student-form" onSubmit={saveAndContinue} noValidate>
             <h2>Personal Details</h2>
             <div className="student-fields">
               <label>First Name <em>*</em><input name="firstName" value={form.firstName} onChange={update} required /></label>
               <label>Middle Name<input name="middleName" value={form.middleName} onChange={update} /></label>
               <label>Last Name <em>*</em><input name="lastName" value={form.lastName} onChange={update} required /></label>
-              <label>Date of Birth <em>*</em><input name="birthDate" type="date" value={form.birthDate} onChange={update} max={getLocalDate()} required /></label>
+              <label className={`birth-date-field${birthDateError ? " has-error" : ""}`}>Date of Birth <em>*</em><input name="birthDate" type="date" value={form.birthDate} onChange={update} onBlur={(event) => setBirthDateError(validateBirthDate(event.target.value))} max={getLocalDate()} required /><small className="birth-date-guideline">{birthDateGuideline ? `For ${applyingClass}: ${birthDateGuideline.ageRange} as on ${formatDate(academicYearStart)}.` : "Select Class Applying For to view the age guideline."}</small>{birthDateError && <small className="birth-date-error" role="alert">{birthDateError}</small>}</label>
               <label>Place of Birth <em>*</em><input name="placeOfBirth" value={form.placeOfBirth} onChange={update} placeholder="Enter place of birth" required /></label>
               <label>Gender <em>*</em><select name="gender" value={form.gender} onChange={update}><option>Female</option><option>Male</option></select></label>
               <label>Blood Group <em>*</em><select name="bloodGroup" value={form.bloodGroup} onChange={update} required><option>A+</option><option>A-</option><option>B+</option><option>B-</option><option>AB+</option><option>AB-</option><option>O+</option><option>O-</option></select></label>
