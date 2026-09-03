@@ -2,6 +2,7 @@ node_modules/
 dist/
 .env
 .env.*
+!backend/.env.example
 .DS_Store
 backend/*.db
 backend/.env

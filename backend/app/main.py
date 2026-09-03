@@ -1,9 +1,15 @@
 from contextlib import asynccontextmanager
 from datetime import UTC, datetime
+from pathlib import Path
 from typing import Annotated, Any
 
+from dotenv import load_dotenv
 from fastapi import Depends, FastAPI, Header, HTTPException, Response, status
 from fastapi.middleware.cors import CORSMiddleware
+
+# Local development settings live in backend/.env. Server environment variables
+# take priority, so production secrets can remain in the process/service config.
+load_dotenv(Path(__file__).resolve().parents[1] / ".env")
 
 from .database import connection, initialize_database
 from .schemas import AdmissionDecisionRequest, CreateApplicationRequest, LoginRequest, RegisterRequest
