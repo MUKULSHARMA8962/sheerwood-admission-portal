@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
+import { requestMobileOtp, verifyMobileOtp } from "../services/api";
 import "./Login.css";
 import "./LoginDemo.css";
 import "./LoginStudent.css";
@@ -13,6 +14,7 @@ export default function Login() {
   const [otpSent, setOtpSent] = useState(false);
   const [otp, setOtp] = useState("");
   const [otpMessage, setOtpMessage] = useState("");
+  const [otpLoading, setOtpLoading] = useState(false);
   const [form, setForm] = useState({ email: "", phone: "", password: "", remember: false, role: "parent" });
   const roleDetails = {
     parent: { label: "PARENT PORTAL", title: "Sign in", text: "Continue your admission application and track its progress.", route: "/dashboard" },
@@ -48,7 +50,7 @@ export default function Login() {
     setOtpMessage("");
   }
 
-  function submit(event) {
+  async function submit(event) {
     event.preventDefault();
 
     if (form.role === "parent" && authMethod === "otp") {
@@ -57,15 +59,31 @@ export default function Login() {
           setOtpMessage("Please enter a valid 10-digit mobile number.");
           return;
         }
-        setOtpSent(true);
-        setOtpMessage("OTP sent to your mobile number. Demo code: 123456");
+        setOtpLoading(true);
+        try {
+          await requestMobileOtp(form.phone);
+          setOtpSent(true);
+          setOtpMessage("OTP sent to your mobile number. It is valid for 5 minutes.");
+        } catch (error) {
+          setOtpMessage(error.message);
+        } finally {
+          setOtpLoading(false);
+        }
         return;
       }
-      if (otp !== "123456") {
-        setOtpMessage("Enter the 6-digit OTP to continue. Demo code: 123456");
+      if (otp.length !== 6) {
+        setOtpMessage("Enter the 6-digit OTP sent to your mobile number.");
         return;
       }
-      navigate(admissionFlow ? "/new-user-dashboard" : "/dashboard", { state: { phone: form.phone, role: "parent" } });
+      setOtpLoading(true);
+      try {
+        await verifyMobileOtp(form.phone, otp);
+        navigate(admissionFlow ? "/new-user-dashboard" : "/dashboard", { state: { phone: form.phone, role: "parent" } });
+      } catch (error) {
+        setOtpMessage(error.message);
+      } finally {
+        setOtpLoading(false);
+      }
       return;
     }
 
@@ -103,11 +121,11 @@ export default function Login() {
           {!isOtpLogin && <section className="demo-access"><div><span>DEMO ACCESS</span><small>{demoAccounts[form.role].email} · {demoAccounts[form.role].password}</small></div><button type="button" onClick={demoLogin}>Open {form.role} dashboard →</button></section>}
 
           {isOtpLogin ? <>
-            <label>Mobile number<input name="phone" type="tel" value={form.phone} onChange={update} placeholder="98765 43210" inputMode="numeric" pattern="[0-9 +()-]{8,}" required /></label>
-            {otpSent && <label>Enter OTP<input className="otp-input" name="otp" value={otp} onChange={(event) => setOtp(event.target.value.replace(/\D/g, "").slice(0, 6))} placeholder="• • • • • •" inputMode="numeric" autoComplete="one-time-code" maxLength="6" required /></label>}
+            <label>Mobile number<input name="phone" type="tel" value={form.phone} onChange={update} placeholder="98765 43210" inputMode="numeric" pattern="[0-9 +()-]{8,}" disabled={otpLoading} required /></label>
+            {otpSent && <label>Enter OTP<input className="otp-input" name="otp" value={otp} onChange={(event) => setOtp(event.target.value.replace(/\D/g, "").slice(0, 6))} placeholder="• • • • • •" inputMode="numeric" autoComplete="one-time-code" maxLength="6" disabled={otpLoading} required /></label>}
             {otpMessage && <p className={otpSent && otpMessage.startsWith("OTP sent") ? "otp-message success" : "otp-message"} role="status">{otpMessage}</p>}
-            <button className="signin" type="submit">{otpSent ? (admissionFlow ? "Verify & Start Admission →" : "Verify & Sign In →") : "Send OTP →"}</button>
-            {otpSent && <button className="otp-resend" type="button" onClick={() => setOtpMessage("A new OTP has been sent. Demo code: 123456")}>Resend OTP</button>}
+            <button className="signin" type="submit" disabled={otpLoading}>{otpLoading ? "Please wait…" : otpSent ? (admissionFlow ? "Verify & Start Admission →" : "Verify & Sign In →") : "Send OTP →"}</button>
+            {otpSent && <button className="otp-resend" type="button" disabled={otpLoading} onClick={() => { setOtpSent(false); setOtp(""); setOtpMessage(""); }}>Request a new OTP</button>}
           </> : <>
             <label>Email address<input name="email" type="email" value={form.email} onChange={update} placeholder="parent@example.com" required /></label>
             <label>Password<div className="password"><input name="password" type={showPassword ? "text" : "password"} value={form.password} onChange={update} placeholder="Enter your password" required /><button type="button" onClick={() => setShowPassword(!showPassword)}>{showPassword ? "Hide" : "Show"}</button></div></label>

@@ -18,3 +18,28 @@ export async function askSchoolAI(prompt, audience = "guest") {
   if (!response.ok) throw new Error(data.detail || "AI service is temporarily unavailable. Please try again shortly.");
   return data.answer;
 }
+
+async function otpRequest(path, payload) {
+  const response = await fetch(`${API_BASE_URL}/auth/otp/${path}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(data.detail || "OTP service is unavailable. Please try again shortly.");
+  return data;
+}
+
+export function toE164PhoneNumber(phoneNumber) {
+  const digits = phoneNumber.replace(/\D/g, "");
+  if (phoneNumber.trim().startsWith("+")) return `+${digits}`;
+  return digits.length === 10 ? `+91${digits}` : `+${digits}`;
+}
+
+export function requestMobileOtp(phoneNumber) {
+  return otpRequest("request", { phone_number: toE164PhoneNumber(phoneNumber) });
+}
+
+export function verifyMobileOtp(phoneNumber, otp) {
+  return otpRequest("verify", { phone_number: toE164PhoneNumber(phoneNumber), otp });
+}
