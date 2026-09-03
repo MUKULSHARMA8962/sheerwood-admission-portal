@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { askSchoolAI } from "../services/api";
 import amitabhTestimonial from "../assets/amitabh-testimonial.png";
 import aboutCampus from "../assets/about-campus.png";
@@ -51,6 +51,7 @@ const homeEvents = {
 };
 
 export default function Home() {
+  const navigate = useNavigate();
   const [menuOpen, setMenuOpen] = useState(false);
   const [campusFilmOpen, setCampusFilmOpen] = useState(true);
   const [admissionCodeOpen, setAdmissionCodeOpen] = useState(false);
@@ -61,6 +62,12 @@ export default function Home() {
   const [postsDay, setPostsDay] = useState("today");
   const [eventsDay, setEventsDay] = useState("today");
   const [principalExpanded, setPrincipalExpanded] = useState(false);
+
+  useEffect(() => {
+    if (window.location.hash === "#start-admission") {
+      navigate("/new-user-dashboard", { replace: true });
+    }
+  }, [navigate]);
 
   useEffect(() => {
     if (!campusFilmOpen) return undefined;
@@ -266,9 +273,9 @@ export default function Home() {
             <span className="admission-code-icon" aria-hidden="true">▦</span>
             <p>ADMISSION ACCESS</p>
             <h2 id="admission-code-title">Scan to start an admission</h2>
-            <img src={`https://api.qrserver.com/v1/create-qr-code/?size=300x300&margin=10&data=${encodeURIComponent(`${window.location.origin}/login?flow=admission`)}`} alt="QR code to open the Sheerwood admission OTP sign-in page" />
-            <small>Scan this code with a phone camera. It opens the secure OTP sign-in page.</small>
-            <Link to="/login?flow=admission" className="admission-code-open">Open on this device →</Link>
+            <img src={`https://api.qrserver.com/v1/create-qr-code/?size=300x300&margin=10&data=${encodeURIComponent(`${window.location.origin}/#start-admission`)}`} alt="QR code to open the Sheerwood admission welcome page" />
+            <small>Scan this code with a phone camera to open your admission welcome page.</small>
+            <Link to="/new-user-dashboard" className="admission-code-open">Open on this device →</Link>
           </section>
         </div>
       )}
