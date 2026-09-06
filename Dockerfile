@@ -1,0 +1,35 @@
+FROM node:22-alpine AS frontend-build
+
+WORKDIR /app
+
+COPY package.json package-lock.json ./
+RUN npm ci
+
+COPY . .
+
+# Vite replaces VITE_* values while building the browser bundle. Keep secrets out
+# of these arguments: they are intentionally visible to browser users.
+ARG VITE_COGNITO_DOMAIN
+ARG VITE_COGNITO_CLIENT_ID
+ARG VITE_COGNITO_REDIRECT_URI
+ARG VITE_COGNITO_LOGOUT_URI
+ARG VITE_COGNITO_SCOPES
+ARG VITE_COGNITO_ROLE_CLAIM
+ARG VITE_COGNITO_DEFAULT_ROLE
+
+ENV VITE_COGNITO_DOMAIN=${VITE_COGNITO_DOMAIN}
+ENV VITE_COGNITO_CLIENT_ID=${VITE_COGNITO_CLIENT_ID}
+ENV VITE_COGNITO_REDIRECT_URI=${VITE_COGNITO_REDIRECT_URI}
+ENV VITE_COGNITO_LOGOUT_URI=${VITE_COGNITO_LOGOUT_URI}
+ENV VITE_COGNITO_SCOPES=${VITE_COGNITO_SCOPES}
+ENV VITE_COGNITO_ROLE_CLAIM=${VITE_COGNITO_ROLE_CLAIM}
+ENV VITE_COGNITO_DEFAULT_ROLE=${VITE_COGNITO_DEFAULT_ROLE}
+
+RUN npm run build
+
+FROM nginx:1.27-alpine
+
+COPY deploy/nginx.conf /etc/nginx/conf.d/default.conf
+COPY --from=frontend-build /app/dist /usr/share/nginx/html
+
+EXPOSE 80

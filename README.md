@@ -22,6 +22,42 @@ Portal access is derived from `custom:role` or from Cognito groups named `parent
 
 The FastAPI backend can validate Cognito access tokens when `AUTH_MODE=cognito` is configured in `backend/.env`. It verifies the JWT signature against Cognito JWKS, issuer, expiry, `token_use=access`, and app-client ID before applying API role checks. See [backend/README.md](backend/README.md) for server configuration.
 
+## Run UI and API continuously on Ubuntu with Docker
+
+The included Docker Compose setup runs three services: the React UI, the internal FastAPI API, and a Caddy HTTPS gateway. The API is reachable only through the UI gateway at `/api`, and its SQLite database is kept in a persistent Docker volume. All services use `restart: unless-stopped`, so they return after a server or Docker restart.
+
+Before the first launch, point the DNS `A` record for `sheerwoodadmission.com` at the Ubuntu server's public IP and allow inbound TCP ports `80` and `443` in the server firewall or cloud security group. Ensure no existing Nginx or Apache service is using those ports; Caddy obtains and renews the TLS certificate automatically.
+
+On the Ubuntu server, install Docker Engine with the Docker Compose v2 plugin, then configure the two ignored environment files:
+
+```bash
+cd ~/sheerwood-admission-portal
+cp deploy/production.env.example .env.production
+test -f backend/.env || cp backend/.env.example backend/.env
+```
+
+Edit `.env.production` and set the public Cognito client ID. Edit `backend/.env` and set the same `COGNITO_CLIENT_ID`, plus any required OpenAI, SMTP, AWS SMS, and OTP values. Keep app-client and API secrets in `backend/.env` only; never put them in `.env.production`.
+
+Start everything and enable Docker to start at reboot:
+
+```bash
+sudo systemctl enable --now docker
+sudo docker compose --env-file .env.production up -d --build
+sudo docker compose --env-file .env.production ps
+```
+
+The portal is then available at `https://sheerwoodadmission.com`, the API health check at `https://sheerwoodadmission.com/api/health`, and OpenAPI documentation at `https://sheerwoodadmission.com/docs`.
+
+Useful operations:
+
+```bash
+sudo docker compose --env-file .env.production logs -f
+sudo docker compose --env-file .env.production up -d --build
+sudo docker compose --env-file .env.production down
+```
+
+The first command follows logs; the second rebuilds and safely replaces services after a code update. Do not use `down -v` unless the saved API database is intentionally being deleted.
+
 ## FastAPI backend
 
 The FastAPI backend lives in [backend](backend/README.md). Run it on port `8000` to use the Vite `/api` development proxy:

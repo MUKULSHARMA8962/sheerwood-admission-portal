@@ -1,0 +1,12 @@
+.git
+node_modules
+dist
+.env
+.env.*
+backend/.env
+backend/.venv
+backend/*.db
+backend/**/__pycache__
+otp-login/venv
+__pycache__
+*.py[cod]
