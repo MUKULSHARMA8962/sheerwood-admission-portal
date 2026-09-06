@@ -9,7 +9,9 @@ npm run dev
 
 ## Cognito Hosted UI sign-in
 
-Copy `.env.example` to `.env` and set the Cognito domain and the **public** app-client ID. The app uses the authorization-code grant with PKCE; do not create an app client secret for this browser client and never place a secret in a `VITE_` variable. The client ID from a Flask confidential-client example can only be used here if that Cognito app client has no secret; otherwise create a separate public SPA app client.
+Copy `.env.example` to `.env` and set the Cognito domain and app-client ID. The app uses the authorization-code grant with PKCE. Never place an app-client secret in a `VITE_` variable.
+
+For a public Cognito SPA app client (no secret), leave `VITE_COGNITO_TOKEN_EXCHANGE_URL` unset and the browser exchanges the PKCE code directly. For the existing confidential client `32616boac6m5uc0t5fob99i2sd`, set `VITE_COGNITO_TOKEN_EXCHANGE_URL=/api/auth/cognito/token`. The FastAPI API then exchanges the code with Cognito using the secret held only in `backend/.env`.
 
 In the Cognito user-pool app client, enable the authorization-code OAuth flow and the `openid`, `email`, and `phone` scopes. Add the exact redirect and sign-out values to Cognito's allowed URLs:
 
@@ -38,7 +40,7 @@ backend/.venv/bin/python -m pip install -r backend/requirements.txt
 test -f backend/.env || cp backend/.env.example backend/.env
 ```
 
-Set the real Cognito client ID in `backend/.env`, then install and start the always-on API service:
+Set the real Cognito client ID in `backend/.env`. For a confidential client, also set `COGNITO_DOMAIN`, `COGNITO_CLIENT_SECRET`, and the exact `COGNITO_REDIRECT_URI`; then install and start the always-on API service:
 
 ```bash
 sudo cp deploy/sheerwood-api.service /etc/systemd/system/sheerwood-api.service

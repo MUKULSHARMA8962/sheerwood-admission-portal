@@ -1,11 +1,14 @@
 from contextlib import asynccontextmanager
 from datetime import UTC, datetime
+import os
 from pathlib import Path
 from typing import Annotated, Any
 
+import httpx
 from dotenv import load_dotenv
 from fastapi import Depends, FastAPI, Header, HTTPException, Response, status
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 
 # Local development settings live in backend/.env. Server environment variables
 # take priority, so production secrets can remain in the process/service config.
@@ -13,7 +16,7 @@ load_dotenv(Path(__file__).resolve().parents[1] / ".env")
 
 from .database import connection, initialize_database
 from .dependencies import CurrentUser, require_roles
-from .schemas import AdmissionDecisionRequest, CreateApplicationRequest, LoginRequest, RegisterRequest
+from .schemas import AdmissionDecisionRequest, CognitoTokenExchangeRequest, CreateApplicationRequest, LoginRequest, RegisterRequest
 from .security import hash_password, new_session_token, session_expiry, verify_password
 from .routers import admin, ai, otp, parent, teacher
 
@@ -51,6 +54,59 @@ def serialize_user(row: Any) -> dict[str, Any]:
 @app.get("/api/health")
 def health_check() -> dict[str, str]:
     return {"status": "ok", "service": "sheerwood-api"}
+
+
+@app.post("/api/auth/cognito/token", include_in_schema=False)
+async def exchange_cognito_code(payload: CognitoTokenExchangeRequest) -> JSONResponse:
+    """Exchange a PKCE authorization code without ever exposing a client secret."""
+    client_id = os.getenv("COGNITO_CLIENT_ID", "").strip()
+    client_secret = os.getenv("COGNITO_CLIENT_SECRET", "").strip()
+    domain = os.getenv("COGNITO_DOMAIN", "").rstrip("/")
+    configured_redirect_uri = os.getenv("COGNITO_REDIRECT_URI", "").strip()
+
+    if not all((client_id, client_secret, domain, configured_redirect_uri)):
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Cognito confidential-client sign-in is not configured on this server.",
+        )
+    if payload.redirect_uri != configured_redirect_uri:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Unexpected Cognito callback URL.")
+
+    try:
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            response = await client.post(
+                f"{domain}/oauth2/token",
+                data={
+                    "grant_type": "authorization_code",
+                    "code": payload.code,
+                    "redirect_uri": configured_redirect_uri,
+                    "code_verifier": payload.code_verifier,
+                },
+                auth=(client_id, client_secret),
+                headers={"Accept": "application/json"},
+            )
+    except httpx.RequestError as exc:
+        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail="Cognito is temporarily unavailable.") from exc
+
+    try:
+        token_data = response.json()
+    except ValueError:
+        token_data = {}
+
+    if not response.is_success:
+        cognito_error = token_data.get("error") if isinstance(token_data, dict) else None
+        if cognito_error == "invalid_client_secret":
+            detail = "The server-side Cognito client secret is invalid. Update backend/.env and restart the API."
+        elif cognito_error == "invalid_grant":
+            detail = "This Cognito sign-in link has expired. Please start sign-in again."
+        else:
+            detail = "Cognito could not complete this sign-in. Please start again."
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=detail)
+
+    if not isinstance(token_data, dict) or not token_data.get("access_token") or not token_data.get("id_token"):
+        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail="Cognito returned an incomplete sign-in response.")
+
+    return JSONResponse(content=token_data, headers={"Cache-Control": "no-store", "Pragma": "no-cache"})
 
 
 @app.get("/", tags=["System"])

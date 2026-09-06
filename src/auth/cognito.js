@@ -1,6 +1,6 @@
 const SESSION_KEY = "sheerwood.cognito.session";
 const TRANSACTION_PREFIX = "sheerwood.cognito.transaction.";
-const DEFAULT_SCOPES = "openid email profile";
+const DEFAULT_SCOPES = "openid email phone";
 const ROLE_NAMES = ["parent", "student", "teacher", "admin"];
 
 function base64UrlEncode(bytes) {
@@ -71,6 +71,9 @@ export function getCognitoConfig() {
     redirectUri,
     logoutUri,
     scopes: import.meta.env.VITE_COGNITO_SCOPES?.trim() || DEFAULT_SCOPES,
+    // Set this only when using a confidential Cognito app client. It must be
+    // same-origin (normally /api/auth/cognito/token), never the client secret.
+    tokenExchangeUrl: import.meta.env.VITE_COGNITO_TOKEN_EXCHANGE_URL?.trim() || "",
   };
 }
 
@@ -151,19 +154,22 @@ export async function completeCognitoSignIn(search) {
 
   const config = getCognitoConfig();
   if (!isCognitoConfigured()) throw new Error(getCognitoConfigurationError());
-  const response = await fetch(`${config.domain}/oauth2/token`, {
+  const usesBackendExchange = Boolean(config.tokenExchangeUrl);
+  const response = await fetch(usesBackendExchange ? config.tokenExchangeUrl : `${config.domain}/oauth2/token`, {
     method: "POST",
-    headers: { "Content-Type": "application/x-www-form-urlencoded" },
-    body: new URLSearchParams({
-      grant_type: "authorization_code",
-      client_id: config.clientId,
-      code,
-      redirect_uri: config.redirectUri,
-      code_verifier: transaction.verifier,
-    }),
+    headers: { "Content-Type": usesBackendExchange ? "application/json" : "application/x-www-form-urlencoded" },
+    body: usesBackendExchange
+      ? JSON.stringify({ code, redirect_uri: config.redirectUri, code_verifier: transaction.verifier })
+      : new URLSearchParams({
+        grant_type: "authorization_code",
+        client_id: config.clientId,
+        code,
+        redirect_uri: config.redirectUri,
+        code_verifier: transaction.verifier,
+      }),
   });
   const data = await response.json().catch(() => ({}));
-  if (!response.ok) throw new Error(data.error_description || "Cognito could not finish your sign-in. Please try again.");
+  if (!response.ok) throw new Error(data.detail || data.error_description || "Cognito could not finish your sign-in. Please try again.");
 
   const session = saveSession(data);
   return { session, returnTo: transaction.returnTo };

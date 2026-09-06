@@ -17,6 +17,12 @@ class LoginRequest(BaseModel):
     role: Literal["parent", "teacher", "admin"]
 
 
+class CognitoTokenExchangeRequest(BaseModel):
+    code: str = Field(min_length=1, max_length=4096)
+    redirect_uri: str = Field(min_length=1, max_length=2048)
+    code_verifier: str = Field(min_length=43, max_length=128)
+
+
 class AdmissionDecisionRequest(BaseModel):
     decision: Literal["approved", "rejected", "needs_information"]
     class_section: str | None = Field(default=None, max_length=30)

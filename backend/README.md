@@ -51,19 +51,27 @@ OTP codes are generated securely, hashed before storage, expire in five minutes,
 
 ## Configure Cognito access-token validation
 
-The React app signs users in through Cognito Hosted UI. The FastAPI API validates the resulting **access token** using Cognito's public JWKS rather than a Flask session or an app-client secret.
+The React app signs users in through Cognito Hosted UI. The FastAPI API validates the resulting **access token** using Cognito's public JWKS.
 
 Copy the Cognito values from `.env.example` into `backend/.env` and run with `AUTH_MODE=cognito`:
 
 ```bash
 AUTH_MODE=cognito
 COGNITO_ISSUER=https://cognito-idp.us-east-1.amazonaws.com/us-east-1_yUXks7iXD
-COGNITO_CLIENT_ID=your_public_spa_app_client_id
+COGNITO_CLIENT_ID=your_cognito_app_client_id
 ```
 
 API authorization accepts roles from `custom:role` or Cognito groups named `parent`, `teacher`, `admin`, and `student`; a user without one receives `COGNITO_DEFAULT_ROLE` (parent by default). The first non-student sign-in links or creates the local profile using the Cognito `sub`, so future requests do not rely on matching an unverified email.
 
-Use a Cognito app client without a secret for the React PKCE flow. If `32616boac6m5uc0t5fob99i2sd` is the confidential client from the Flask example, create a separate public SPA app client and use that client ID here. The old seeded username/password endpoints remain only when `AUTH_MODE=local`. Do not use local mode in production.
+For a public SPA app client with no secret, React exchanges the PKCE code directly. For the confidential client `32616boac6m5uc0t5fob99i2sd`, configure this API instead and put the secret in `backend/.env` only:
+
+```bash
+COGNITO_DOMAIN=https://us-east-1yuxks7ixd.auth.us-east-1.amazoncognito.com
+COGNITO_CLIENT_SECRET=your_actual_cognito_app_client_secret
+COGNITO_REDIRECT_URI=https://sheerwoodadmission.com/callback
+```
+
+Then set `VITE_COGNITO_TOKEN_EXCHANGE_URL=/api/auth/cognito/token` in the frontend production environment and rebuild React. The browser sends the authorization code and PKCE verifier to the same-origin API; only the API sends the confidential secret to Cognito. The old seeded username/password endpoints remain only when `AUTH_MODE=local`. Do not use local mode in production.
 
 ## Configure email OTP
 
