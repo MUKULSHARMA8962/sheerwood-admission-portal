@@ -13,12 +13,12 @@ Copy `.env.example` to `.env` and set the Cognito domain and app-client ID. The 
 
 For a public Cognito SPA app client (no secret), leave `VITE_COGNITO_TOKEN_EXCHANGE_URL` unset and the browser exchanges the PKCE code directly. For the existing confidential client `32616boac6m5uc0t5fob99i2sd`, set `VITE_COGNITO_TOKEN_EXCHANGE_URL=/api/auth/cognito/token`. The FastAPI API then exchanges the code with Cognito using the secret held only in `backend/.env`.
 
-In the Cognito user-pool app client, enable the authorization-code OAuth flow and the `openid`, `email`, and `phone` scopes. Add the exact redirect and sign-out values to Cognito's allowed URLs:
+In the Cognito user-pool app client, select the Cognito user pool identity provider, enable the authorization-code OAuth flow, and select the `openid` and `email` scopes. Select `phone` only if the app needs the phone claim. Add only these exact production URLs to Cognito's allowed URLs:
 
 - Development: `http://localhost:5173/callback` and `http://localhost:5173/`
-- Production: `https://YOUR-PORTAL-DOMAIN/callback` and `https://YOUR-PORTAL-DOMAIN/`
+- Production: `https://sheerwoodadmission.com/callback` and `https://sheerwoodadmission.com/`
 
-If your Cognito app client is already configured with the supplied `https://sheerwoodadmission.com/callback` URL, set `VITE_COGNITO_REDIRECT_URI=https://sheerwoodadmission.com/callback`. Both `/callback` and `/auth/callback` are handled by the React app, but the configured value must match Cognito exactly.
+Set the default redirect URL to `https://sheerwoodadmission.com/callback`, and remove the old `/home` callback URL. Set `VITE_COGNITO_REDIRECT_URI=https://sheerwoodadmission.com/callback` in the production build. The React callback page handles the token exchange and then navigates to the role-specific dashboard; the configured value must match Cognito exactly.
 
 Portal access is derived from `custom:role` or from Cognito groups named `parent`, `student`, `teacher`, and `admin`. The React app redirects users to the corresponding portal after Cognito returns to `/callback`. Logout clears the browser session and sends the user to Cognito's `/logout` endpoint.
 

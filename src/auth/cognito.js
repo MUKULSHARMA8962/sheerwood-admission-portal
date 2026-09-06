@@ -1,6 +1,6 @@
 const SESSION_KEY = "sheerwood.cognito.session";
 const TRANSACTION_PREFIX = "sheerwood.cognito.transaction.";
-const DEFAULT_SCOPES = "openid email phone";
+const DEFAULT_SCOPES = "openid email";
 const ROLE_NAMES = ["parent", "student", "teacher", "admin"];
 
 function base64UrlEncode(bytes) {
@@ -62,7 +62,7 @@ export function getCognitoConfig() {
   const domain = normalizeDomain(import.meta.env.VITE_COGNITO_DOMAIN);
   const clientId = import.meta.env.VITE_COGNITO_CLIENT_ID?.trim();
   const origin = typeof window === "undefined" ? "" : window.location.origin;
-  const redirectUri = import.meta.env.VITE_COGNITO_REDIRECT_URI?.trim() || `${origin}/auth/callback`;
+  const redirectUri = import.meta.env.VITE_COGNITO_REDIRECT_URI?.trim() || `${origin}/callback`;
   const logoutUri = import.meta.env.VITE_COGNITO_LOGOUT_URI?.trim() || `${origin}/`;
 
   return {
