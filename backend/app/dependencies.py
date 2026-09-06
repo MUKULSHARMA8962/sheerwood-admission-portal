@@ -25,9 +25,12 @@ def cognito_role(claims: dict[str, Any]) -> str:
     groups = claims.get("cognito:groups") or []
     if not isinstance(groups, list):
         groups = []
-    candidates = [claims.get(configured_claim), claims.get("custom:role"), claims.get("role"), *groups]
-    role = next((str(value).strip().lower().replace(".", "") for value in candidates if str(value or "").strip().lower().replace(".", "") in {"parent", "teacher", "admin", "student", "admission"}), None)
-    return role or os.getenv("COGNITO_DEFAULT_ROLE", "admission").strip().lower()
+    normalize = lambda value: str(value or "").strip().lower().replace(".", "")
+    normalized_groups = [normalize(value) for value in groups]
+    group_priority = ("admin", "teacher", "student", "parent", "admission")
+    group_role = next((role for role in group_priority if role in normalized_groups), None)
+    claim_role = normalize(claims.get(configured_claim) or claims.get("custom:role") or claims.get("role"))
+    return group_role or claim_role or normalize(os.getenv("COGNITO_DEFAULT_ROLE", "admission"))
 
 
 @lru_cache(maxsize=1)
