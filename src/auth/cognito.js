@@ -39,7 +39,7 @@ function sanitizeReturnTo(returnTo) {
   return typeof returnTo === "string" && returnTo.startsWith("/") && !returnTo.startsWith("//") ? returnTo : "";
 }
 
-function deriveRole(claims) {
+export function deriveRole(claims) {
   const configuredClaim = import.meta.env.VITE_COGNITO_ROLE_CLAIM || "custom:role";
   const claimValue = claims?.[configuredClaim] || claims?.["custom:role"] || claims?.role;
   const groups = Array.isArray(claims?.["cognito:groups"]) ? claims["cognito:groups"] : [];

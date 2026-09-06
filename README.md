@@ -9,18 +9,20 @@ npm run dev
 
 ## Cognito Hosted UI sign-in
 
-Copy `.env.example` to `.env` and set the Cognito domain and app-client ID. The app uses the authorization-code grant with PKCE. Never place an app-client secret in a `VITE_` variable.
+The frontend uses `oidc-client-ts` through `react-oidc-context` with the authorization-code grant and PKCE. Copy `.env.example` to `.env` and set the Cognito authority, hosted domain, app-client ID, and exact callback/logout URLs. Never place an app-client secret in a `VITE_` variable.
 
 For a public Cognito SPA app client (no secret), leave `VITE_COGNITO_TOKEN_EXCHANGE_URL` unset and the browser exchanges the PKCE code directly. For the existing confidential client `32616boac6m5uc0t5fob99i2sd`, set `VITE_COGNITO_TOKEN_EXCHANGE_URL=/api/auth/cognito/token`. The FastAPI API then exchanges the code with Cognito using the secret held only in `backend/.env`.
 
-In the Cognito user-pool app client, select the Cognito user pool identity provider, enable the authorization-code OAuth flow, and select the `openid` and `email` scopes. Select `phone` only if the app needs the phone claim. Add only these exact production URLs to Cognito's allowed URLs:
+In the Cognito user-pool app client, select the Cognito user pool identity provider, enable the authorization-code OAuth flow, and select the `email`, `openid`, and `phone` scopes. Add only these exact production URLs to Cognito's allowed URLs:
 
-- Development: `http://localhost:5173/callback` and `http://localhost:5173/`
-- Production: `https://sheerwoodadmission.com/callback` and `https://sheerwoodadmission.com/`
+- Development callback: `http://localhost:5173/`
+- Production callback: `https://sheerwoodadmission.com/`
+- Development logout: `http://localhost:5173/`
+- Production logout: `https://sheerwoodadmission.com/`
 
-Set the default redirect URL to `https://sheerwoodadmission.com/callback`, and remove the old `/home` callback URL. Set `VITE_COGNITO_REDIRECT_URI=https://sheerwoodadmission.com/callback` in the production build. The React callback page handles the token exchange and then navigates to the role-specific dashboard; the configured value must match Cognito exactly.
+Set the default redirect URL to `https://sheerwoodadmission.com/`. The OIDC provider handles the callback and then the app navigates to the role-specific dashboard; the configured value must match Cognito exactly.
 
-Portal access is derived from `custom:role` or from Cognito groups named `parent`, `student`, `teacher`, and `admin`. The React app redirects users to the corresponding portal after Cognito returns to `/callback`. Logout clears the browser session and sends the user to Cognito's `/logout` endpoint.
+Portal access is derived from `custom:role` or from Cognito groups named `parent`, `student`, `teacher`, and `admin`. The React app redirects users to the corresponding portal after Cognito returns to `/`. Logout clears the browser session and sends the user to Cognito's `/logout` endpoint.
 
 The FastAPI backend can validate Cognito access tokens when `AUTH_MODE=cognito` is configured in `backend/.env`. It verifies the JWT signature against Cognito JWKS, issuer, expiry, `token_use=access`, and app-client ID before applying API role checks. See [backend/README.md](backend/README.md) for server configuration.
 

@@ -1,7 +1,9 @@
 
 
 
-import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
+import { useEffect } from "react";
+import { useAuth } from "react-oidc-context";
+import { BrowserRouter, Navigate, Route, Routes, useLocation, useNavigate } from "react-router-dom";
 import Dashboard from "./pages/Dashboard";
 import ApplicationStages from "./pages/Application_Stages/Application_Stages";
 import FeePayment from "./pages/Fee_Payment/Fee_Payment";
@@ -21,23 +23,43 @@ import NewUserDashboard from "./pages/NewUserDashboard";
 import StudentDashboard from "./pages/StudentDashboard";
 import SchoolCalendar from "./pages/SchoolCalendar";
 import VirtualTour from "./pages/VirtualTour";
-import AuthCallback from "./auth/AuthCallback";
+import { getDefaultRouteForRole } from "./auth/cognito";
 import RequireCognitoAuth from "./auth/RequireCognitoAuth";
+import { useCognitoAuth } from "./auth/useCognitoAuth";
 import "./pages/AdmissionMobile.css";
 
 function Protected({ roles, children }) {
   return <RequireCognitoAuth roles={roles}>{children}</RequireCognitoAuth>;
 }
 
+function OidcReturnRedirect() {
+  const auth = useAuth();
+  const { user } = useCognitoAuth();
+  const location = useLocation();
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    const returnTo = auth.user?.state?.returnTo;
+    const isSigninCallback = auth.user?.state && location.pathname === "/";
+    if (auth.isAuthenticated && isSigninCallback) {
+      const destination = typeof returnTo === "string" && returnTo.startsWith("/")
+        ? returnTo
+        : getDefaultRouteForRole(user?.role);
+      navigate(destination, { replace: true });
+    }
+  }, [auth.isAuthenticated, auth.user, location.pathname, navigate]);
+
+  return null;
+}
+
 export default function App() {
   return (
     <BrowserRouter>
+      <OidcReturnRedirect />
       <Routes>
         <Route path="/" element={<Home />} />
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
-        <Route path="/auth/callback" element={<AuthCallback />} />
-        <Route path="/callback" element={<AuthCallback />} />
         <Route path="/gallery" element={<Gallery />} />
         <Route path="/calendar" element={<SchoolCalendar />} />
         <Route path="/virtual-tour" element={<VirtualTour />} />
