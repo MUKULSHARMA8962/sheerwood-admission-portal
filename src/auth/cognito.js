@@ -1,7 +1,7 @@
 const SESSION_KEY = "sheerwood.cognito.session";
 const TRANSACTION_PREFIX = "sheerwood.cognito.transaction.";
 const DEFAULT_SCOPES = "openid email";
-const ROLE_NAMES = ["parent", "student", "teacher", "admin"];
+const ROLE_NAMES = ["parent", "student", "teacher", "admin", "admission"];
 
 function base64UrlEncode(bytes) {
   let binary = "";
@@ -44,7 +44,7 @@ export function deriveRole(claims) {
   const claimValue = claims?.[configuredClaim] || claims?.["custom:role"] || claims?.role;
   const groups = Array.isArray(claims?.["cognito:groups"]) ? claims["cognito:groups"] : [];
   const candidates = [claimValue, ...groups].map((value) => String(value || "").trim().toLowerCase().replace(/[^a-z]/g, ""));
-  return candidates.find((value) => ROLE_NAMES.includes(value)) || (import.meta.env.VITE_COGNITO_DEFAULT_ROLE || "parent").toLowerCase();
+  return candidates.find((value) => ROLE_NAMES.includes(value)) || (import.meta.env.VITE_COGNITO_DEFAULT_ROLE || "admission").toLowerCase();
 }
 
 function normalizeDomain(domain) {
@@ -202,6 +202,7 @@ export function getDefaultRouteForRole(role) {
     student: "/student/dashboard",
     teacher: "/teacher/dashboard",
     admin: "/admin/dashboard",
+    admission: "/admission-details",
   }[role] || "/dashboard";
 }
 

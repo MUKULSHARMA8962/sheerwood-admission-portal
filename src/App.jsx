@@ -66,7 +66,7 @@ export default function App() {
         <Route path="/dashboard" element={<Protected roles={["parent"]}><Dashboard /></Protected>} />
         <Route path="/new-user-dashboard" element={<Protected roles={["parent"]}><NewUserDashboard /></Protected>} />
         <Route path="/student/dashboard" element={<Protected roles={["student"]}><StudentDashboard /></Protected>} />
-        <Route path="/admission-details" element={<Protected roles={["parent"]}><ParentDashboard /></Protected>} />
+        <Route path="/admission-details" element={<Protected roles={["admission", "parent"]}><ParentDashboard /></Protected>} />
         <Route path="/student-information" element={<Protected roles={["parent"]}><StudentInformation /></Protected>} />
         <Route path="/parent-guardian" element={<Protected roles={["parent"]}><ParentGuardian /></Protected>} />
         <Route path="/application/medical" element={<Protected roles={["parent"]}><Navigate to="/application/documents" replace /></Protected>} />

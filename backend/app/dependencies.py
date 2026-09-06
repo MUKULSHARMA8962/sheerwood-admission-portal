@@ -26,8 +26,8 @@ def cognito_role(claims: dict[str, Any]) -> str:
     if not isinstance(groups, list):
         groups = []
     candidates = [claims.get(configured_claim), claims.get("custom:role"), claims.get("role"), *groups]
-    role = next((str(value).strip().lower() for value in candidates if str(value or "").strip().lower() in {"parent", "teacher", "admin", "student"}), None)
-    return role or os.getenv("COGNITO_DEFAULT_ROLE", "parent").strip().lower()
+    role = next((str(value).strip().lower().replace(".", "") for value in candidates if str(value or "").strip().lower().replace(".", "") in {"parent", "teacher", "admin", "student", "admission"}), None)
+    return role or os.getenv("COGNITO_DEFAULT_ROLE", "admission").strip().lower()
 
 
 @lru_cache(maxsize=1)
@@ -68,6 +68,7 @@ def provision_cognito_user(claims: dict[str, Any]) -> dict[str, Any]:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Cognito access token has no subject claim.")
 
     role = cognito_role(claims)
+    database_role = "parent" if role == "admission" else role
     username = str(claims.get("username") or subject).strip()
     email = username.lower()
     full_name = str(claims.get("name") or username).strip()
@@ -82,11 +83,11 @@ def provision_cognito_user(claims: dict[str, Any]) -> dict[str, Any]:
         if not user:
             user = database.execute("SELECT id, email, full_name, role FROM users WHERE email = ?", (email,)).fetchone()
             if user:
-                database.execute("UPDATE users SET cognito_subject = ?, role = ? WHERE id = ?", (subject, role, user["id"]))
+                database.execute("UPDATE users SET cognito_subject = ?, role = ? WHERE id = ?", (subject, database_role, user["id"]))
             else:
                 cursor = database.execute(
                     "INSERT INTO users (email, full_name, role, password_hash, cognito_subject) VALUES (?, ?, ?, ?, ?)",
-                    (email, full_name, role, hash_password(secrets.token_urlsafe(32)), subject),
+                    (email, full_name, database_role, hash_password(secrets.token_urlsafe(32)), subject),
                 )
                 user = database.execute("SELECT id, email, full_name, role FROM users WHERE id = ?", (cursor.lastrowid,)).fetchone()
                 return serialize_user(user)
