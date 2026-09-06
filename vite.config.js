@@ -1,3 +1,4 @@
+import { existsSync } from "node:fs";
 import { copyFile, mkdir, writeFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import { defineConfig } from "vite";
@@ -8,13 +9,19 @@ function appGardenStaticWorker() {
     name: "app-garden-static-worker",
     apply: "build",
     async closeBundle() {
+      const hostingConfig = resolve(process.cwd(), ".openai", "hosting.json");
+
+      // Self-hosted builds do not receive the private Sites metadata directory.
+      // Build the normal Vite static bundle without its Sites-only worker files.
+      if (!existsSync(hostingConfig)) return;
+
       const outputDirectory = resolve(process.cwd(), "dist");
       const serverDirectory = resolve(outputDirectory, "server");
       const metadataDirectory = resolve(outputDirectory, ".openai");
 
       await mkdir(serverDirectory, { recursive: true });
       await mkdir(metadataDirectory, { recursive: true });
-      await copyFile(resolve(process.cwd(), ".openai", "hosting.json"), resolve(metadataDirectory, "hosting.json"));
+      await copyFile(hostingConfig, resolve(metadataDirectory, "hosting.json"));
       await writeFile(resolve(serverDirectory, "index.js"), `
 export default {
   async fetch(request, env) {

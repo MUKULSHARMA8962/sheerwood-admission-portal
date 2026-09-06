@@ -48,6 +48,16 @@ sudo systemctl status sheerwood-api --no-pager
 curl http://127.0.0.1:8000/api/health
 ```
 
+Build and publish the React UI after setting the public Cognito values in `.env.production`. Vite compiles these browser-safe `VITE_` values into the static files, so rerun this step whenever they change:
+
+```bash
+grep '^VITE_COGNITO_' .env.production
+npm run build
+sudo cp -a dist/. /var/www/html/
+```
+
+The build works whether or not the private `.openai/hosting.json` Sites metadata file is present. It is not required for this Nginx deployment.
+
 The service listens only on `127.0.0.1:8000`; it is not publicly exposed. Add the API proxy to the existing HTTPS virtual host without replacing its React static-file configuration:
 
 ```bash
