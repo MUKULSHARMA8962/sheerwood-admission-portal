@@ -95,10 +95,14 @@ async def exchange_cognito_code(payload: CognitoTokenExchangeRequest) -> JSONRes
 
     if not response.is_success:
         cognito_error = token_data.get("error") if isinstance(token_data, dict) else None
-        if cognito_error == "invalid_client_secret":
+        if cognito_error in {"invalid_client", "invalid_client_secret"}:
             detail = "The server-side Cognito client secret is invalid. Update backend/.env and restart the API."
         elif cognito_error == "invalid_grant":
             detail = "This Cognito sign-in link has expired. Please start sign-in again."
+        elif cognito_error == "unauthorized_client":
+            detail = "Cognito rejected this app client's authorization-code or callback configuration."
+        elif cognito_error == "invalid_request":
+            detail = "Cognito rejected an incomplete sign-in request. Please start sign-in again."
         else:
             detail = "Cognito could not complete this sign-in. Please start again."
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=detail)
