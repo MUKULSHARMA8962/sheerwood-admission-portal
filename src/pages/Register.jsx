@@ -13,7 +13,7 @@ export default function Register() {
   async function beginRegistration() {
     setMessage("");
     try {
-      await signIn("/new-user-dashboard");
+      await signIn("/admission-details");
     } catch (reason) {
       setMessage(reason.message || "Cognito account setup could not be started.");
     }

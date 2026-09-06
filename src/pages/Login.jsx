@@ -11,7 +11,7 @@ export default function Login() {
   const location = useLocation();
   const { signIn, isConfigured } = useCognitoAuth();
   const admissionFlow = new URLSearchParams(location.search).get("flow") === "admission";
-  const returnTo = new URLSearchParams(location.search).get("returnTo") || (admissionFlow ? "/new-user-dashboard" : "");
+  const returnTo = new URLSearchParams(location.search).get("returnTo") || (admissionFlow ? "/admission-details" : "");
   const description = admissionFlow ? "Sign in or create an account securely to open the admission form." : "Use your school account to continue to the correct portal.";
   const [error, setError] = useState("");
 
