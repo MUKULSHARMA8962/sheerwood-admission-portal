@@ -43,3 +43,11 @@ export function requestMobileOtp(phoneNumber) {
 export function verifyMobileOtp(phoneNumber, otp) {
   return otpRequest("verify", { phone_number: toE164PhoneNumber(phoneNumber), otp });
 }
+
+export function requestEmailOtp(email) {
+  return otpRequest("email/request", { email: email.trim().toLowerCase() });
+}
+
+export function verifyEmailOtp(email, otp) {
+  return otpRequest("email/verify", { email: email.trim().toLowerCase(), otp });
+}

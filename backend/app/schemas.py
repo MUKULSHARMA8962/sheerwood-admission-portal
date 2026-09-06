@@ -62,3 +62,11 @@ class OTPRequest(BaseModel):
 
 class OTPVerifyRequest(OTPRequest):
     otp: str = Field(pattern=r"^\d{6}$")
+
+
+class EmailOTPRequest(BaseModel):
+    email: str = Field(min_length=5, max_length=254)
+
+
+class EmailOTPVerifyRequest(EmailOTPRequest):
+    otp: str = Field(pattern=r"^\d{6}$")

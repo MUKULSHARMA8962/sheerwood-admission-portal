@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { askSchoolAI } from "../../services/api";
 import { getAdmissionDocuments, updateAdmissionDocument } from "../../services/admission";
+import { useCognitoAuth } from "../../auth/useCognitoAuth";
 import "./Admin_Portal.css";
 import "./AdminFeatures.css";
 import "./AdminDocumentActions.css";
@@ -16,7 +17,8 @@ function AdminButton({ children, onClick, outline = false }) { return <button cl
 
 function Sidebar({ screen }) {
   const navigate = useNavigate();
-  return <aside className="admin-sidebar"><Link className="admin-brand" to="/admin/dashboard"><span>S</span><div><strong>Sheerwood</strong><small>Admin Portal</small></div></Link><nav aria-label="Admin portal navigation">{navItems.map(([icon, label, target]) => <button className={screen === target ? "active" : ""} key={label} onClick={() => navigate(`/admin/${target}`)}><span>{icon}</span>{label}</button>)}</nav><Link className="admin-logout" to="/login"><span>↪</span> Logout</Link></aside>;
+  const { signOut } = useCognitoAuth();
+  return <aside className="admin-sidebar"><Link className="admin-brand" to="/admin/dashboard"><span>S</span><div><strong>Sheerwood</strong><small>Admin Portal</small></div></Link><nav aria-label="Admin portal navigation">{navItems.map(([icon, label, target]) => <button className={screen === target ? "active" : ""} key={label} onClick={() => navigate(`/admin/${target}`)}><span>{icon}</span>{label}</button>)}</nav><button className="admin-logout" onClick={signOut}><span>↪</span> Logout</button></aside>;
 }
 
 function DashboardView({ openScreen, setNotice }) {

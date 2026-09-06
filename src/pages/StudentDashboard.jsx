@@ -1,6 +1,8 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
+import { useCognitoAuth } from "../auth/useCognitoAuth";
 import "./StudentDashboard.css";
+import "./StudentAuth.css";
 import StudentPortalModule from "./StudentPortalModule";
 
 const navigation = [["⌂", "Dashboard"], ["◔", "Attendance"], ["▤", "My Subjects"], ["◷", "Timetable"], ["▱", "Homework"], ["✦", "Exams & Results"], ["▥", "Performance"], ["▣", "Study Material"], ["✉", "Announcements"], ["◫", "Fees"], ["◒", "Leave Request"], ["✧", "AI Assistant"], ["♙", "My Profile"]];
@@ -10,6 +12,7 @@ const classes = [["09:00", "English", "Neha Sharma", "Room 204", "Completed"], [
 const homework = [["Mathematics", "Algebra practice worksheet", "Today, 6:00 PM", "Pending"], ["Science", "Complete cell structure diagram", "Tomorrow, 9:00 AM", "Pending"], ["English", "Read Chapter 8 and write summary", "14 Jun", "Pending"]];
 
 export default function StudentDashboard() {
+  const { signOut, user } = useCognitoAuth();
   const [activeNav, setActiveNav] = useState("Dashboard");
   const [notice, setNotice] = useState("");
   const [search, setSearch] = useState("");
@@ -29,10 +32,11 @@ export default function StudentDashboard() {
       <Link className="student-brand" to="/"><span>S</span><div><strong>Sheerwood</strong><small>Student Portal</small></div></Link>
       <nav aria-label="Student dashboard navigation">{navigation.map(([icon, label]) => <button className={activeNav === label ? "active" : ""} key={label} onClick={() => { setActiveNav(label); if (label !== "Dashboard") setNotice(`${label} workspace selected.`); }}><i>{icon}</i><span>{label}</span>{label === "Homework" && <b>3</b>}</button>)}</nav>
       <section className="student-sidebar-help"><span>✧</span><b>AI Study Assistant</b><small>Homework help, MCQs and revision support.</small><button onClick={() => setAiOpen(true)}>Ask AI →</button></section>
+      <button className="student-logout" onClick={signOut}>↪ Logout</button>
     </aside>
 
     <section className="student-workspace">
-      <header className="student-topbar"><label className="student-search"><span>⌕</span><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search subjects, homework or notes..." /></label><div className="student-top-actions"><button className="student-ai-top" onClick={() => setAiOpen(true)}>✧ AI Assistant</button><button className="student-bell" onClick={() => setNotice("You have 3 new notifications.")} aria-label="Notifications">♧<i>3</i></button><button className="student-profile"><span>RK</span><div><b>Rahul Kumar</b><small>Class 8-A</small></div></button></div></header>
+      <header className="student-topbar"><label className="student-search"><span>⌕</span><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search subjects, homework or notes..." /></label><div className="student-top-actions"><button className="student-ai-top" onClick={() => setAiOpen(true)}>✧ AI Assistant</button><button className="student-bell" onClick={() => setNotice("You have 3 new notifications.")} aria-label="Notifications">♧<i>3</i></button><button className="student-profile"><span>RK</span><div><b>{user?.name || "Student"}</b><small>Class 8-A</small></div></button></div></header>
 
       <section className="student-content">
         <header className="student-welcome"><div><p>WEDNESDAY, 12 JUNE 2027</p><h1>Good Morning, Rahul <span>👋</span></h1><small>Class 8-A · Roll No. 24 · Class Teacher: <b>Neha Sharma</b></small></div><button onClick={() => setNotice("Your student profile is up to date.")}>♙ View profile</button></header>

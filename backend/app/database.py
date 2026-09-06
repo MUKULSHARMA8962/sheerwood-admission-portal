@@ -33,6 +33,7 @@ def initialize_database() -> None:
                 full_name TEXT NOT NULL,
                 role TEXT NOT NULL CHECK(role IN ('parent', 'teacher', 'admin')),
                 password_hash TEXT NOT NULL,
+                cognito_subject TEXT UNIQUE,
                 created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
             );
 
@@ -75,8 +76,20 @@ def initialize_database() -> None:
                 expires_at TEXT NOT NULL,
                 attempts INTEGER NOT NULL DEFAULT 0
             );
+
+            CREATE TABLE IF NOT EXISTS email_otp_codes (
+                email TEXT PRIMARY KEY,
+                code_hash TEXT NOT NULL,
+                created_at TEXT NOT NULL,
+                expires_at TEXT NOT NULL,
+                attempts INTEGER NOT NULL DEFAULT 0
+            );
             """
         )
+        existing_columns = {row["name"] for row in database.execute("PRAGMA table_info(users)")}
+        if "cognito_subject" not in existing_columns:
+            database.execute("ALTER TABLE users ADD COLUMN cognito_subject TEXT")
+            database.execute("CREATE UNIQUE INDEX IF NOT EXISTS users_cognito_subject_idx ON users(cognito_subject) WHERE cognito_subject IS NOT NULL")
         _seed_data(database)
 
 

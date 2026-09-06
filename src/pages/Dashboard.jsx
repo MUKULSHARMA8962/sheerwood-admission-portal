@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { getSchoolInformationAnswer } from "../services/schoolInformation";
+import { useCognitoAuth } from "../auth/useCognitoAuth";
 import "./Dashboard.css";
 import "./DashboardToggle.css";
 import "./AdmissionDashboard.css";
@@ -68,6 +69,7 @@ function progressClass(value) {
 export default function Dashboard() {
   const location = useLocation();
   const navigate = useNavigate();
+  const { signOut, user } = useCognitoAuth();
   const [notice, setNotice] = useState("");
   const [question, setQuestion] = useState("");
   const [answer, setAnswer] = useState("Hello! I’m your AI Assistant. How can I help you today?");
@@ -76,7 +78,7 @@ export default function Dashboard() {
   const [sessionMenuOpen, setSessionMenuOpen] = useState(false);
   const [profileMenuOpen, setProfileMenuOpen] = useState(false);
   const [aiFloatingOpen, setAiFloatingOpen] = useState(false);
-  const parentName = location.state?.email?.split("@")[0] || "Parent";
+  const parentName = user?.name || location.state?.email?.split("@")[0] || "Parent";
 
   function openItem(label, route) {
     if (route) {
@@ -105,7 +107,7 @@ export default function Dashboard() {
           {navigation.map(([icon, label, route, badge]) => <button className={label === "Dashboard" ? "active" : ""} key={label} onClick={() => openItem(label, route)}><i>{icon}</i><span>{label}</span>{badge && <b>{badge}</b>}</button>)}
         </nav>
         <section className="sidebar-assistant"><p>Need Help?</p><span>Chat with our<br />AI Assistant</span><div className="tiny-robot"><i>● ●</i><b>⌣</b></div><button onClick={() => navigate("/ai-assistant")}>Start Chat</button></section>
-        <button className="parent-logout" onClick={() => navigate("/login")}><i>↪</i> Logout</button>
+        <button className="parent-logout" onClick={signOut}><i>↪</i> Logout</button>
       </aside>
 
       <section className="parent-workspace">
@@ -119,7 +121,7 @@ export default function Dashboard() {
             <button className="bell" aria-label="Notifications">♧<i>3</i></button>
             <div className="topbar-dropdown profile-dropdown">
               <button className="profile-select" onClick={() => { setProfileMenuOpen((open) => !open); setSessionMenuOpen(false); }} aria-expanded={profileMenuOpen}><span className="top-avatar">RS</span><span><b>Rajesh Sharma⌄</b><small>Parent</small></span></button>
-              {profileMenuOpen && <div className="topbar-menu profile-menu"><button onClick={() => { setProfileMenuOpen(false); setNotice("Profile settings will be available soon."); }}>♙ My Profile</button><button onClick={() => { setProfileMenuOpen(false); navigate("/track-application"); }}>▤ Track Application</button><button className="menu-logout" onClick={() => navigate("/login")}>↪ Logout</button></div>}
+              {profileMenuOpen && <div className="topbar-menu profile-menu"><button onClick={() => { setProfileMenuOpen(false); setNotice("Profile settings will be available soon."); }}>♙ My Profile</button><button onClick={() => { setProfileMenuOpen(false); navigate("/track-application"); }}>▤ Track Application</button><button className="menu-logout" onClick={signOut}>↪ Logout</button></div>}
             </div>
           </div>
         </header>

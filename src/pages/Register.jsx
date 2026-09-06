@@ -1,34 +1,22 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
+import { useCognitoAuth } from "../auth/useCognitoAuth";
+import { getCognitoConfigurationError } from "../auth/cognito";
 import campusImage from "../assets/sheerwood-campus-aerial-web.jpg";
 import "./Register.css";
 
 export default function Register() {
   const navigate = useNavigate();
-  const [showPassword, setShowPassword] = useState(false);
-  const [form, setForm] = useState({ firstName: "", lastName: "", email: "", phone: "", password: "", confirmPassword: "", consent: false });
+  const { signIn, isConfigured } = useCognitoAuth();
   const [message, setMessage] = useState("");
 
-  function update(event) {
-    const { name, value, checked, type } = event.target;
-    setForm((current) => ({ ...current, [name]: type === "checkbox" ? checked : value }));
-  }
-
-  function submit(event) {
-    event.preventDefault();
-    if (form.password.length < 8) {
-      setMessage("Please use a password with at least 8 characters.");
-      return;
+  async function beginRegistration() {
+    setMessage("");
+    try {
+      await signIn("/new-user-dashboard");
+    } catch (reason) {
+      setMessage(reason.message || "Cognito account setup could not be started.");
     }
-    if (form.password !== form.confirmPassword) {
-      setMessage("Your passwords do not match. Please try again.");
-      return;
-    }
-    if (!form.consent) {
-      setMessage("Please accept the terms to create your account.");
-      return;
-    }
-    setMessage("Account created successfully. You can now continue to your parent dashboard.");
   }
 
   return <main className="register-page">
@@ -42,17 +30,14 @@ export default function Register() {
 
       <section className="register-form-wrap">
         <header><span className="register-label">PARENT REGISTRATION</span><h2>Create your account</h2><p>Already have an account? <Link to="/login">Sign in</Link></p></header>
-        {message && <div className={message.startsWith("Account") ? "register-message success" : "register-message"} role="status">{message}<button onClick={() => setMessage("")} aria-label="Dismiss message">×</button></div>}
-        {message.startsWith("Account") ? <button className="register-dashboard" onClick={() => navigate("/dashboard", { state: { email: form.email } })}>Go to Parent Dashboard →</button> : <form className="register-form" onSubmit={submit}>
-          <div className="register-name-fields"><label>First name<input name="firstName" value={form.firstName} onChange={update} placeholder="Rajesh" required /></label><label>Last name<input name="lastName" value={form.lastName} onChange={update} placeholder="Sharma" required /></label></div>
-          <label>Email address<input name="email" type="email" value={form.email} onChange={update} placeholder="parent@example.com" required /></label>
-          <label>Mobile number<input name="phone" type="tel" value={form.phone} onChange={update} placeholder="98765 43210" pattern="[0-9 +()-]{8,}" required /></label>
-          <label>Create password<div className="register-password"><input name="password" type={showPassword ? "text" : "password"} value={form.password} onChange={update} placeholder="Minimum 8 characters" minLength="8" required /><button type="button" onClick={() => setShowPassword((current) => !current)}>{showPassword ? "Hide" : "Show"}</button></div></label>
-          <label>Confirm password<input name="confirmPassword" type={showPassword ? "text" : "password"} value={form.confirmPassword} onChange={update} placeholder="Re-enter password" required /></label>
-          <label className="register-consent"><input name="consent" type="checkbox" checked={form.consent} onChange={update} /><span>I agree to the <a href="#terms">Terms of Use</a> and <a href="#privacy">Privacy Policy</a>.</span></label>
-          <button className="register-submit" type="submit">Create Parent Account →</button>
+        {message && <div className="register-message" role="alert">{message}<button onClick={() => setMessage("")} aria-label="Dismiss message">×</button></div>}
+        {!isConfigured && <div className="register-message" role="alert">{getCognitoConfigurationError()}</div>}
+        <section className="register-form" aria-label="Cognito account setup">
+          <label>Account setup is managed securely by Cognito.</label>
+          <p>Your hosted sign-in page can offer account creation, password recovery, email verification and any configured MFA options.</p>
+          <button className="register-submit" type="button" disabled={!isConfigured} onClick={beginRegistration}>Continue to Cognito →</button>
           <small>Your information is protected and used only for the admissions process.</small>
-        </form>}
+        </section>
       </section>
     </section>
   </main>;

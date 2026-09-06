@@ -6,7 +6,10 @@ import hashlib
 import hmac
 import os
 import secrets
+import smtplib
+import ssl
 from datetime import UTC, datetime, timedelta
+from email.message import EmailMessage
 
 import boto3
 
@@ -37,6 +40,15 @@ def normalize_phone_number(phone_number: str) -> str:
     return normalized
 
 
+def normalize_email_address(email: str) -> str:
+    """Return a normalized email address suitable for OTP storage and delivery."""
+    normalized = email.strip().lower()
+    local_part, separator, domain = normalized.partition("@")
+    if not separator or not local_part or not domain or "." not in domain or len(normalized) > 254:
+        raise ValueError("Enter a valid email address.")
+    return normalized
+
+
 def _otp_secret() -> str:
     secret = os.getenv("OTP_SECRET_KEY")
     if not secret:
@@ -44,8 +56,8 @@ def _otp_secret() -> str:
     return secret
 
 
-def _hash_otp(phone_number: str, otp: str) -> str:
-    return hmac.new(_otp_secret().encode(), f"{phone_number}:{otp}".encode(), hashlib.sha256).hexdigest()
+def _hash_otp(recipient: str, otp: str) -> str:
+    return hmac.new(_otp_secret().encode(), f"{recipient}:{otp}".encode(), hashlib.sha256).hexdigest()
 
 
 def _now() -> datetime:
@@ -65,6 +77,40 @@ def send_otp(phone_number: str, otp: str) -> None:
         )
     except Exception as error:
         raise OTPDeliveryError("Unable to send the OTP right now. Please try again shortly.") from error
+
+
+def send_email_otp(email: str, otp: str) -> None:
+    """Deliver an OTP over SMTP without logging the email address or code."""
+    host = os.getenv("SMTP_HOST")
+    sender = os.getenv("SMTP_FROM_EMAIL")
+    if not host or not sender:
+        raise OTPConfigurationError("SMTP_HOST and SMTP_FROM_EMAIL must be configured on the server.")
+
+    message = EmailMessage()
+    message["Subject"] = "Your Sheerwood verification code"
+    message["From"] = sender
+    message["To"] = email
+    message.set_content(
+        f"Your Sheerwood verification code is {otp}. It is valid for 5 minutes. Do not share this code."
+    )
+
+    try:
+        port = int(os.getenv("SMTP_PORT", "587"))
+        username = os.getenv("SMTP_USERNAME")
+        password = os.getenv("SMTP_PASSWORD")
+        use_tls = os.getenv("SMTP_USE_TLS", "true").lower() in {"1", "true", "yes"}
+        with smtplib.SMTP(host, port, timeout=10) as smtp:
+            if use_tls:
+                smtp.starttls(context=ssl.create_default_context())
+            if username:
+                if not password:
+                    raise OTPConfigurationError("SMTP_PASSWORD must be configured when SMTP_USERNAME is set.")
+                smtp.login(username, password)
+            smtp.send_message(message)
+    except OTPConfigurationError:
+        raise
+    except Exception as error:
+        raise OTPDeliveryError("Unable to send the email OTP right now. Please try again shortly.") from error
 
 
 def issue_otp(phone_number: str) -> int:
@@ -116,4 +162,56 @@ def verify_otp(phone_number: str, otp: str) -> bool:
             return True
 
         database.execute("UPDATE otp_codes SET attempts = attempts + 1 WHERE phone_number = ?", (normalized_phone,))
+        return False
+
+
+def issue_email_otp(email: str) -> int:
+    """Create, hash, store and email a one-time password."""
+    normalized_email = normalize_email_address(email)
+    now = _now()
+
+    with connection() as database:
+        previous = database.execute("SELECT created_at FROM email_otp_codes WHERE email = ?", (normalized_email,)).fetchone()
+        if previous:
+            last_request = datetime.fromisoformat(previous["created_at"])
+            remaining = OTP_RESEND_SECONDS - int((now - last_request).total_seconds())
+            if remaining > 0:
+                raise OTPResendTooSoonError(f"Please wait {remaining} seconds before requesting another OTP.")
+
+    otp = str(secrets.randbelow(900_000) + 100_000)
+    send_email_otp(normalized_email, otp)
+    code_hash = _hash_otp(normalized_email, otp)
+
+    with connection() as database:
+        database.execute(
+            """INSERT INTO email_otp_codes (email, code_hash, created_at, expires_at, attempts)
+            VALUES (?, ?, ?, ?, 0)
+            ON CONFLICT(email) DO UPDATE SET
+                code_hash = excluded.code_hash,
+                created_at = excluded.created_at,
+                expires_at = excluded.expires_at,
+                attempts = 0""",
+            (normalized_email, code_hash, now.isoformat(), (now + timedelta(seconds=OTP_EXPIRY_SECONDS)).isoformat()),
+        )
+    return OTP_EXPIRY_SECONDS
+
+
+def verify_email_otp(email: str, otp: str) -> bool:
+    """Verify one email OTP once; reject expired or over-attempted codes."""
+    normalized_email = normalize_email_address(email)
+    with connection() as database:
+        record = database.execute("SELECT * FROM email_otp_codes WHERE email = ?", (normalized_email,)).fetchone()
+        if not record:
+            return False
+
+        if datetime.fromisoformat(record["expires_at"]) <= _now() or record["attempts"] >= OTP_MAX_ATTEMPTS:
+            database.execute("DELETE FROM email_otp_codes WHERE email = ?", (normalized_email,))
+            return False
+
+        is_valid = hmac.compare_digest(record["code_hash"], _hash_otp(normalized_email, otp))
+        if is_valid:
+            database.execute("DELETE FROM email_otp_codes WHERE email = ?", (normalized_email,))
+            return True
+
+        database.execute("UPDATE email_otp_codes SET attempts = attempts + 1 WHERE email = ?", (normalized_email,))
         return False
