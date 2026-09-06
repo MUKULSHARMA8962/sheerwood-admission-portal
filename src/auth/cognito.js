@@ -138,7 +138,10 @@ export async function completeCognitoSignIn(search) {
   }
 
   const code = query.get("code");
-  if (!code || !state) throw new Error("The Cognito callback is missing its authorization code or state.");
+  if (!code) throw new Error("The Cognito callback is missing its authorization code. Please start sign-in again from the portal.");
+  if (!state) {
+    throw new Error("This sign-in was not started from the portal. Return to sign in and use Continue with Cognito; do not open the callback URL directly.");
+  }
 
   const transactionKey = `${TRANSACTION_PREFIX}${state}`;
   const serializedTransaction = sessionStorage.getItem(transactionKey);
