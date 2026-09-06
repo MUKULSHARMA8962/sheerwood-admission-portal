@@ -33,6 +33,17 @@ function Protected({ roles, children }) {
   return <RequireCognitoAuth roles={roles}>{children}</RequireCognitoAuth>;
 }
 
+function canRoleOpenPath(role, path) {
+  if (!path || path === "/") return false;
+  if (path.startsWith("/admin/")) return role === "admin";
+  if (path.startsWith("/teacher/")) return role === "teacher";
+  if (path.startsWith("/student/")) return role === "student";
+  if (path === "/dashboard" || path === "/new-user-dashboard" || path.startsWith("/application/") || ["/admission-details", "/student-information", "/parent-guardian", "/fee-payment", "/application-success"].includes(path)) {
+    return role === "parent" || role === "admission";
+  }
+  return true;
+}
+
 function OidcReturnRedirect() {
   const auth = useAuth();
   const { user } = useCognitoAuth();
@@ -43,7 +54,7 @@ function OidcReturnRedirect() {
     const returnTo = auth.user?.state?.returnTo;
     const isSigninCallback = auth.user?.state && location.pathname === "/";
     if (auth.isAuthenticated && isSigninCallback) {
-      const destination = typeof returnTo === "string" && returnTo.startsWith("/")
+      const destination = typeof returnTo === "string" && returnTo.startsWith("/") && canRoleOpenPath(user?.role, returnTo)
         ? returnTo
         : getDefaultRouteForRole(user?.role);
       navigate(destination, { replace: true });
