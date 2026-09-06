@@ -43,7 +43,7 @@ export function deriveRole(claims) {
   const configuredClaim = import.meta.env.VITE_COGNITO_ROLE_CLAIM || "custom:role";
   const claimValue = claims?.[configuredClaim] || claims?.["custom:role"] || claims?.role;
   const groups = Array.isArray(claims?.["cognito:groups"]) ? claims["cognito:groups"] : [];
-  const candidates = [claimValue, ...groups].map((value) => String(value || "").trim().toLowerCase());
+  const candidates = [claimValue, ...groups].map((value) => String(value || "").trim().toLowerCase().replace(/[^a-z]/g, ""));
   return candidates.find((value) => ROLE_NAMES.includes(value)) || (import.meta.env.VITE_COGNITO_DEFAULT_ROLE || "parent").toLowerCase();
 }
 
