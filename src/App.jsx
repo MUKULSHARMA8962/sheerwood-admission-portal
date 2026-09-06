@@ -5,6 +5,7 @@ import { useEffect } from "react";
 import { useAuth } from "react-oidc-context";
 import { BrowserRouter, Navigate, Route, Routes, useLocation, useNavigate } from "react-router-dom";
 import Dashboard from "./pages/Dashboard";
+import AdmissionDetails from "./pages/AdmissionDetails";
 import ApplicationStages from "./pages/Application_Stages/Application_Stages";
 import FeePayment from "./pages/Fee_Payment/Fee_Payment";
 import Gallery from "./pages/Gallery/Gallery";
@@ -66,7 +67,7 @@ export default function App() {
         <Route path="/dashboard" element={<Protected roles={["parent"]}><Dashboard /></Protected>} />
         <Route path="/new-user-dashboard" element={<Protected roles={["parent"]}><NewUserDashboard /></Protected>} />
         <Route path="/student/dashboard" element={<Protected roles={["student"]}><StudentDashboard /></Protected>} />
-        <Route path="/admission-details" element={<Protected roles={["admission", "parent"]}><ParentDashboard /></Protected>} />
+        <Route path="/admission-details" element={<Protected roles={["admission", "parent"]}><AdmissionDetails /></Protected>} />
         <Route path="/student-information" element={<Protected roles={["parent"]}><StudentInformation /></Protected>} />
         <Route path="/parent-guardian" element={<Protected roles={["parent"]}><ParentGuardian /></Protected>} />
         <Route path="/application/medical" element={<Protected roles={["parent"]}><Navigate to="/application/documents" replace /></Protected>} />
