@@ -22,6 +22,53 @@ Portal access is derived from `custom:role` or from Cognito groups named `parent
 
 The FastAPI backend can validate Cognito access tokens when `AUTH_MODE=cognito` is configured in `backend/.env`. It verifies the JWT signature against Cognito JWKS, issuer, expiry, `token_use=access`, and app-client ID before applying API role checks. See [backend/README.md](backend/README.md) for server configuration.
 
+## Existing Nginx server: run the API continuously
+
+If the Ubuntu server already serves the React site with Nginx, use this deployment path instead of Docker Compose. Do not start the included Caddy Docker gateway on the same server while Nginx owns ports `80` and `443`.
+
+Create the isolated Python environment and install the API dependencies:
+
+```bash
+cd ~/sheerwood-admission-portal
+sudo apt update
+sudo apt install -y python3-venv
+python3 -m venv backend/.venv
+backend/.venv/bin/python -m pip install --upgrade pip
+backend/.venv/bin/python -m pip install -r backend/requirements.txt
+test -f backend/.env || cp backend/.env.example backend/.env
+```
+
+Set the real Cognito client ID in `backend/.env`, then install and start the always-on API service:
+
+```bash
+sudo cp deploy/sheerwood-api.service /etc/systemd/system/sheerwood-api.service
+sudo systemctl daemon-reload
+sudo systemctl enable --now sheerwood-api
+sudo systemctl status sheerwood-api --no-pager
+curl http://127.0.0.1:8000/api/health
+```
+
+The service listens only on `127.0.0.1:8000`; it is not publicly exposed. Add the API proxy to the existing HTTPS virtual host without replacing its React static-file configuration:
+
+```bash
+sudo cp deploy/nginx-api-proxy.conf /etc/nginx/snippets/sheerwood-api.conf
+sudo grep -RIl "server_name.*sheerwoodadmission\\.com" /etc/nginx/sites-enabled /etc/nginx/conf.d
+```
+
+In the `server { ... }` block shown by the last command, add this line:
+
+```nginx
+include /etc/nginx/snippets/sheerwood-api.conf;
+```
+
+Ensure its existing React route has `try_files $uri $uri/ /index.html;` so the Cognito `/callback` route loads the SPA. Then validate and reload Nginx:
+
+```bash
+sudo nginx -t
+sudo systemctl reload nginx
+curl https://sheerwoodadmission.com/api/health
+```
+
 ## Run UI and API continuously on Ubuntu with Docker
 
 The included Docker Compose setup runs three services: the React UI, the internal FastAPI API, and a Caddy HTTPS gateway. The API is reachable only through the UI gateway at `/api`, and its SQLite database is kept in a persistent Docker volume. All services use `restart: unless-stopped`, so they return after a server or Docker restart.

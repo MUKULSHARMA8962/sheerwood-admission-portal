@@ -1,0 +1,17 @@
+[Unit]
+Description=Sheerwood Admission Portal FastAPI API
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=simple
+User=ubuntu
+Group=ubuntu
+WorkingDirectory=/home/ubuntu/sheerwood-admission-portal/backend
+Environment=PYTHONUNBUFFERED=1
+ExecStart=/home/ubuntu/sheerwood-admission-portal/backend/.venv/bin/uvicorn app.main:app --host 127.0.0.1 --port 8000 --proxy-headers --forwarded-allow-ips=127.0.0.1
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
