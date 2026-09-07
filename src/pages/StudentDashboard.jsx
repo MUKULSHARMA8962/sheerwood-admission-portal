@@ -6,10 +6,10 @@ import "./StudentAuth.css";
 import StudentPortalModule from "./StudentPortalModule";
 
 const navigation = [["⌂", "Dashboard"], ["◔", "Attendance"], ["▤", "My Subjects"], ["◷", "Timetable"], ["▱", "Homework"], ["✦", "Exams & Results"], ["▥", "Performance"], ["▣", "Study Material"], ["✉", "Announcements"], ["◫", "Fees"], ["◒", "Leave Request"], ["✧", "AI Assistant"], ["♙", "My Profile"]];
-const kpis = [["◔", "Attendance", "92%", "Great progress", "green"], ["▤", "Subjects", "7", "This term", "blue"], ["▱", "Pending Homework", "3", "Due this week", "orange"], ["✦", "Upcoming Exams", "2", "Next: 18 Jun", "purple"], ["↗", "Average Score", "86%", "+4% this month", "mint"]];
-const subjects = [["English", "Neha Ma'am", "42/45", "93%", "Good", "green"], ["Mathematics", "Amit Sir", "35/45", "78%", "Watch", "yellow"], ["Science", "Rahul Sir", "44/45", "98%", "Excellent", "green"], ["Hindi", "Priya Ma'am", "31/45", "69%", "Low", "red"]];
-const classes = [["09:00", "English", "Neha Sharma", "Room 204", "Completed"], ["10:00", "Mathematics", "Amit Verma", "Room 107", "Now"], ["11:00", "Science", "Rahul Mehta", "Lab 02", "Upcoming"], ["12:00", "Computer", "Arjun Singh", "Lab 01", "Upcoming"]];
-const homework = [["Mathematics", "Algebra practice worksheet", "Today, 6:00 PM", "Pending"], ["Science", "Complete cell structure diagram", "Tomorrow, 9:00 AM", "Pending"], ["English", "Read Chapter 8 and write summary", "14 Jun", "Pending"]];
+const kpis = [];
+const subjects = [];
+const classes = [];
+const homework = [];
 
 export default function StudentDashboard() {
   const { signOut, user } = useCognitoAuth();

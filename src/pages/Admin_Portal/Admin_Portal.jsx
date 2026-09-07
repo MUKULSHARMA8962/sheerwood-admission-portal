@@ -1,16 +1,17 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
-import { askSchoolAI } from "../../services/api";
+import { askSchoolAI, getAdminUsers, updateAdminUserRole } from "../../services/api";
 import { getAdmissionDocuments, updateAdmissionDocument } from "../../services/admission";
 import { useCognitoAuth } from "../../auth/useCognitoAuth";
+import AdminUsers from "./AdminUsers";
 import "./Admin_Portal.css";
 import "./AdminFeatures.css";
 import "./AdminDocumentActions.css";
 
 const navItems = [["▦", "Dashboard", "dashboard"], ["▤", "Admissions", "admissions"], ["♙", "Students", "students"], ["♧", "Teachers", "teachers"], ["▤", "Classes", "classes"], ["✓", "Attendance", "attendance"], ["◫", "Fees", "fees"], ["▥", "Exams & Results", "exams"], ["◷", "Timetable", "timetable"], ["▣", "Documents", "documents"], ["▰", "Transport / Hostel", "transport"], ["♙", "Parents", "parents"], ["✉", "Notifications", "notifications"], ["◉", "Reports", "reports"], ["✦", "AI Assistant", "ai"], ["◈", "Users & Roles", "users"], ["⚙", "Settings", "settings"]];
-const applications = [["AIS/2027-28/000124", "Aadhya Sharma", "Class 2", "Document verification", "26 May 2027"], ["AIS/2027-28/000123", "Ananya Gupta", "Class 3", "New application", "25 May 2027"], ["AIS/2027-28/000125", "Vivaan Singh", "Class 1", "Pending approval", "24 May 2027"], ["AIS/2027-28/000122", "Myra Patel", "Class 2", "Approved", "22 May 2027"]];
-const students = [["AS", "Aarav Sharma", "STU-10424", "5A", "96%", "Mrs. Sharma"], ["SG", "Saanvi Gupta", "STU-10425", "5A", "92%", "Mr. Gupta"], ["VS", "Vivaan Singh", "STU-10426", "5A", "88%", "Mrs. Singh"], ["RP", "Riya Patel", "STU-10427", "5B", "98%", "Mr. Patel"]];
-const teachers = [["MK", "Meera Kapoor", "Mathematics & Science", "Class 5A", "96%", "Active"], ["RA", "Rohan Arora", "English", "Class 6B", "94%", "Active"], ["SP", "Sonia Patel", "Biology", "Class 9A", "91%", "On Leave"], ["VS", "Vikram Singh", "Physical Education", "Classes 6–8", "98%", "Active"]];
+const applications = [];
+const students = [];
+const teachers = [];
 
 function AdminHeading({ eyebrow, title, text, action }) { return <header className="admin-feature-heading"><div><p>{eyebrow}</p><h1>{title}</h1>{text && <small>{text}</small>}</div>{action}</header>; }
 function AdminButton({ children, onClick, outline = false }) { return <button className={outline ? "admin-feature-button outline" : "admin-feature-button"} onClick={onClick}>{children}</button>; }
@@ -97,7 +98,7 @@ export default function AdminPortal() {
   const { screen = "dashboard" } = useParams();
   const [notice, setNotice] = useState("");
   const openScreen = (target) => { setNotice(""); navigate(`/admin/${target}`); };
-  const views = { dashboard: <DashboardView openScreen={openScreen} setNotice={setNotice} />, admissions: <Admissions openScreen={openScreen} setNotice={setNotice} />, students: <StudentManagement setNotice={setNotice} />, teachers: <TeacherManagement setNotice={setNotice} />, classes: <Classes setNotice={setNotice} />, attendance: <Attendance setNotice={setNotice} />, fees: <Fees setNotice={setNotice} />, exams: <Exams setNotice={setNotice} />, timetable: <Timetable setNotice={setNotice} />, documents: <Documents setNotice={setNotice} />, transport: <Transport setNotice={setNotice} />, parents: <Parents setNotice={setNotice} />, notifications: <Notifications setNotice={setNotice} />, reports: <Reports setNotice={setNotice} />, ai: <AIAssistant setNotice={setNotice} />, users: <Users setNotice={setNotice} />, settings: <Settings setNotice={setNotice} />, application: <ApplicationView openScreen={openScreen} setNotice={setNotice} /> };
+  const views = { dashboard: <DashboardView openScreen={openScreen} setNotice={setNotice} />, admissions: <Admissions openScreen={openScreen} setNotice={setNotice} />, students: <StudentManagement setNotice={setNotice} />, teachers: <TeacherManagement setNotice={setNotice} />, classes: <Classes setNotice={setNotice} />, attendance: <Attendance setNotice={setNotice} />, fees: <Fees setNotice={setNotice} />, exams: <Exams setNotice={setNotice} />, timetable: <Timetable setNotice={setNotice} />, documents: <Documents setNotice={setNotice} />, transport: <Transport setNotice={setNotice} />, parents: <Parents setNotice={setNotice} />, notifications: <Notifications setNotice={setNotice} />, reports: <Reports setNotice={setNotice} />, ai: <AIAssistant setNotice={setNotice} />, users: <AdminUsers setNotice={setNotice} />, settings: <Settings setNotice={setNotice} />, application: <ApplicationView openScreen={openScreen} setNotice={setNotice} /> };
   const activeScreen = screen === "application" ? "admissions" : screen;
   return <main className="admin-page"><Sidebar screen={activeScreen} /><section className="admin-content">{notice && <div className="admin-notice admin-global-notice" role="status">{notice}<button onClick={() => setNotice("")} aria-label="Dismiss notice">×</button></div>}{views[screen] || views.dashboard}</section></main>;
 }

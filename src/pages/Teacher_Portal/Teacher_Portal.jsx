@@ -6,12 +6,12 @@ import "./Teacher_Portal.css";
 import "./TeacherFeatures.css";
 
 const navigation = [["▦", "Dashboard"], ["▤", "My Classes"], ["♙", "Students"], ["✓", "Attendance"], ["▱", "Assignments"], ["▥", "Exams & Marks"], ["▣", "Study Material"], ["◷", "Timetable"], ["✉", "Messages"], ["▰", "Announcements"], ["◒", "Leave Management"], ["✦", "AI Assistant"], ["⚙", "Profile"]];
-const todayClasses = [["08:15", "Class 5A", "Mathematics", "Room 204", "Now"], ["09:10", "Class 5B", "Mathematics", "Room 204", "Next"], ["10:30", "Class 4A", "Science", "Lab 02", "Later"], ["12:05", "Class 5A", "Mathematics", "Room 204", "Later"]];
-const assignedClasses = [["Class 5A", "Mathematics", "36 students", "92% attendance", "08:15 – 09:00"], ["Class 5B", "Mathematics", "34 students", "94% attendance", "09:10 – 09:55"], ["Class 4A", "Science", "31 students", "96% attendance", "10:30 – 11:15"], ["Class 4B", "Science", "27 students", "91% attendance", "Thursday · 10:30"]];
-const students = [["AS", "Aarav Sharma", "24", "Class 5A", "96%", "Excellent", "+91 98765 23120"], ["SG", "Saanvi Gupta", "18", "Class 5A", "92%", "Good", "+91 98765 16780"], ["VS", "Vivaan Singh", "31", "Class 5A", "88%", "Needs support", "+91 98765 44321"], ["RP", "Riya Patel", "09", "Class 5A", "98%", "Excellent", "+91 98765 98001"], ["AK", "Arjun Kumar", "13", "Class 5B", "90%", "Good", "+91 98765 78542"]];
+const todayClasses = [];
+const assignedClasses = [];
+const students = [];
 const assignments = [["Fractions practice worksheet", "Class 5A", "14 Jun", "28 / 36 submitted", "8 pending"], ["Plant life observation journal", "Class 4A", "15 Jun", "24 / 31 submitted", "7 pending"], ["Decimals revision quiz", "Class 5B", "18 Jun", "0 / 34 submitted", "New"]];
 const materials = [["Mathematics · Fractions Notes", "PDF", "Class 5A", "12 Jun 2027"], ["Plant life video lesson", "Video", "Class 4A", "10 Jun 2027"], ["Decimals practice worksheet", "Worksheet", "Class 5B", "08 Jun 2027"]];
-const attendanceStudents = [["Aarav Sharma", "24"], ["Saanvi Gupta", "18"], ["Vivaan Singh", "31"], ["Riya Patel", "09"], ["Diya Mehta", "16"]];
+const attendanceStudents = [];
 const timetable = [["08:15", "Mathematics", "Class 5A", "Room 204"], ["09:10", "Mathematics", "Class 5B", "Room 204"], ["10:30", "Science", "Class 4A", "Lab 02"], ["12:05", "Mathematics", "Class 5A", "Room 204"]];
 
 function SectionHeading({ eyebrow, title, text, action }) {

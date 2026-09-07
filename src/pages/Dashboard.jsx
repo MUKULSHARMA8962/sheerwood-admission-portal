@@ -21,19 +21,9 @@ const navigation = [
   ["⚙", "Settings"],
 ];
 
-const stats = [
-  ["▤", "Applications", "1,245", "Total", "leaf"],
-  ["◷", "In Progress", "320", "25.8%", "blue"],
-  ["➤", "Submitted", "925", "74.2%", "purple"],
-  ["✓", "Approved", "210", "22.7%", "mint"],
-];
+const stats = [];
 
-const recentApplications = [
-  ["AS", "Aarav Sharma", "Class 5", "In Progress", "2 hours ago"],
-  ["AG", "Ananya Gupta", "Class 3", "Submitted", "1 day ago"],
-  ["VS", "Vivaan Singh", "Class 1", "Draft", "2 days ago"],
-  ["MP", "Myra Patel", "Class 2", "Approved", "3 days ago"],
-];
+const recentApplications = [];
 
 const quickActions = [
   ["▣", "New Admission", "Start a new admission", "/admission-details"],
@@ -53,12 +43,7 @@ const journey = [
   ["Fee Payment", "Pay the required admission fees online.", "0%", "/fee-payment", "▥"],
 ];
 
-const documentChecklist = [
-  ["✓", "Birth Certificate", "Verified", "verified"],
-  ["✓", "Aadhaar Card", "Verified", "verified"],
-  ["✓", "Passport Photograph", "Verified", "verified"],
-  ["⇧", "Transfer Certificate", "Upload required", "required"],
-];
+const documentChecklist = [];
 
 const suggestions = ["What documents are required?", "How can I apply?", "What is the age criteria for Class 3?", "Fee structure details", "What are the boarding and calling rules?"];
 
