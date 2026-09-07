@@ -34,7 +34,7 @@ class CreateApplicationRequest(BaseModel):
 
 
 class UserRoleUpdate(BaseModel):
-    role: Literal["parent", "teacher", "admin"]
+    role: Literal["parent", "teacher", "student", "admin", "admission"]
 
 
 class AttendanceRecord(BaseModel):

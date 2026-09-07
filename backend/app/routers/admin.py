@@ -1,4 +1,8 @@
+import os
+
 from fastapi import APIRouter, Depends, HTTPException, status
+import boto3
+from botocore.exceptions import BotoCoreError, ClientError
 
 from ..ai import AIConfigurationError, AIProviderRateLimitError, AIProviderUnavailableError, generate_ai_reply
 from ..database import connection
@@ -7,6 +11,15 @@ from ..schemas import AIRequest, AnnouncementRequest, UserRoleUpdate
 
 router = APIRouter(prefix="/api/admin", tags=["Admin UI"])
 AdminUser = Depends(require_roles("admin"))
+
+
+def cognito_admin_client():
+    issuer = os.getenv("COGNITO_ISSUER", "").rstrip("/")
+    user_pool_id = issuer.rsplit("/", 1)[-1]
+    region = os.getenv("AWS_REGION", "us-east-1")
+    if not user_pool_id:
+        raise HTTPException(status_code=503, detail="Cognito user pool is not configured.")
+    return boto3.client("cognito-idp", region_name=region), user_pool_id
 
 
 @router.get("/dashboard")
@@ -90,13 +103,45 @@ def reports(_: dict = AdminUser) -> list[dict]:
 
 @router.get("/users-roles")
 def users_roles(_: dict = AdminUser) -> list[dict]:
-    with connection() as database:
-        rows = database.execute("SELECT id, email, full_name, role, cognito_subject FROM users ORDER BY full_name").fetchall()
-    return [dict(row) for row in rows]
+    client, user_pool_id = cognito_admin_client()
+    users = []
+    pagination_token = None
+    try:
+        while True:
+            parameters = {"UserPoolId": user_pool_id, "Limit": 60}
+            if pagination_token:
+                parameters["PaginationToken"] = pagination_token
+            response = client.list_users(**parameters)
+            users.extend(response.get("Users", []))
+            pagination_token = response.get("PaginationToken")
+            if not pagination_token:
+                break
+        result = []
+        for cognito_user in users:
+            attributes = {item["Name"]: item["Value"] for item in cognito_user.get("Attributes", [])}
+            groups = client.admin_list_groups_for_user(UserPoolId=user_pool_id, Username=cognito_user["Username"]).get("Groups", [])
+            group_names = [group["GroupName"] for group in groups]
+            role = next((candidate for candidate in ("admin", "teacher", "student", "parent", "admission") if candidate in group_names), "admission")
+            result.append({"id": f"cognito:{cognito_user['Username']}", "email": attributes.get("email", ""), "full_name": attributes.get("name") or attributes.get("email", cognito_user["Username"]), "role": role, "cognito_subject": attributes.get("sub"), "groups": group_names, "status": cognito_user.get("UserStatus", "")})
+        return result
+    except (BotoCoreError, ClientError) as error:
+        raise HTTPException(status_code=503, detail="Cognito users could not be loaded. Check the server IAM permissions.") from error
 
 
 @router.patch("/users-roles/{user_id}")
-def update_user_role(user_id: int, payload: UserRoleUpdate, _: dict = AdminUser) -> dict:
+def update_user_role(user_id: str, payload: UserRoleUpdate, _: dict = AdminUser) -> dict:
+    if user_id.startswith("cognito:"):
+        client, user_pool_id = cognito_admin_client()
+        username = user_id.removeprefix("cognito:")
+        try:
+            groups = client.admin_list_groups_for_user(UserPoolId=user_pool_id, Username=username).get("Groups", [])
+            for group in ("admin", "teacher", "student", "parent", "admission"):
+                if any(item["GroupName"] == group for item in groups) and group != payload.role:
+                    client.admin_remove_user_from_group(UserPoolId=user_pool_id, Username=username, GroupName=group)
+            client.admin_add_user_to_group(UserPoolId=user_pool_id, Username=username, GroupName=payload.role)
+            return {"id": user_id, "email": "", "full_name": username, "role": payload.role, "cognito_subject": "", "groups": [payload.role]}
+        except (BotoCoreError, ClientError) as error:
+            raise HTTPException(status_code=503, detail="Cognito role could not be updated. Check the server IAM permissions.") from error
     with connection() as database:
         cursor = database.execute("UPDATE users SET role = ? WHERE id = ?", (payload.role, user_id))
         if cursor.rowcount == 0:
