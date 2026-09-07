@@ -1,7 +1,6 @@
 const SESSION_KEY = "sheerwood.cognito.session";
 const TRANSACTION_PREFIX = "sheerwood.cognito.transaction.";
 const DEFAULT_SCOPES = "openid email";
-const ROLE_NAMES = ["parent", "student", "teacher", "admin", "admission"];
 const GROUP_ROLE_PRIORITY = ["admin", "teacher", "student", "parent", "admission"];
 
 function base64UrlEncode(bytes) {

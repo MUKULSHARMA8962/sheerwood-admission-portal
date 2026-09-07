@@ -1,23 +1,22 @@
 import { getSchoolInformationAnswer, schoolInformationContext } from "./schoolInformation";
-
-const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || "/api").replace(/\/$/, "");
+import { API_ROUTES } from "../constants/routes";
 
 export async function getAdminUsers(accessToken) {
-  const response = await fetch(`${API_BASE_URL}/admin/users-roles`, { headers: { Authorization: `Bearer ${accessToken}` } });
+  const response = await fetch(API_ROUTES.adminUsers, { headers: { Authorization: `Bearer ${accessToken}` } });
   const data = await response.json().catch(() => ({}));
   if (!response.ok) throw new Error(data.detail || "Users could not be loaded.");
   return data;
 }
 
 export async function updateAdminUserRole(accessToken, userId, user) {
-  const response = await fetch(`${API_BASE_URL}/admin/users-roles/${encodeURIComponent(userId)}`, { method: "PATCH", headers: { "Content-Type": "application/json", Authorization: `Bearer ${accessToken}` }, body: JSON.stringify({ role: user.role, full_name: user.full_name, email: user.email }) });
+  const response = await fetch(`${API_ROUTES.adminUsers}/${encodeURIComponent(userId)}`, { method: "PATCH", headers: { "Content-Type": "application/json", Authorization: `Bearer ${accessToken}` }, body: JSON.stringify({ role: user.role, full_name: user.full_name, email: user.email }) });
   const data = await response.json().catch(() => ({}));
   if (!response.ok) throw new Error(data.detail || "User role could not be updated.");
   return data;
 }
 
 export async function getAdminDocuments(accessToken) {
-  const response = await fetch(`${API_BASE_URL}/admin/documents`, { headers: { Authorization: `Bearer ${accessToken}` } });
+  const response = await fetch(API_ROUTES.adminDocuments, { headers: { Authorization: `Bearer ${accessToken}` } });
   const data = await response.json().catch(() => ({}));
   if (!response.ok) throw new Error(data.detail || "Documents could not be loaded.");
   return data;
@@ -27,7 +26,7 @@ export async function askSchoolAI(prompt, audience = "guest") {
   const schoolInformationAnswer = getSchoolInformationAnswer(prompt);
   if (schoolInformationAnswer) return schoolInformationAnswer;
 
-  const response = await fetch(`${API_BASE_URL}/ai/chat`, {
+  const response = await fetch(API_ROUTES.aiChat, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
@@ -41,7 +40,7 @@ export async function askSchoolAI(prompt, audience = "guest") {
 }
 
 async function otpRequest(path, payload) {
-  const response = await fetch(`${API_BASE_URL}/auth/otp/${path}`, {
+  const response = await fetch(API_ROUTES.otp(path), {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload),
