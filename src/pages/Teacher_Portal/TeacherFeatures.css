@@ -1,5 +1,13 @@
 :root { --teacher-navy: #054b2d; --teacher-blue: #08783f; --teacher-sky: #edf8f0; --teacher-ink: #173b2a; --teacher-muted: #6a7d72; --teacher-border: #d9e8dd; }
 .teacher-sidebar { background: linear-gradient(175deg, #043e26, #08783f); }
+.teacher-account-details { margin-top: 20px; overflow: hidden; }
+.teacher-account-details header { display: flex; align-items: center; justify-content: space-between; padding: 18px 20px; border-bottom: 1px solid #edf3ee; }
+.teacher-account-details header p { margin: 0 0 6px; color: var(--teacher-blue); font-size: 9px; font-weight: 800; letter-spacing: 1.4px; }
+.teacher-account-details header h2 { margin: 0; }
+.teacher-role-badge { padding: 5px 8px; border-radius: 999px; color: #237246; background: #e8f7ed; font-size: 9px; font-weight: 800; text-transform: capitalize; }
+.teacher-account-details > div { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; padding: 17px 20px; color: var(--teacher-muted); font-size: 11px; }
+.teacher-account-details > div span { display: grid; gap: 5px; }
+.teacher-account-details > div b { color: var(--teacher-ink); font-size: 9px; text-transform: uppercase; }
 .teacher-sidebar nav button i { color: #bfe5ca; }
 .teacher-sidebar nav button.active { box-shadow: inset 3px 0 #a9efbd; }
 .teacher-brand small { color: #cbead4; }
