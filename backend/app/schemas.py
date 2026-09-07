@@ -35,6 +35,8 @@ class CreateApplicationRequest(BaseModel):
 
 class UserRoleUpdate(BaseModel):
     role: Literal["parent", "teacher", "student", "admin", "admission"]
+    full_name: str = Field(min_length=1, max_length=120)
+    email: str = Field(min_length=5, max_length=254)
 
 
 class AttendanceRecord(BaseModel):

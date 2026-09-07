@@ -57,7 +57,7 @@ Copy the Cognito values from `.env.example` into `backend/.env` and run with `AU
 
 ```bash
 AUTH_MODE=cognito
-COGNITO_ISSUER=https://cognito-idp.us-east-1.amazonaws.com/us-east-1_yUXks7iXD
+COGNITO_ISSUER=https://cognito-idp.us-east-1.amazonaws.com/us-east-1_PGsbC8UiT
 COGNITO_CLIENT_ID=your_cognito_app_client_id
 ```
 

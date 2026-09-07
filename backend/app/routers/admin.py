@@ -139,11 +139,12 @@ def update_user_role(user_id: str, payload: UserRoleUpdate, _: dict = AdminUser)
                 if any(item["GroupName"] == group for item in groups) and group != payload.role:
                     client.admin_remove_user_from_group(UserPoolId=user_pool_id, Username=username, GroupName=group)
             client.admin_add_user_to_group(UserPoolId=user_pool_id, Username=username, GroupName=payload.role)
-            return {"id": user_id, "email": "", "full_name": username, "role": payload.role, "cognito_subject": "", "groups": [payload.role]}
+            client.admin_update_user_attributes(UserPoolId=user_pool_id, Username=username, UserAttributes=[{"Name": "name", "Value": payload.full_name}, {"Name": "email", "Value": payload.email}])
+            return {"id": user_id, "email": payload.email, "full_name": payload.full_name, "role": payload.role, "cognito_subject": "", "groups": [payload.role]}
         except (BotoCoreError, ClientError) as error:
             raise HTTPException(status_code=503, detail="Cognito role could not be updated. Check the server IAM permissions.") from error
     with connection() as database:
-        cursor = database.execute("UPDATE users SET role = ? WHERE id = ?", (payload.role, user_id))
+        cursor = database.execute("UPDATE users SET role = ?, full_name = ?, email = ? WHERE id = ?", (payload.role, payload.full_name, payload.email, user_id))
         if cursor.rowcount == 0:
             raise HTTPException(status_code=404, detail="User was not found.")
         row = database.execute("SELECT id, email, full_name, role, cognito_subject FROM users WHERE id = ?", (user_id,)).fetchone()
