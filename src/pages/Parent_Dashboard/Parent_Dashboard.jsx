@@ -26,7 +26,7 @@ function getNextAcademicSession() {
 }
 
 const nextAcademicSession = getNextAcademicSession();
-const classOrder = ["Class 4", "Class 5", "Class 6", "Class 7", "Class 8", "Class 9", "Class 10", "Class 11"];
+const classOrder = ["Class 5", "Class 6", "Class 7", "Class 8", "Class 9", "Class 10", "Class 11"];
 const classRank = Object.fromEntries(classOrder.map((className, index) => [className, index + 4]));
 const admissionClassOptions = classOrder;
 const currentClassOptions = classOrder;
