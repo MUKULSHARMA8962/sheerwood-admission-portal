@@ -16,6 +16,13 @@ export async function updateAdminUserRole(accessToken, userId, user) {
   return data;
 }
 
+export async function getAdminDocuments(accessToken) {
+  const response = await fetch(`${API_BASE_URL}/admin/documents`, { headers: { Authorization: `Bearer ${accessToken}` } });
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(data.detail || "Documents could not be loaded.");
+  return data;
+}
+
 export async function askSchoolAI(prompt, audience = "guest") {
   const schoolInformationAnswer = getSchoolInformationAnswer(prompt);
   if (schoolInformationAnswer) return schoolInformationAnswer;

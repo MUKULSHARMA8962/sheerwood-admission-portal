@@ -1,7 +1,8 @@
 import { useRef, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
-import { getAdmissionDocuments, updateAdmissionDocument } from "../../services/admission";
+import { getAdmissionData, getAdmissionDocuments, saveAdmissionDraft, updateAdmissionDocument } from "../../services/admission";
 import AccountMenu from "../../components/AccountMenu";
+import { useCognitoAuth } from "../../auth/useCognitoAuth";
 import "./Application_Stages.css";
 import "./ResidentialAddress.css";
 import "../DocumentUploadStatus.css";
@@ -48,18 +49,10 @@ function ResidentialForm({ form, update, useCurrentLocation, toggleSameAsPermane
   return <div className="residential-addresses"><AddressFields title="Permanent Address" prefix="permanent" form={form} update={update} useCurrentLocation={useCurrentLocation} /><AddressFields title="Correspondence Address" prefix="correspondence" form={form} update={update} useCurrentLocation={useCurrentLocation} sameAsPermanent={form.sameAsPermanent} toggleSameAsPermanent={toggleSameAsPermanent} /></div>;
 }
 
-function AcademicForm({ setMessage }) {
+function AcademicForm({ setMessage, accessToken }) {
   const fileRef = useRef(null);
   const selectedDocument = useRef("");
-  const [files, setFiles] = useState({});
-  const documents = [
-    { id: "reportCard", title: "Report Card", required: true },
-    { id: "aadhaarCard", title: "Aadhaar Card", required: true },
-    { id: "birthCertificate", title: "Birth Certificate", required: true },
-    { id: "passport", title: "Passport", required: false },
-    { id: "nationalIdCard", title: "National ID Card", required: false },
-    { id: "other", title: "Other Document", required: false },
-  ];
+  const [documents, setDocuments] = useState(getAdmissionDocuments);
 
   function chooseFile(documentId) {
     selectedDocument.current = documentId;
@@ -71,19 +64,22 @@ function AcademicForm({ setMessage }) {
     const documentId = selectedDocument.current;
     if (!file || !documentId) return;
 
-    setFiles((current) => ({ ...current, [documentId]: file.name }));
-    setMessage(`${file.name} uploaded.`);
+    const updatedDocuments = updateAdmissionDocument(documentId, "Submitted", "", file.name);
+    setDocuments(updatedDocuments);
+    saveAdmissionDraft(accessToken, { academicDocuments: updatedDocuments })
+      .then(() => setMessage(`${file.name} submitted and saved for admin approval.`))
+      .catch((error) => setMessage(error.message));
     event.target.value = "";
   }
 
-  return <div className="stage-fields academic-fields"><div className="upload-group"><b>Upload Academic Documents</b>{documents.map((document) => <button type="button" key={document.id} onClick={() => chooseFile(document.id)}><span>{files[document.id] || `Upload ${document.title}`}{document.required && <em> *</em>}</span><span>⇧</span></button>)}<input ref={fileRef} type="file" accept=".pdf,.jpg,.jpeg,.png" hidden onChange={uploadFile} /></div></div>;
+  return <div className="stage-fields academic-fields"><div className="upload-group"><b>Upload Academic Documents</b>{documents.map((document) => <button type="button" key={document.id} onClick={() => chooseFile(document.id)}><span>{document.file || `Upload ${document.name}`}{["report-card", "aadhaar-card", "birth-certificate"].includes(document.id) && <em> *</em>}</span><span>⇧</span></button>)}<input ref={fileRef} type="file" accept=".pdf,.jpg,.jpeg,.png" hidden onChange={uploadFile} /></div></div>;
 }
 
-function DocumentsForm({ setMessage }) {
+function DocumentsForm({ setMessage, accessToken }) {
   const fileRef = useRef(null);
   const [documents, setDocuments] = useState(getAdmissionDocuments);
   const chooseFile = (index) => { fileRef.current.dataset.index = index; fileRef.current.click(); };
-  const uploaded = (event) => { const file = event.target.files?.[0]; const index = Number(event.target.dataset.index); if (!file) return; const document = documents[index]; const updatedDocuments = updateAdmissionDocument(document.id, "Submitted", "", file.name); setDocuments(updatedDocuments); setMessage(`${file.name} submitted and waiting for admin approval.`); event.target.value = ""; };
+  const uploaded = (event) => { const file = event.target.files?.[0]; const index = Number(event.target.dataset.index); if (!file) return; const document = documents[index]; const updatedDocuments = updateAdmissionDocument(document.id, "Submitted", "", file.name); setDocuments(updatedDocuments); saveAdmissionDraft(accessToken, { uploadedDocuments: updatedDocuments }).then(() => setMessage(`${file.name} submitted and saved for admin approval.`)).catch((error) => setMessage(error.message)); event.target.value = ""; };
   return <><p className="document-intro">Upload Required Documents <small>Uploaded documents are submitted for admin approval. Documents not uploaded remain marked Not Uploaded.</small></p><div className="document-list">{documents.map((document, index) => <button className={document.status.toLowerCase().replaceAll(" ", "-")} type="button" key={document.id} onClick={() => chooseFile(index)}><span>▣</span><b>{document.name}</b><em>{document.file || "Not uploaded"}</em><i>{document.status === "Approved" ? "✓" : document.status === "Submitted" ? "◷" : "⇧"}</i><small>{document.status === "Submitted" ? "Waiting for approval" : document.status}</small></button>)}</div><input ref={fileRef} type="file" accept=".pdf,.jpg,.jpeg,.png" hidden onChange={uploaded} /></>;
 }
 
@@ -98,7 +94,8 @@ export default function ApplicationStages() {
   const { stage } = useParams();
   const navigate = useNavigate();
   const config = stageConfig[stage] || stageConfig.residential;
-  const [form, setForm] = useState(initialForm);
+  const { session } = useCognitoAuth();
+  const [form, setForm] = useState(() => ({ ...initialForm, ...getAdmissionData().residential }));
   const [message, setMessage] = useState("");
   const update = (event) => setForm((current) => {
     const { name, value } = event.target;
@@ -146,7 +143,7 @@ export default function ApplicationStages() {
       }
     }, () => setMessage("Location permission was not granted. Please enter the address manually."), { enableHighAccuracy: true, timeout: 10000, maximumAge: 300000 });
   };
-  const save = (event) => { event.preventDefault(); if (stage === "review") { navigate(config.next); return; } navigate(config.next); };
-  const renderForm = () => { if (stage === "academic") return <AcademicForm setMessage={setMessage} />; if (stage === "documents") return <DocumentsForm setMessage={setMessage} />; if (stage === "review") return <ReviewForm navigate={navigate} />; return <ResidentialForm form={form} update={update} useCurrentLocation={useCurrentLocation} toggleSameAsPermanent={toggleSameAsPermanent} />; };
+  const save = async (event) => { event.preventDefault(); try { await saveAdmissionDraft(session?.accessToken, stage === "residential" ? { residential: form } : {}, stage === "review" ? "submitted" : "draft"); navigate(config.next); } catch (error) { setMessage(error.message); } };
+  const renderForm = () => { if (stage === "academic") return <AcademicForm setMessage={setMessage} accessToken={session?.accessToken} />; if (stage === "documents") return <DocumentsForm setMessage={setMessage} accessToken={session?.accessToken} />; if (stage === "review") return <ReviewForm navigate={navigate} />; return <ResidentialForm form={form} update={update} useCurrentLocation={useCurrentLocation} toggleSameAsPermanent={toggleSameAsPermanent} />; };
   return <main className="stage-page"><PortalHeader /><section className="stage-shell"><div className="stage-main"><div className="stage-title"><div><p>NEW APPLICATION</p><h1>{config.title}</h1><small>{stage === "review" ? "Review every section before you submit your application." : "Complete this section to continue your admission application."}</small></div><button onClick={() => navigate("/dashboard")}>← Back to dashboard</button></div><Progress index={config.index} />{message && <div className="stage-message" role="status">{message}<button aria-label="Dismiss notification" onClick={() => setMessage("")}>×</button></div>}<form className={`stage-form ${stage}`} onSubmit={save}>{renderForm()}<div className="stage-actions"><button type="button" className="stage-back" onClick={() => navigate(config.previous)}>← Back</button><button className="stage-next" type="submit">{stage === "review" ? "Submit Application" : "Save & Next"} <span>→</span></button></div></form></div><HelpPanel onAsk={setMessage} onOpenAssistant={() => navigate("/ai-assistant")} /></section></main>;
 }

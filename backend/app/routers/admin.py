@@ -1,5 +1,6 @@
 import os
 import logging
+import json
 
 from fastapi import APIRouter, Depends, HTTPException, status
 import boto3
@@ -75,7 +76,26 @@ def timetable(_: dict = AdminUser) -> list[dict]:
 
 @router.get("/documents")
 def documents(_: dict = AdminUser) -> list[dict]:
-    return [{"student": "Aadhya Sharma", "document": "Birth Certificate", "status": "verified"}, {"student": "Vivaan Singh", "document": "Transfer Certificate", "status": "pending"}, {"student": "Ananya Gupta", "document": "Previous Report Card", "status": "needs_review"}]
+    result = []
+    with connection() as database:
+        rows = database.execute("SELECT application_number, student_name, documents_json FROM applications ORDER BY id DESC").fetchall()
+    for row in rows:
+        try:
+            uploaded_documents = json.loads(row["documents_json"] or "[]")
+        except json.JSONDecodeError:
+            uploaded_documents = []
+        for document in uploaded_documents:
+            result.append({
+                "id": f"{row['application_number']}:{document.get('id', document.get('name', 'document'))}",
+                "application_number": row["application_number"],
+                "student": row["student_name"],
+                "document": document.get("name", "Document"),
+                "name": document.get("name", "Document"),
+                "file": document.get("file", ""),
+                "status": document.get("status", "Not Uploaded"),
+                "reason": document.get("reason", ""),
+            })
+    return result
 
 
 @router.get("/transport-hostel")

@@ -2,6 +2,8 @@ import { useEffect, useRef, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import "./Parent_Guardian.css";
 import AccountMenu from "../../components/AccountMenu";
+import { getAdmissionData, saveAdmissionDraft } from "../../services/admission";
+import { useCognitoAuth } from "../../auth/useCognitoAuth";
 
 const steps = ["Admission Details", "Student Information", "Parent / Guardian", "Residential Background", "Academic Background", "Documents", "Review & Submit"];
 
@@ -15,7 +17,8 @@ const fieldLabels = [["fullName", "Full Name"], ["occupation", "Occupation"], ["
 export default function ParentGuardian() {
   const navigate = useNavigate();
   const location = useLocation();
-  const [family, setFamily] = useState(families);
+  const { session } = useCognitoAuth();
+  const [family, setFamily] = useState(() => ({ ...families, ...getAdmissionData().guardians }));
   const [photos, setPhotos] = useState({ Father: "", Mother: "" });
   const [message, setMessage] = useState("");
   const fatherUploadRef = useRef(null);
@@ -68,7 +71,9 @@ export default function ParentGuardian() {
         return;
       }
     }
-    navigate("/application/residential");
+    saveAdmissionDraft(session?.accessToken, { guardians: family })
+      .then(() => navigate("/application/residential"))
+      .catch((error) => setMessage(error.message));
   }
 
   function renderParentSection(parentType) {

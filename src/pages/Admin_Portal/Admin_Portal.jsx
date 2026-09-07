@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
-import { askSchoolAI, getAdminUsers, updateAdminUserRole } from "../../services/api";
+import { askSchoolAI, getAdminDocuments, getAdminUsers, updateAdminUserRole } from "../../services/api";
 import { getAdmissionDocuments, updateAdmissionDocument } from "../../services/admission";
 import { useCognitoAuth } from "../../auth/useCognitoAuth";
 import AdminUsers from "./AdminUsers";
@@ -58,7 +58,13 @@ function Timetable({ setNotice }) { return <><AdminHeading eyebrow="SCHEDULE MAN
 }
 
 function Documents({ setNotice }) {
-  const [reviewDocuments, setReviewDocuments] = useState(getAdmissionDocuments);
+  const { session } = useCognitoAuth();
+  const [reviewDocuments, setReviewDocuments] = useState([]);
+  useEffect(() => {
+    getAdminDocuments(session?.accessToken)
+      .then(setReviewDocuments)
+      .catch(() => setReviewDocuments(getAdmissionDocuments()));
+  }, [session?.accessToken]);
   const pendingCount = reviewDocuments.filter((document) => document.status !== "Approved").length;
   const reviewDocument = (document, status) => {
     const reason = status === "Re-upload Required" ? "Please upload a clear, readable copy." : "";

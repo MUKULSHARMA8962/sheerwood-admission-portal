@@ -1,5 +1,7 @@
 const APPLICATION_ID_KEY = "sheerwood-new-admission-id";
 const DOCUMENTS_KEY = "sheerwood-new-admission-documents";
+const APPLICATION_DATA_KEY = "sheerwood-admission-data";
+const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || "/api").replace(/\/$/, "");
 
 export function getNewAdmissionId() {
   const existingId = localStorage.getItem(APPLICATION_ID_KEY);
@@ -16,13 +18,12 @@ const defaultDocuments = [
   { id: "birth-certificate", name: "Birth Certificate", status: "Not Uploaded", file: "" },
   { id: "passport", name: "Passport", status: "Not Uploaded", file: "" },
   { id: "national-id-card", name: "National ID Card", status: "Not Uploaded", file: "" },
-  { id: "other", name: "Other Document", status: "Not Uploaded", file: "" },
 ];
 
 export function getAdmissionDocuments() {
   const savedDocuments = localStorage.getItem(DOCUMENTS_KEY);
   if (savedDocuments) {
-    const documents = JSON.parse(savedDocuments).map((document) => {
+    const documents = JSON.parse(savedDocuments).filter((document) => document.id !== "other").map((document) => {
       if (document.status === "Verified" || document.status === "Under Verification" || document.status === "Pending") {
         return { ...document, status: document.file ? "Submitted" : "Not Uploaded" };
       }
@@ -40,4 +41,25 @@ export function updateAdmissionDocument(documentId, status, reason = "", file) {
   const updatedDocuments = getAdmissionDocuments().map((document) => document.id === documentId ? { ...document, status, reason, ...(file ? { file } : {}) } : document);
   localStorage.setItem(DOCUMENTS_KEY, JSON.stringify(updatedDocuments));
   return updatedDocuments;
+}
+
+export function getAdmissionData() {
+  try {
+    return JSON.parse(sessionStorage.getItem(APPLICATION_DATA_KEY) || "{}");
+  } catch {
+    return {};
+  }
+}
+
+export async function saveAdmissionDraft(accessToken, data, status = "draft") {
+  const mergedData = { ...getAdmissionData(), ...data };
+  sessionStorage.setItem(APPLICATION_DATA_KEY, JSON.stringify(mergedData));
+  const response = await fetch(`${API_BASE_URL}/applications/draft`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json", Authorization: `Bearer ${accessToken}` },
+    body: JSON.stringify({ application_number: getNewAdmissionId(), data: mergedData, documents: getAdmissionDocuments(), status }),
+  });
+  const result = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(result.detail || "Application could not be saved.");
+  return result;
 }

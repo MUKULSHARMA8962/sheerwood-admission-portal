@@ -1,6 +1,7 @@
 from contextlib import asynccontextmanager
 from datetime import UTC, datetime
 import os
+import json
 from pathlib import Path
 from typing import Annotated, Any
 
@@ -16,7 +17,7 @@ load_dotenv(Path(__file__).resolve().parents[1] / ".env")
 
 from .database import connection, initialize_database
 from .dependencies import CurrentUser, require_roles
-from .schemas import AdmissionDecisionRequest, CognitoTokenExchangeRequest, CreateApplicationRequest, LoginRequest, RegisterRequest
+from .schemas import AdmissionDecisionRequest, CognitoTokenExchangeRequest, CreateApplicationRequest, LoginRequest, RegisterRequest, SaveApplicationDraftRequest
 from .security import hash_password, new_session_token, session_expiry, verify_password
 from .routers import admin, ai, otp, parent, teacher
 
@@ -209,6 +210,38 @@ def create_application(payload: CreateApplicationRequest, user: Annotated[dict[s
             (application_number, payload.student_name, user["full_name"], payload.desired_class, datetime.now(UTC).date().isoformat(), user["id"]),
         )
         application = database.execute("SELECT * FROM applications WHERE id = ?", (cursor.lastrowid,)).fetchone()
+    return dict(application)
+
+
+@app.put("/api/applications/draft")
+def save_application_draft(payload: SaveApplicationDraftRequest, user: Annotated[dict[str, Any], Depends(require_roles("parent"))]) -> dict[str, Any]:
+    application_data = json.dumps(payload.data, ensure_ascii=True)
+    documents_json = json.dumps(payload.documents, ensure_ascii=True)
+    student_name = str(payload.data.get("studentName") or payload.data.get("firstName") or "Application in progress").strip()
+    desired_class = str(payload.data.get("class") or "Class 4").strip()
+    with connection() as database:
+        existing = database.execute(
+            "SELECT id FROM applications WHERE application_number = ? AND parent_id = ?",
+            (payload.application_number, user["id"]),
+        ).fetchone()
+        if existing:
+            database.execute(
+                """UPDATE applications
+                SET student_name = ?, desired_class = ?, status = ?, documents_status = ?,
+                    application_data = ?, documents_json = ?, submitted_on = ?
+                WHERE id = ?""",
+                (student_name, desired_class, payload.status, "submitted" if payload.documents else "pending", application_data, documents_json, datetime.now(UTC).date().isoformat(), existing["id"]),
+            )
+            application_id = existing["id"]
+        else:
+            cursor = database.execute(
+                """INSERT INTO applications
+                (application_number, student_name, parent_name, desired_class, status, documents_status, submitted_on, parent_id, application_data, documents_json)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                (payload.application_number, student_name, user["full_name"], desired_class, payload.status, "submitted" if payload.documents else "pending", datetime.now(UTC).date().isoformat(), user["id"], application_data, documents_json),
+            )
+            application_id = cursor.lastrowid
+        application = database.execute("SELECT * FROM applications WHERE id = ?", (application_id,)).fetchone()
     return dict(application)
 
 

@@ -3,6 +3,8 @@ import { Link, useLocation, useNavigate } from "react-router-dom";
 import "./Student_Information.css";
 import AccountMenu from "../../components/AccountMenu";
 import "./StudentBirthDate.css";
+import { getAdmissionData, saveAdmissionDraft } from "../../services/admission";
+import { useCognitoAuth } from "../../auth/useCognitoAuth";
 
 const steps = [
   "Admission Details",
@@ -72,8 +74,9 @@ const initialForm = {
 export default function StudentInformation() {
   const navigate = useNavigate();
   const location = useLocation();
+  const { session } = useCognitoAuth();
   const uploadRef = useRef(null);
-  const [form, setForm] = useState(initialForm);
+  const [form, setForm] = useState(() => ({ ...initialForm, ...getAdmissionData().student }));
   const [photo, setPhoto] = useState("");
   const [message, setMessage] = useState("");
   const [birthDateError, setBirthDateError] = useState("");
@@ -160,7 +163,9 @@ export default function StudentInformation() {
       setMessage("Please enter a valid 12-digit Aadhaar Number.");
       return;
     }
-    navigate("/parent-guardian", { state: { singleParent: form.singleParent, responsibleParent: form.responsibleParent } });
+    saveAdmissionDraft(session?.accessToken, { student: form })
+      .then(() => navigate("/parent-guardian", { state: { singleParent: form.singleParent, responsibleParent: form.responsibleParent } }))
+      .catch((error) => setMessage(error.message));
   }
 
   return (

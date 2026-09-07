@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { getNewAdmissionId } from "../../services/admission";
+import { getAdmissionData, getNewAdmissionId, saveAdmissionDraft } from "../../services/admission";
+import { useCognitoAuth } from "../../auth/useCognitoAuth";
 import AccountMenu from "../../components/AccountMenu";
 import "./Parent_Dashboard.css";
 
@@ -26,8 +27,8 @@ function getNextAcademicSession() {
 
 const nextAcademicSession = getNextAcademicSession();
 const classRank = { Nursery: 0, "Class 1": 1, "Class 2": 2, "Class 3": 3, "Class 4": 4, "Class 5": 5, "Class 6": 6, "Class 7": 7, "Class 8": 8, "Class 9": 9, "Class 10": 10, "Class 11": 11 };
-const admissionClassOptions = Object.entries(classRank).filter(([, rank]) => rank >= 5);
-const currentClassOptions = Object.entries(classRank).filter(([, rank]) => rank >= 5);
+const admissionClassOptions = Object.entries(classRank).filter(([, rank]) => rank >= 4);
+const currentClassOptions = Object.entries(classRank).filter(([, rank]) => rank >= 4);
 
 const initialForm = {
   session: nextAcademicSession,
@@ -44,7 +45,8 @@ const initialForm = {
 
 export default function ParentDashboard() {
   const navigate = useNavigate();
-  const [form, setForm] = useState(initialForm);
+  const { session } = useCognitoAuth();
+  const [form, setForm] = useState(() => ({ ...initialForm, ...getAdmissionData().admissionDetails }));
   const [message, setMessage] = useState("");
   const applicationId = getNewAdmissionId();
 
@@ -62,8 +64,13 @@ export default function ParentDashboard() {
     });
   }
 
-  function saveDraft() {
-    setMessage("Your admission details have been saved as a draft.");
+  async function saveDraft() {
+    try {
+      await saveAdmissionDraft(session?.accessToken, { admissionDetails: form, ...form });
+      setMessage("Your admission details have been saved as a draft.");
+    } catch (error) {
+      setMessage(error.message);
+    }
   }
 
   function continueApplication() {
@@ -83,8 +90,12 @@ export default function ParentDashboard() {
       setMessage("Current Class must be the same as or lower than Class Applying For.");
       return;
     }
-    sessionStorage.setItem("sheerwood-applying-class", form.class);
-    navigate("/student-information", { state: { applyingClass: form.class, stream: form.stream } });
+    saveAdmissionDraft(session?.accessToken, { admissionDetails: form, ...form })
+      .then(() => {
+        sessionStorage.setItem("sheerwood-applying-class", form.class);
+        navigate("/student-information", { state: { applyingClass: form.class, stream: form.stream } });
+      })
+      .catch((error) => setMessage(error.message));
   }
 
   return (

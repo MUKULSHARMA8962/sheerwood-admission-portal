@@ -1,4 +1,4 @@
-from typing import Literal
+from typing import Any, Literal
 
 from pydantic import BaseModel, Field
 
@@ -31,6 +31,13 @@ class AdmissionDecisionRequest(BaseModel):
 class CreateApplicationRequest(BaseModel):
     student_name: str = Field(min_length=2, max_length=120)
     desired_class: str = Field(min_length=2, max_length=40)
+
+
+class SaveApplicationDraftRequest(BaseModel):
+    application_number: str = Field(min_length=5, max_length=60)
+    data: dict[str, Any] = Field(default_factory=dict)
+    documents: list[dict[str, Any]] = Field(default_factory=list)
+    status: Literal["draft", "submitted"] = "draft"
 
 
 class UserRoleUpdate(BaseModel):

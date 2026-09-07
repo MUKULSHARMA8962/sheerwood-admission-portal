@@ -55,6 +55,8 @@ def initialize_database() -> None:
                 submitted_on TEXT NOT NULL,
                 class_section TEXT,
                 parent_id INTEGER,
+                application_data TEXT NOT NULL DEFAULT '{}',
+                documents_json TEXT NOT NULL DEFAULT '[]',
                 FOREIGN KEY(parent_id) REFERENCES users(id) ON DELETE SET NULL
             );
 
@@ -89,3 +91,8 @@ def initialize_database() -> None:
         if "cognito_subject" not in existing_columns:
             database.execute("ALTER TABLE users ADD COLUMN cognito_subject TEXT")
             database.execute("CREATE UNIQUE INDEX IF NOT EXISTS users_cognito_subject_idx ON users(cognito_subject) WHERE cognito_subject IS NOT NULL")
+        application_columns = {row["name"] for row in database.execute("PRAGMA table_info(applications)")}
+        if "application_data" not in application_columns:
+            database.execute("ALTER TABLE applications ADD COLUMN application_data TEXT NOT NULL DEFAULT '{}'")
+        if "documents_json" not in application_columns:
+            database.execute("ALTER TABLE applications ADD COLUMN documents_json TEXT NOT NULL DEFAULT '[]'")
