@@ -13,7 +13,10 @@ from .security import hash_password
 
 
 def serialize_user(row: Any) -> dict[str, Any]:
-    return {"id": row["id"], "email": row["email"], "full_name": row["full_name"], "role": row["role"]}
+    # ``admission`` is the legacy/applicant Cognito role.  The API uses the
+    # parent permissions for an applicant throughout the admission workflow.
+    role = "parent" if row["role"] == "admission" else row["role"]
+    return {"id": row["id"], "email": row["email"], "full_name": row["full_name"], "role": role}
 
 
 def authentication_mode() -> str:
@@ -76,8 +79,8 @@ def provision_cognito_user(claims: dict[str, Any]) -> dict[str, Any]:
     email = username.lower()
     full_name = str(claims.get("name") or username).strip()
 
-    # Student UI has no API endpoints backed by the local users table.
-    # Avoid creating an incompatible row in its pre-existing role-constrained table.
+    # Student and admission sessions can still derive a local identity without
+    # requiring a DB row when the project is using Cognito-only access.
     if role == "student":
         return {"id": subject, "email": email, "full_name": full_name, "role": role}
 
@@ -89,10 +92,10 @@ def provision_cognito_user(claims: dict[str, Any]) -> dict[str, Any]:
                 database.execute("UPDATE users SET cognito_subject = ?, role = ? WHERE id = ?", (subject, database_role, user["id"]))
             else:
                 cursor = database.execute(
-                    "INSERT INTO users (email, full_name, role, password_hash, cognito_subject) VALUES (?, ?, ?, ?, ?)",
+                    "INSERT INTO users (email, full_name, role, password_hash, cognito_subject) VALUES (?, ?, ?, ?, ?) RETURNING id",
                     (email, full_name, database_role, hash_password(secrets.token_urlsafe(32)), subject),
                 )
-                user = database.execute("SELECT id, email, full_name, role FROM users WHERE id = ?", (cursor.lastrowid,)).fetchone()
+                user = database.execute("SELECT id, email, full_name, role FROM users WHERE id = ?", (cursor.fetchone()["id"],)).fetchone()
                 return serialize_user(user)
             user = database.execute("SELECT id, email, full_name, role FROM users WHERE id = ?", (user["id"],)).fetchone()
     return serialize_user(user)

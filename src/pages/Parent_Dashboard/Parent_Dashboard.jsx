@@ -1,6 +1,14 @@
-import { useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { getAdmissionData, getNewAdmissionId, saveAdmissionDraft } from "../../services/admission";
+import {
+  getAdmissionData,
+  getAdmissionDocumentLabel,
+  getAdmissionStatus,
+  getApplicationStatusLabel,
+  getDocumentStatusLabel,
+  getNewAdmissionId,
+  saveAdmissionDraft,
+} from "../../services/admission";
 import { useCognitoAuth } from "../../auth/useCognitoAuth";
 import AccountMenu from "../../components/AccountMenu";
 import "./Parent_Dashboard.css";
@@ -26,10 +34,12 @@ function getNextAcademicSession() {
 }
 
 const nextAcademicSession = getNextAcademicSession();
-const classOrder = ["Class 5", "Class 6", "Class 7", "Class 8", "Class 9", "Class 10", "Class 11"];
+// Admissions begin at Class 5. Class 4 is only available as a student's
+// current class when they are applying for Class 5.
+const admissionClassOptions = ["Class 5", "Class 6", "Class 7", "Class 8", "Class 9", "Class 10", "Class 11"];
+const currentClassOptions = ["Class 4", ...admissionClassOptions];
+const classOrder = currentClassOptions;
 const classRank = Object.fromEntries(classOrder.map((className, index) => [className, index + 4]));
-const admissionClassOptions = classOrder;
-const currentClassOptions = classOrder;
 
 const currentClassChoices = (selectedClass) =>
   currentClassOptions.filter((className) => selectedClass === "Select class" || classRank[className] <= classRank[selectedClass]);
@@ -47,12 +57,99 @@ const initialForm = {
   medium: "English",
 };
 
+function statusClassName(status) {
+  return String(status || "unknown").replaceAll("_", "-");
+}
+
+function statusIcon(status) {
+  if (status === "approved") return "✓";
+  if (status === "reupload_required") return "!";
+  return "◷";
+}
+
+function LiveApplicationStatus({ liveStatus, isLoading, error, onRefresh }) {
+  const documents = liveStatus?.documents || [];
+  const summary = liveStatus?.document_summary || { uploaded: 0, approved: 0, pending: 0, reupload_required: 0 };
+  const applicationStatus = liveStatus?.application?.status;
+
+  return <section className="admission-form-block admission-live-status" aria-labelledby="live-status-heading">
+    <header className="admission-form-block-header">
+      <div>
+        <p>LIVE APPLICATION STATUS</p>
+        <h2 id="live-status-heading">Document verification &amp; admission approval</h2>
+      </div>
+      <div className="live-status-header-actions">
+        <span className={`live-application-status is-${statusClassName(applicationStatus)}`}>
+          {liveStatus ? getApplicationStatusLabel(applicationStatus) : "Waiting for first save"}
+        </span>
+        <button type="button" onClick={onRefresh} disabled={isLoading}>{isLoading ? "Refreshing…" : "Refresh"}</button>
+      </div>
+    </header>
+
+    {error && <p className="live-status-error" role="status">{error} We will try again automatically.</p>}
+    {!liveStatus && !error && <p className="live-status-empty">{isLoading ? "Checking the latest application status…" : "Save your draft once to see real-time document and admission updates here."}</p>}
+
+    {liveStatus && <>
+      <p className="live-status-description">Status is read directly from your saved application. It refreshes automatically every 15 seconds.</p>
+      <div className="live-status-summary" aria-label="Document verification summary">
+        <span><b>{summary.uploaded}</b><small>Uploaded</small></span>
+        <span><b>{summary.approved}</b><small>Verified</small></span>
+        <span><b>{summary.pending}</b><small>Under review</small></span>
+        <span><b>{summary.reupload_required}</b><small>Action needed</small></span>
+      </div>
+
+      {documents.length > 0 ? <div className="live-document-list" role="list" aria-label="Uploaded document statuses">
+        {documents.map((document) => <article className={`is-${statusClassName(document.status)}`} key={document.id} role="listitem">
+          <i aria-hidden="true">{statusIcon(document.status)}</i>
+          <div className="live-document-name"><b>{getAdmissionDocumentLabel(document.document_key)}</b><small title={document.file_name}>{document.file_name}</small></div>
+          <span className="live-document-status">{getDocumentStatusLabel(document.status)}</span>
+          {document.reason && <p><b>Admin note:</b> {document.reason}</p>}
+        </article>)}
+      </div> : <p className="live-status-empty">No documents are saved in the database yet. Upload them in the Documents step to send them for verification.</p>}
+    </>}
+  </section>;
+}
+
 export default function ParentDashboard() {
   const navigate = useNavigate();
   const { session } = useCognitoAuth();
-  const [form, setForm] = useState(() => ({ ...initialForm, ...getAdmissionData().admissionDetails }));
+  const [form, setForm] = useState(() => {
+    const savedForm = { ...initialForm, ...getAdmissionData().admissionDetails };
+    // A saved Class 4 application is no longer valid after removing Class 4
+    // from the admission dropdown.
+    return admissionClassOptions.includes(savedForm.class)
+      ? savedForm
+      : { ...savedForm, class: "Select class", stream: "Select stream" };
+  });
   const [message, setMessage] = useState("");
   const applicationId = getNewAdmissionId();
+  const [liveStatus, setLiveStatus] = useState(null);
+  const [isLiveStatusLoading, setIsLiveStatusLoading] = useState(true);
+  const [liveStatusError, setLiveStatusError] = useState("");
+
+  const loadLiveStatus = useCallback(async () => {
+    if (!session?.accessToken) {
+      setIsLiveStatusLoading(false);
+      return;
+    }
+
+    setIsLiveStatusLoading(true);
+    try {
+      const nextStatus = await getAdmissionStatus(session.accessToken, applicationId);
+      setLiveStatus(nextStatus);
+      setLiveStatusError("");
+    } catch (error) {
+      setLiveStatusError(error.message || "Live status is temporarily unavailable.");
+    } finally {
+      setIsLiveStatusLoading(false);
+    }
+  }, [applicationId, session?.accessToken]);
+
+  useEffect(() => {
+    void loadLiveStatus();
+    const refreshTimer = window.setInterval(loadLiveStatus, 15_000);
+    return () => window.clearInterval(refreshTimer);
+  }, [loadLiveStatus]);
 
   function update(event) {
     const { name, value } = event.target;
@@ -72,6 +169,7 @@ export default function ParentDashboard() {
     try {
       await saveAdmissionDraft(session?.accessToken, { admissionDetails: form, ...form });
       setMessage("Your admission details have been saved as a draft.");
+      void loadLiveStatus();
     } catch (error) {
       setMessage(error.message);
     }
@@ -96,6 +194,7 @@ export default function ParentDashboard() {
     }
     saveAdmissionDraft(session?.accessToken, { admissionDetails: form, ...form })
       .then(() => {
+        void loadLiveStatus();
         sessionStorage.setItem("sheerwood-applying-class", form.class);
         navigate("/student-information", { state: { applyingClass: form.class, stream: form.stream } });
       })
@@ -146,6 +245,7 @@ export default function ParentDashboard() {
                 <label>Medium<select name="medium" value={form.medium} onChange={update}><option value="English">English</option><option value="Hindi">Hindi</option><option value="Other">Other</option></select></label>
               </div>
             </section>
+            <LiveApplicationStatus liveStatus={liveStatus} isLoading={isLiveStatusLoading} error={liveStatusError} onRefresh={loadLiveStatus} />
             <div className="form-actions"><button type="button" className="save-draft" onClick={saveDraft}>Save Draft</button><button className="next-step" type="submit">Next <span>→</span></button></div>
           </form>
         </div>

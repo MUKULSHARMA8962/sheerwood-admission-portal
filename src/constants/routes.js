@@ -26,6 +26,8 @@ export const ROUTES = {
 export const API_ROUTES = {
   adminUsers: `${API_BASE_URL}/admin/users-roles`,
   adminDocuments: `${API_BASE_URL}/admin/documents`,
+  adminAdmissions: `${API_BASE_URL}/admin/admissions`,
+  applicationDecision: (applicationId) => `${API_BASE_URL}/applications/${encodeURIComponent(applicationId)}/decision`,
   aiChat: `${API_BASE_URL}/ai/chat`,
   otp: (action) => `${API_BASE_URL}/auth/otp/${action}`,
 };

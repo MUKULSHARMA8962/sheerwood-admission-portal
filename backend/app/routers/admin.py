@@ -1,19 +1,69 @@
-import os
+from datetime import UTC, datetime
 import logging
-import json
+import os
+import secrets
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Response, status
 import boto3
 from botocore.exceptions import BotoCoreError, ClientError
 
 from ..ai import AIConfigurationError, AIProviderRateLimitError, AIProviderUnavailableError, generate_ai_reply
 from ..database import connection
 from ..dependencies import require_roles
-from ..schemas import AIRequest, AnnouncementRequest, UserRoleUpdate
+from ..schemas import AIRequest, AnnouncementRequest, CreateUserRequest, DocumentReviewRequest, UserRoleUpdate
+from ..security import hash_password
 
 router = APIRouter(prefix="/api/admin", tags=["Admin UI"])
 AdminUser = Depends(require_roles("admin"))
 logger = logging.getLogger(__name__)
+
+DOCUMENT_LABELS = {
+    "report-card": "Report Card",
+    "aadhaar-card": "Aadhaar Card",
+    "birth-certificate": "Birth Certificate",
+    "passport": "Passport",
+    "national-id-card": "National ID Card",
+    "student-photo": "Student Photograph",
+    "father-photo": "Father's Photograph",
+    "mother-photo": "Mother's Photograph",
+}
+DOCUMENT_STATUS_LABELS = {
+    "submitted": "Submitted",
+    "approved": "Approved",
+    "reupload_required": "Re-upload Required",
+}
+
+
+def serialize_document(row: dict) -> dict:
+    status_value = row["status"]
+    return {
+        "id": row["id"],
+        "application_number": row["application_number"],
+        "student": row["student_name"] or "Applicant",
+        "document_key": row["document_key"],
+        "document": DOCUMENT_LABELS.get(row["document_key"], row["document_key"].replace("-", " ").title()),
+        "name": DOCUMENT_LABELS.get(row["document_key"], row["document_key"].replace("-", " ").title()),
+        "file": row["file_name"],
+        "content_type": row["content_type"],
+        "size_bytes": row["size_bytes"],
+        "status": DOCUMENT_STATUS_LABELS.get(status_value, status_value.replace("_", " ").title()),
+        "status_code": status_value,
+        "reason": row["reason"] or "",
+        "updated_at": row["updated_at"],
+    }
+
+
+def document_row(database, document_id: int):
+    return database.execute(
+        """SELECT d.id, d.application_number, d.document_key, d.file_name, d.content_type,
+                  d.size_bytes, d.status, d.reason, d.updated_at,
+                  COALESCE(n.student_name, a.student_name, 'Applicant') AS student_name
+           FROM admission_documents d
+           LEFT JOIN new_admissions n ON n.application_number = d.application_number
+           LEFT JOIN applications a ON a.application_number = d.application_number
+           WHERE d.id = ?""",
+        (document_id,),
+    ).fetchone()
 
 
 def cognito_admin_client():
@@ -76,26 +126,68 @@ def timetable(_: dict = AdminUser) -> list[dict]:
 
 @router.get("/documents")
 def documents(_: dict = AdminUser) -> list[dict]:
-    result = []
     with connection() as database:
-        rows = database.execute("SELECT application_number, student_name, documents_json FROM applications ORDER BY id DESC").fetchall()
-    for row in rows:
-        try:
-            uploaded_documents = json.loads(row["documents_json"] or "[]")
-        except json.JSONDecodeError:
-            uploaded_documents = []
-        for document in uploaded_documents:
-            result.append({
-                "id": f"{row['application_number']}:{document.get('id', document.get('name', 'document'))}",
-                "application_number": row["application_number"],
-                "student": row["student_name"],
-                "document": document.get("name", "Document"),
-                "name": document.get("name", "Document"),
-                "file": document.get("file", ""),
-                "status": document.get("status", "Not Uploaded"),
-                "reason": document.get("reason", ""),
-            })
-    return result
+        rows = database.execute(
+            """SELECT d.id, d.application_number, d.document_key, d.file_name, d.content_type,
+                      d.size_bytes, d.status, d.reason, d.updated_at,
+                      COALESCE(n.student_name, a.student_name, 'Applicant') AS student_name
+               FROM admission_documents d
+               LEFT JOIN new_admissions n ON n.application_number = d.application_number
+               LEFT JOIN applications a ON a.application_number = d.application_number
+               ORDER BY d.updated_at DESC"""
+        ).fetchall()
+    return [serialize_document(row) for row in rows]
+
+
+@router.patch("/documents/{document_id}")
+def review_document(document_id: int, payload: DocumentReviewRequest, _: dict = AdminUser) -> dict:
+    updated_at = datetime.now(UTC).isoformat()
+    with connection() as database:
+        existing = database.execute(
+            "SELECT application_number FROM admission_documents WHERE id = ?",
+            (document_id,),
+        ).fetchone()
+        if not existing:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Admission document was not found.")
+        database.execute(
+            "UPDATE admission_documents SET status = ?, reason = ?, updated_at = ? WHERE id = ?",
+            (payload.decision, payload.reason.strip(), updated_at, document_id),
+        )
+        all_statuses = [row["status"] for row in database.execute(
+            "SELECT status FROM admission_documents WHERE application_number = ?",
+            (existing["application_number"],),
+        ).fetchall()]
+        document_status = "approved" if all_statuses and all(value == "approved" for value in all_statuses) else "reupload_required" if "reupload_required" in all_statuses else "submitted"
+        database.execute(
+            "UPDATE applications SET documents_status = ? WHERE application_number = ?",
+            (document_status, existing["application_number"]),
+        )
+        database.execute(
+            "UPDATE new_admissions SET documents_status = ?, updated_at = ? WHERE application_number = ?",
+            (document_status, updated_at, existing["application_number"]),
+        )
+        updated = document_row(database, document_id)
+    return serialize_document(updated)
+
+
+@router.get("/documents/{document_id}/download")
+def download_document(document_id: int, _: dict = AdminUser) -> Response:
+    with connection() as database:
+        document = database.execute(
+            "SELECT file_name, content_type, file_content FROM admission_documents WHERE id = ?",
+            (document_id,),
+        ).fetchone()
+    if not document:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Admission document was not found.")
+    return Response(
+        content=bytes(document["file_content"]),
+        media_type=document["content_type"],
+        headers={
+            "Content-Disposition": f'attachment; filename="{document["file_name"]}"',
+            "Cache-Control": "private, no-store",
+            "X-Content-Type-Options": "nosniff",
+        },
+    )
 
 
 @router.get("/transport-hostel")
@@ -150,6 +242,30 @@ def users_roles(_: dict = AdminUser) -> list[dict]:
         error_code = error.response.get("Error", {}).get("Code", "AWS credentials or permissions error") if isinstance(error, ClientError) else str(error)
         logger.exception("Cognito user listing failed: %s", error_code)
         raise HTTPException(status_code=503, detail=f"Cognito users could not be loaded: {error_code}") from error
+
+
+@router.post("/users-roles", status_code=201)
+def create_user(payload: CreateUserRequest, _: dict = AdminUser) -> dict:
+    full_name = payload.full_name.strip()
+    email = payload.email.strip().lower()
+    password = (payload.password or secrets.token_urlsafe(16)).strip()
+
+    if not full_name:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Full name is required.")
+    if len(password) < 8:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Password must be at least 8 characters long.")
+
+    with connection() as database:
+        if database.execute("SELECT 1 FROM users WHERE email = ?", (email,)).fetchone():
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="A user with this email already exists.")
+        cursor = database.execute(
+            "INSERT INTO users (email, full_name, role, password_hash) VALUES (?, ?, ?, ?) RETURNING id",
+            (email, full_name, payload.role, hash_password(password)),
+        )
+        row = database.execute("SELECT id, email, full_name, role, cognito_subject FROM users WHERE id = ?", (cursor.fetchone()["id"],)).fetchone()
+    created = dict(row)
+    created["temporary_password"] = password if payload.password is None else None
+    return created
 
 
 @router.patch("/users-roles/{user_id}")

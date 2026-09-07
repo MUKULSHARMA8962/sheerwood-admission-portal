@@ -12,6 +12,68 @@ uvicorn app.main:app --reload --port 8000
 
 Open API documentation at `http://localhost:8000/docs` and the health check at `http://localhost:8000/api/health`.
 
+## Configure AWS RDS PostgreSQL
+
+The API now supports PostgreSQL and automatically creates its schema when it
+starts. Copy `backend/.env.example` to `backend/.env` and provide the RDS
+database name, username and password; the endpoint and port are already set:
+
+```dotenv
+POSTGRES_HOST=database-1.c0164k0cckzv.us-east-1.rds.amazonaws.com
+POSTGRES_PORT=5432
+POSTGRES_DATABASE=postgres
+POSTGRES_USER=postgres
+POSTGRES_PASSWORD=your_rds_password
+POSTGRES_SSLMODE=verify-full
+POSTGRES_SSLROOTCERT=/certs/global-bundle.pem
+```
+
+`DATABASE_URL` is also supported and takes precedence over the individual
+`POSTGRES_*` values. Keep all database credentials in `backend/.env` or the
+server's secret manager—never in React `VITE_` variables.
+
+The Docker image includes AWS's RDS global CA bundle at
+`/certs/global-bundle.pem`. For a local API process, download it and point
+`POSTGRES_SSLROOTCERT` to the downloaded file:
+
+```bash
+curl -o global-bundle.pem https://truststore.pki.rds.amazonaws.com/global/global-bundle.pem
+```
+
+The RDS security group must allow TCP `5432` from the API server (or its
+security group). The endpoint is currently not publicly reachable from this
+development machine, so deploy the API in the permitted network or add the
+server's source to that inbound rule.
+
+### Portal tables
+
+The API creates these operational tables at startup: `new_admissions`,
+`teachers`, `students`, and `admins`. The admission form's visible fields—
+academic session, class, PEN number, previous school, current class, board and
+medium—are stored as named `new_admissions` columns. The full multi-step form
+payload and document list are also retained as JSON in the same row.
+
+### Admission document storage
+
+Actual admission files (PDF, JPG and PNG) are stored in the private
+`admission_documents` table as database binary data. Every upload is limited to
+5 MB by default, type-checked on the server, linked to the authenticated
+parent's application, and can only be downloaded through the authenticated API.
+Set `MAX_ADMISSION_DOCUMENT_BYTES` in `backend/.env` to change the limit.
+
+Document verification and admission decisions are database-backed:
+
+- Parents read their live document and approval state through
+  `GET /api/applications/{application_number}/status`.
+- Admins review the queue with `GET /api/admin/documents`, download a stored
+  file with `GET /api/admin/documents/{document_id}/download`, and persist a
+  decision with `PATCH /api/admin/documents/{document_id}`.
+- Admin final decisions use `PATCH /api/applications/{application_id}/decision`.
+
+The parent-facing Admission Details and New User Dashboard refresh these
+statuses automatically. Parent draft saves do not overwrite an admin's final
+approval/rejection or document-review state.
+
 ## Configure Sheerwood AI
 
 Create `backend/.env` from `.env.example`, then add an OpenAI API key **only** in that server-side file:

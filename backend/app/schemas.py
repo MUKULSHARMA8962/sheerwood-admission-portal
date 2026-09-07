@@ -14,7 +14,7 @@ class RegisterRequest(BaseModel):
 class LoginRequest(BaseModel):
     email: str = Field(min_length=5, max_length=254)
     password: str = Field(min_length=1, max_length=128)
-    role: Literal["parent", "teacher", "admin"]
+    role: Literal["parent", "teacher", "student", "admin", "admission"]
 
 
 class CognitoTokenExchangeRequest(BaseModel):
@@ -28,6 +28,11 @@ class AdmissionDecisionRequest(BaseModel):
     class_section: str | None = Field(default=None, max_length=30)
 
 
+class DocumentReviewRequest(BaseModel):
+    decision: Literal["approved", "reupload_required"]
+    reason: str = Field(default="", max_length=500)
+
+
 class CreateApplicationRequest(BaseModel):
     student_name: str = Field(min_length=2, max_length=120)
     desired_class: str = Field(min_length=2, max_length=40)
@@ -38,6 +43,13 @@ class SaveApplicationDraftRequest(BaseModel):
     data: dict[str, Any] = Field(default_factory=dict)
     documents: list[dict[str, Any]] = Field(default_factory=list)
     status: Literal["draft", "submitted"] = "draft"
+
+
+class CreateUserRequest(BaseModel):
+    full_name: str = Field(min_length=1, max_length=120)
+    email: str = Field(min_length=5, max_length=254)
+    role: Literal["parent", "teacher", "student", "admin", "admission"]
+    password: str | None = Field(default=None, min_length=8, max_length=128)
 
 
 class UserRoleUpdate(BaseModel):

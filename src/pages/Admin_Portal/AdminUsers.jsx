@@ -1,12 +1,16 @@
 import { useEffect, useState } from "react";
-import { getAdminUsers, updateAdminUserRole } from "../../services/api";
+import { createAdminUser, getAdminUsers, updateAdminUserRole } from "../../services/api";
 import { useCognitoAuth } from "../../auth/useCognitoAuth";
+
+const emptyUserForm = { full_name: "", email: "", role: "parent", password: "" };
 
 export default function AdminUsers({ setNotice }) {
   const { session } = useCognitoAuth();
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [showCreateForm, setShowCreateForm] = useState(false);
+  const [newUser, setNewUser] = useState(emptyUserForm);
 
   useEffect(() => {
     getAdminUsers(session?.accessToken)
@@ -29,10 +33,25 @@ export default function AdminUsers({ setNotice }) {
     }
   }
 
+  async function createUser(event) {
+    event.preventDefault();
+    try {
+      const created = await createAdminUser(session.accessToken, newUser);
+      setUsers((current) => [created, ...current]);
+      setNewUser(emptyUserForm);
+      setShowCreateForm(false);
+      const passwordNotice = created.temporary_password ? ` Temporary password: ${created.temporary_password}` : "";
+      setNotice(`${created.full_name} was added to ${created.role}.${passwordNotice}`);
+    } catch (reason) {
+      setError(reason.message);
+    }
+  }
+
   return <>
-    <header className="admin-feature-heading"><div><p>ACCESS CONTROL</p><h1>Users &amp; Roles</h1><small>Manage database users and their portal roles.</small></div></header>
+    <header className="admin-feature-heading"><div><p>ACCESS CONTROL</p><h1>Users &amp; Roles</h1><small>Manage database users and their portal roles.</small></div><button className="admin-feature-button" type="button" onClick={() => setShowCreateForm((value) => !value)}>＋ New user</button></header>
     <section className="admin-feature-card role-table">
       <header><div><p>DATABASE USERS</p><h2>User role assignments</h2></div><span>{users.length} loaded</span></header>
+      {showCreateForm && <form className="admin-user-create" onSubmit={createUser}><input value={newUser.full_name} onChange={(event) => setNewUser((current) => ({ ...current, full_name: event.target.value }))} placeholder="Full name" required /><input type="email" value={newUser.email} onChange={(event) => setNewUser((current) => ({ ...current, email: event.target.value }))} placeholder="Email address" required /><select value={newUser.role} onChange={(event) => setNewUser((current) => ({ ...current, role: event.target.value }))}><option value="parent">Parent</option><option value="teacher">Teacher</option><option value="student">Student</option><option value="admin">Admin</option><option value="admission">Admission</option></select><input type="password" value={newUser.password} onChange={(event) => setNewUser((current) => ({ ...current, password: event.target.value }))} placeholder="Optional password (8+ chars)" minLength={8} /><div className="admin-user-actions"><button type="submit">Create user</button><button type="button" className="outline" onClick={() => setShowCreateForm(false)}>Cancel</button></div></form>}
       {error && <p className="admin-inline-error">{error}</p>}
       {loading ? <p className="admin-inline-loading">Loading users...</p> : users.length === 0 ? <p className="admin-inline-loading">No database users found.</p> : users.map((user) => <article key={user.id}>
         <i>{user.full_name?.slice(0, 1) || "U"}</i>

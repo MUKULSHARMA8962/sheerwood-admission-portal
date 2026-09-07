@@ -15,10 +15,69 @@ export async function updateAdminUserRole(accessToken, userId, user) {
   return data;
 }
 
+export async function createAdminUser(accessToken, user) {
+  const response = await fetch(API_ROUTES.adminUsers, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Authorization: `Bearer ${accessToken}` },
+    body: JSON.stringify({
+      full_name: user.full_name,
+      email: user.email,
+      role: user.role,
+      password: user.password || undefined,
+    }),
+  });
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(data.detail || "User could not be created.");
+  return data;
+}
+
 export async function getAdminDocuments(accessToken) {
   const response = await fetch(API_ROUTES.adminDocuments, { headers: { Authorization: `Bearer ${accessToken}` } });
   const data = await response.json().catch(() => ({}));
   if (!response.ok) throw new Error(data.detail || "Documents could not be loaded.");
+  return data;
+}
+
+export async function reviewAdminDocument(accessToken, documentId, decision, reason = "") {
+  const response = await fetch(`${API_ROUTES.adminDocuments}/${encodeURIComponent(documentId)}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json", Authorization: `Bearer ${accessToken}` },
+    body: JSON.stringify({ decision, reason }),
+  });
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(data.detail || "Document review could not be saved.");
+  return data;
+}
+
+export async function downloadAdminDocument(accessToken, documentId, fallbackFileName = "admission-document") {
+  const response = await fetch(`${API_ROUTES.adminDocuments}/${encodeURIComponent(documentId)}/download`, {
+    headers: { Authorization: `Bearer ${accessToken}` },
+  });
+  if (!response.ok) {
+    const data = await response.json().catch(() => ({}));
+    throw new Error(data.detail || "Document could not be downloaded.");
+  }
+
+  const contentDisposition = response.headers.get("content-disposition") || "";
+  const fileNameMatch = contentDisposition.match(/filename="?([^";]+)"?/i);
+  return { blob: await response.blob(), fileName: fileNameMatch?.[1] || fallbackFileName };
+}
+
+export async function getAdminAdmissions(accessToken) {
+  const response = await fetch(API_ROUTES.adminAdmissions, { headers: { Authorization: `Bearer ${accessToken}` } });
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(data.detail || "Admissions could not be loaded.");
+  return data;
+}
+
+export async function decideAdminAdmission(accessToken, applicationId, decision, classSection = null) {
+  const response = await fetch(API_ROUTES.applicationDecision(applicationId), {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json", Authorization: `Bearer ${accessToken}` },
+    body: JSON.stringify({ decision, class_section: classSection }),
+  });
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(data.detail || "Admission decision could not be saved.");
   return data;
 }
 

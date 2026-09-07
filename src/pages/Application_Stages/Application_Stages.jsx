@@ -1,6 +1,6 @@
 import { useRef, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
-import { getAdmissionData, getAdmissionDocuments, saveAdmissionDraft, updateAdmissionDocument } from "../../services/admission";
+import { getAdmissionData, getAdmissionDocuments, saveAdmissionDraft, updateAdmissionDocument, uploadAdmissionDocument } from "../../services/admission";
 import AccountMenu from "../../components/AccountMenu";
 import { useCognitoAuth } from "../../auth/useCognitoAuth";
 import "./Application_Stages.css";
@@ -59,16 +59,25 @@ function AcademicForm({ setMessage, accessToken }) {
     fileRef.current?.click();
   }
 
-  function uploadFile(event) {
+  async function uploadFile(event) {
     const file = event.target.files?.[0];
     const documentId = selectedDocument.current;
     if (!file || !documentId) return;
-
-    const updatedDocuments = updateAdmissionDocument(documentId, "Submitted", "", file.name);
-    setDocuments(updatedDocuments);
-    saveAdmissionDraft(accessToken, { academicDocuments: updatedDocuments })
-      .then(() => setMessage(`${file.name} submitted and saved for admin approval.`))
-      .catch((error) => setMessage(error.message));
+    try {
+      setMessage(`Uploading ${file.name}…`);
+      await saveAdmissionDraft(accessToken, {});
+      const uploaded = await uploadAdmissionDocument(accessToken, documentId, file);
+      const updatedDocuments = updateAdmissionDocument(documentId, "Submitted", "", uploaded.file_name, {
+        storageId: uploaded.id,
+        sizeBytes: uploaded.size_bytes,
+        contentType: uploaded.content_type,
+      });
+      setDocuments(updatedDocuments);
+      await saveAdmissionDraft(accessToken, { academicDocuments: updatedDocuments });
+      setMessage(`${uploaded.file_name} uploaded and saved securely.`);
+    } catch (error) {
+      setMessage(error.message);
+    }
     event.target.value = "";
   }
 
@@ -79,7 +88,28 @@ function DocumentsForm({ setMessage, accessToken }) {
   const fileRef = useRef(null);
   const [documents, setDocuments] = useState(getAdmissionDocuments);
   const chooseFile = (index) => { fileRef.current.dataset.index = index; fileRef.current.click(); };
-  const uploaded = (event) => { const file = event.target.files?.[0]; const index = Number(event.target.dataset.index); if (!file) return; const document = documents[index]; const updatedDocuments = updateAdmissionDocument(document.id, "Submitted", "", file.name); setDocuments(updatedDocuments); saveAdmissionDraft(accessToken, { uploadedDocuments: updatedDocuments }).then(() => setMessage(`${file.name} submitted and saved for admin approval.`)).catch((error) => setMessage(error.message)); event.target.value = ""; };
+  const uploaded = async (event) => {
+    const file = event.target.files?.[0];
+    const index = Number(event.target.dataset.index);
+    if (!file) return;
+    const document = documents[index];
+    try {
+      setMessage(`Uploading ${file.name}…`);
+      await saveAdmissionDraft(accessToken, {});
+      const storedDocument = await uploadAdmissionDocument(accessToken, document.id, file);
+      const updatedDocuments = updateAdmissionDocument(document.id, "Submitted", "", storedDocument.file_name, {
+        storageId: storedDocument.id,
+        sizeBytes: storedDocument.size_bytes,
+        contentType: storedDocument.content_type,
+      });
+      setDocuments(updatedDocuments);
+      await saveAdmissionDraft(accessToken, { uploadedDocuments: updatedDocuments });
+      setMessage(`${storedDocument.file_name} uploaded and saved securely.`);
+    } catch (error) {
+      setMessage(error.message);
+    }
+    event.target.value = "";
+  };
   return <><p className="document-intro">Upload Required Documents <small>Uploaded documents are submitted for admin approval. Documents not uploaded remain marked Not Uploaded.</small></p><div className="document-list">{documents.map((document, index) => <button className={document.status.toLowerCase().replaceAll(" ", "-")} type="button" key={document.id} onClick={() => chooseFile(index)}><span>▣</span><b>{document.name}</b><em>{document.file || "Not uploaded"}</em><i>{document.status === "Approved" ? "✓" : document.status === "Submitted" ? "◷" : "⇧"}</i><small>{document.status === "Submitted" ? "Waiting for approval" : document.status}</small></button>)}</div><input ref={fileRef} type="file" accept=".pdf,.jpg,.jpeg,.png" hidden onChange={uploaded} /></>;
 }
 

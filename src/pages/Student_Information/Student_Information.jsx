@@ -3,7 +3,7 @@ import { Link, useLocation, useNavigate } from "react-router-dom";
 import "./Student_Information.css";
 import AccountMenu from "../../components/AccountMenu";
 import "./StudentBirthDate.css";
-import { getAdmissionData, saveAdmissionDraft } from "../../services/admission";
+import { getAdmissionData, saveAdmissionDraft, uploadAdmissionDocument } from "../../services/admission";
 import { useCognitoAuth } from "../../auth/useCognitoAuth";
 
 const steps = [
@@ -106,7 +106,7 @@ export default function StudentInformation() {
     if (name === "birthDate") setBirthDateError(validateBirthDate(value));
   }
 
-  function selectPhoto(event) {
+  async function selectPhoto(event) {
     const file = event.target.files?.[0];
     if (!file) return;
 
@@ -115,8 +115,19 @@ export default function StudentInformation() {
       event.target.value = "";
       return;
     }
-    setPhoto(URL.createObjectURL(file));
-    setMessage("Student photo updated successfully.");
+    try {
+      setMessage("Uploading student photograph…");
+      await saveAdmissionDraft(session?.accessToken, { student: form });
+      const uploaded = await uploadAdmissionDocument(session?.accessToken, "student-photo", file);
+      await saveAdmissionDraft(session?.accessToken, {
+        studentPhoto: { storageId: uploaded.id, file: uploaded.file_name, contentType: uploaded.content_type, sizeBytes: uploaded.size_bytes },
+      });
+      setPhoto(URL.createObjectURL(file));
+      setMessage("Student photograph uploaded and saved securely.");
+    } catch (error) {
+      setMessage(error.message);
+    }
+    event.target.value = "";
   }
 
   function saveAndContinue(event) {

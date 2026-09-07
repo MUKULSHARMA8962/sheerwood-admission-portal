@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import "./Parent_Guardian.css";
 import AccountMenu from "../../components/AccountMenu";
-import { getAdmissionData, saveAdmissionDraft } from "../../services/admission";
+import { getAdmissionData, saveAdmissionDraft, uploadAdmissionDocument } from "../../services/admission";
 import { useCognitoAuth } from "../../auth/useCognitoAuth";
 
 const steps = ["Admission Details", "Student Information", "Parent / Guardian", "Residential Background", "Academic Background", "Documents", "Review & Submit"];
@@ -35,7 +35,7 @@ export default function ParentGuardian() {
     setFamily((details) => ({ ...details, [parentType]: { ...details[parentType], [name]: value } }));
   }
 
-  function selectPhoto(event, parentType) {
+  async function selectPhoto(event, parentType) {
     const file = event.target.files?.[0];
     if (!file) return;
 
@@ -45,17 +45,33 @@ export default function ParentGuardian() {
       return;
     }
 
-    const nextPhotoUrl = URL.createObjectURL(file);
-    setPhotos((currentPhotos) => {
-      const previousPhotoUrl = currentPhotos[parentType];
-      if (previousPhotoUrl) {
-        URL.revokeObjectURL(previousPhotoUrl);
-        photoUrlsRef.current.delete(previousPhotoUrl);
-      }
-      photoUrlsRef.current.add(nextPhotoUrl);
-      return { ...currentPhotos, [parentType]: nextPhotoUrl };
-    });
-    setMessage(`${parentType}'s photograph updated successfully.`);
+    try {
+      setMessage(`Uploading ${parentType.toLowerCase()}'s photograph…`);
+      await saveAdmissionDraft(session?.accessToken, { guardians: family });
+      const uploaded = await uploadAdmissionDocument(session?.accessToken, `${parentType.toLowerCase()}-photo`, file);
+      await saveAdmissionDraft(session?.accessToken, {
+        parentPhotos: {
+          ...(getAdmissionData().parentPhotos || {}),
+          [parentType]: { storageId: uploaded.id, file: uploaded.file_name, contentType: uploaded.content_type, sizeBytes: uploaded.size_bytes },
+        },
+      });
+
+      const nextPhotoUrl = URL.createObjectURL(file);
+      setPhotos((currentPhotos) => {
+        const previousPhotoUrl = currentPhotos[parentType];
+        if (previousPhotoUrl) {
+          URL.revokeObjectURL(previousPhotoUrl);
+          photoUrlsRef.current.delete(previousPhotoUrl);
+        }
+        photoUrlsRef.current.add(nextPhotoUrl);
+        return { ...currentPhotos, [parentType]: nextPhotoUrl };
+      });
+      setMessage(`${parentType}'s photograph uploaded and saved securely.`);
+    } catch (error) {
+      setMessage(error.message);
+    }
+
+    event.target.value = "";
   }
 
   function saveAndContinue(event) {

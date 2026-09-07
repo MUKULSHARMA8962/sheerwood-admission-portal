@@ -1,7 +1,6 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
-import { askSchoolAI, getAdminDocuments } from "../../services/api";
-import { getAdmissionDocuments, updateAdmissionDocument } from "../../services/admission";
+import { askSchoolAI, decideAdminAdmission, downloadAdminDocument, getAdminAdmissions, getAdminDocuments, reviewAdminDocument } from "../../services/api";
 import { useCognitoAuth } from "../../auth/useCognitoAuth";
 import AdminUsers from "./AdminUsers";
 import "./Admin_Portal.css";
@@ -9,7 +8,6 @@ import "./AdminFeatures.css";
 import "./AdminDocumentActions.css";
 
 const navItems = [["▦", "Dashboard", "dashboard"], ["▤", "Admissions", "admissions"], ["♙", "Students", "students"], ["♧", "Teachers", "teachers"], ["▤", "Classes", "classes"], ["✓", "Attendance", "attendance"], ["◫", "Fees", "fees"], ["▥", "Exams & Results", "exams"], ["◷", "Timetable", "timetable"], ["▣", "Documents", "documents"], ["▰", "Transport / Hostel", "transport"], ["♙", "Parents", "parents"], ["✉", "Notifications", "notifications"], ["◉", "Reports", "reports"], ["✦", "AI Assistant", "ai"], ["◈", "Users & Roles", "users"], ["⚙", "Settings", "settings"]];
-const applications = [];
 const students = [];
 const teachers = [];
 
@@ -26,10 +24,72 @@ function DashboardView({ openScreen, setNotice }) {
   return <><AdminHeading eyebrow="SCHOOL OPERATIONS" title="Admin Dashboard" text="A complete view of admissions, academics and school operations." action={<AdminButton onClick={() => openScreen("notifications")}>✉ Send notification</AdminButton>} /><section className="admin-control-stats">{[["♙", "Students", "1,248", "Across classes 2–12"], ["♧", "Teachers", "74", "68 active today"], ["▤", "New Applications", "126", "This admission cycle"], ["✓", "Pending Approvals", "38", "Need action"], ["◫", "Fees Collected", "₹8.4L", "This month"], ["◉", "Attendance", "93.6%", "School average"]].map(([icon, label, value, note]) => <article key={label}><i>{icon}</i><div><span>{label}</span><strong>{value}</strong><small>{note}</small></div></article>)}</section><section className="admin-overview-grid"><article className="admin-feature-card admin-activity-chart"><header><div><p>ADMISSIONS ANALYTICS</p><h2>Applications overview</h2></div><button onClick={() => openScreen("reports")}>View report →</button></header><div className="admin-bar-chart">{[38, 62, 53, 82, 70, 56, 90].map((height, index) => <span key={index}><i style={{ height: `${height}%` }} /><b>{["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul"][index]}</b></span>)}</div></article><article className="admin-feature-card admin-pie-card"><header><div><p>ADMISSION STATUS</p><h2>Applications by status</h2></div></header><div className="admin-pie-row"><div className="admin-pie"><b>1,245<small>Total</small></b></div><ul><li><i className="submitted" />Submitted <b>625</b></li><li><i className="review" />Under review <b>320</b></li><li><i className="approved" />Approved <b>210</b></li><li><i className="pending" />Draft <b>90</b></li></ul></div></article></section><section className="admin-overview-grid admin-overview-bottom"><article className="admin-feature-card admin-action-panel"><header><div><p>PRIORITY TASKS</p><h2>Need your attention</h2></div></header>{[["38", "Admission approvals pending", "Review applications"], ["12", "Documents awaiting verification", "Verify documents"], ["6", "Fee payment follow-ups", "Review dues"]].map(([count, title, action]) => <article key={title}><b>{count}</b><span>{title}</span><button onClick={() => setNotice(`${action} workspace opened.`)}>{action} →</button></article>)}</article><article className="admin-feature-card admin-notification-feed"><header><div><p>RECENT NOTIFICATIONS</p><h2>School updates</h2></div><button onClick={() => openScreen("notifications")}>View all →</button></header>{[["New application received", "Class 3 · Ananya Gupta", "8 min ago"], ["Teacher leave request", "Sonia Patel · Biology", "24 min ago"], ["Fee payment received", "Aarav Sharma · ₹24,500", "1 hour ago"]].map(([title, detail, time]) => <article key={title}><i>●</i><div><b>{title}</b><small>{detail}</small></div><time>{time}</time></article>)}</article></section></>;
 }
 
+function admissionStatusLabel(status) {
+  return ({ draft: "Draft", submitted: "Submitted", approved: "Approved", rejected: "Rejected", needs_information: "Needs information", submitted_for_review: "Submitted", not_uploaded: "Not uploaded", reupload_required: "Re-upload required" })[status] || String(status || "Unknown").replaceAll("_", " ");
+}
+
+function applicationDate(value) {
+  if (!value) return "—";
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? value : new Intl.DateTimeFormat("en-IN", { day: "2-digit", month: "short", year: "numeric" }).format(date);
+}
+
 function Admissions({ openScreen, setNotice }) {
+  const { session } = useCognitoAuth();
   const [query, setQuery] = useState("");
-  const visible = useMemo(() => applications.filter((entry) => entry.join(" ").toLowerCase().includes(query.toLowerCase())), [query]);
-  return <><AdminHeading eyebrow="ADMISSION MANAGEMENT" title="Admissions" text="Review applications, verify documents, approve admissions and allocate classes." action={<AdminButton onClick={() => setNotice("New admission application form opened.")}>＋ Add application</AdminButton>} /><section className="admin-feature-card"><div className="admin-filter-row"><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search application, student or class..." /><select defaultValue="All statuses"><option>All statuses</option><option>New application</option><option>Document verification</option><option>Pending approval</option></select><AdminButton outline onClick={() => setNotice("Admissions export is ready.")}>⇩ Export</AdminButton></div><div className="admin-control-table admissions-table"><div className="admin-control-head"><span>Application no.</span><span>Student</span><span>Class</span><span>Status</span><span>Submitted</span><span /></div>{visible.map(([id, name, className, status, submitted]) => <div className="admin-control-row" key={id}><span>{id}</span><b>{name}</b><span>{className}</span><em className={status.toLowerCase().replaceAll(" ", "-")}>{status}</em><span>{submitted}</span><button onClick={() => openScreen("application")}>Review →</button></div>)}</div></section><section className="admin-mini-card-grid">{[["▣", "Document verification", "12 applications need document checks"], ["✓", "Pending decisions", "38 applications ready for approval"], ["▤", "Class allocation", "21 approved students need a class assignment"]].map(([icon, title, detail]) => <article key={title}><i>{icon}</i><div><h2>{title}</h2><p>{detail}</p><button onClick={() => setNotice(`${title} workspace opened.`)}>Manage →</button></div></article>)}</section></>;
+  const [statusFilter, setStatusFilter] = useState("all");
+  const [admissions, setAdmissions] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [loadError, setLoadError] = useState("");
+  const [decisionError, setDecisionError] = useState("");
+  const [decidingId, setDecidingId] = useState(null);
+
+  const loadAdmissions = useCallback(async () => {
+    if (!session?.accessToken) {
+      setAdmissions([]);
+      setLoadError("Your admin session is unavailable. Please sign in again.");
+      setIsLoading(false);
+      return;
+    }
+    setIsLoading(true);
+    setLoadError("");
+    setDecisionError("");
+    try {
+      const result = await getAdminAdmissions(session.accessToken);
+      setAdmissions(Array.isArray(result) ? result : []);
+    } catch (error) {
+      setAdmissions([]);
+      setLoadError(error.message || "Admissions could not be loaded.");
+    } finally {
+      setIsLoading(false);
+    }
+  }, [session?.accessToken]);
+
+  useEffect(() => {
+    loadAdmissions();
+  }, [loadAdmissions]);
+
+  const visible = useMemo(() => admissions.filter((application) => {
+    const searchable = [application.application_number, application.student_name, application.parent_name, application.desired_class].filter(Boolean).join(" ").toLowerCase();
+    return searchable.includes(query.toLowerCase()) && (statusFilter === "all" || application.status === statusFilter);
+  }), [admissions, query, statusFilter]);
+
+  const decideAdmission = async (application, decision) => {
+    if (!session?.accessToken || decidingId !== null) return;
+    setDecisionError("");
+    setDecidingId(application.id);
+    try {
+      const updatedApplication = await decideAdminAdmission(session.accessToken, application.id, decision);
+      setAdmissions((current) => current.map((item) => (item.id === updatedApplication.id ? updatedApplication : item)));
+      setNotice(`${application.student_name || "Applicant"}: ${admissionStatusLabel(decision)} decision saved. The parent dashboard will update automatically.`);
+    } catch (error) {
+      setDecisionError(error.message || "Admission decision could not be saved.");
+    } finally {
+      setDecidingId(null);
+    }
+  };
+
+  return <><AdminHeading eyebrow="ADMISSION MANAGEMENT" title="Admissions" text="Review documents and save the final admission decision directly to the applicant record." action={<AdminButton onClick={loadAdmissions}>Refresh admissions</AdminButton>} /><section className="admin-feature-card"><div className="admin-filter-row"><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search application, student or class..." /><select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)} aria-label="Filter admissions by final status"><option value="all">All statuses</option><option value="draft">Draft</option><option value="submitted">Submitted</option><option value="needs_information">Needs information</option><option value="approved">Approved</option><option value="rejected">Rejected</option></select><AdminButton outline onClick={loadAdmissions}>↻ Refresh</AdminButton></div>{loadError && <div className="admission-table-message error" role="alert"><span>{loadError}</span><button type="button" onClick={loadAdmissions}>Try again</button></div>}{decisionError && <div className="admission-table-message error" role="alert">{decisionError}</div>}<div className="admin-control-table admissions-table admissions-live-table" aria-busy={isLoading}><div className="admin-control-head"><span>Application no.</span><span>Student</span><span>Class</span><span>Documents</span><span>Admission status</span><span>Submitted</span><span>Decision</span></div>{isLoading && <p className="admission-empty-state" role="status">Loading admission records…</p>}{!isLoading && !loadError && visible.length === 0 && <p className="admission-empty-state" role="status">No admission records match this view.</p>}{!isLoading && !loadError && visible.map((application) => { const isSaving = decidingId === application.id; const admissionStatus = application.status || "draft"; const documentStatus = application.documents_status || "not_uploaded"; return <div className="admin-control-row" key={application.id}><span>{application.application_number}</span><b>{application.student_name || "Applicant"}</b><span>{application.desired_class || "—"}</span><em className={`document-state ${documentStatus.replaceAll("_", "-")}`}>{admissionStatusLabel(documentStatus)}</em><em className={`admission-state ${admissionStatus.replaceAll("_", "-")}`}>{admissionStatusLabel(admissionStatus)}</em><span>{applicationDate(application.submitted_on)}</span><div className="admission-decision-actions"><button type="button" className="approve" onClick={() => decideAdmission(application, "approved")} disabled={decidingId !== null}>{isSaving ? "Saving…" : "Approve"}</button><button type="button" className="information" onClick={() => decideAdmission(application, "needs_information")} disabled={decidingId !== null}>Needs info</button><button type="button" className="reject" onClick={() => decideAdmission(application, "rejected")} disabled={decidingId !== null}>Reject</button></div></div>; })}</div></section><section className="admin-mini-card-grid">{[["▣", "Document verification", "Review uploaded records before deciding the admission"], ["✓", "Final decisions", "Approval, information requests and rejections are saved live"], ["▤", "Class allocation", "Approved students can be assigned to a class section"]].map(([icon, title, detail]) => <article key={title}><i>{icon}</i><div><h2>{title}</h2><p>{detail}</p><button onClick={() => openScreen("documents")}>{title === "Document verification" ? "Open queue →" : "View admissions →"}</button></div></article>)}</section></>;
 }
 
 function StudentManagement({ setNotice }) {
@@ -57,22 +117,89 @@ function Exams({ setNotice }) { return <><AdminHeading eyebrow="ASSESSMENT MANAG
 function Timetable({ setNotice }) { return <><AdminHeading eyebrow="SCHEDULE MANAGEMENT" title="Timetable" text="Manage class, teacher and room schedules with conflict detection." action={<AdminButton onClick={() => setNotice("Timetable conflict scan completed: 2 potential conflicts found.")}>Scan conflicts</AdminButton>} /><section className="admin-feature-card timetable-admin"><header><div><p>WEDNESDAY SCHEDULE</p><h2>Class & teacher allocation</h2></div><select defaultValue="All classes"><option>All classes</option><option>Class 5A</option><option>Class 5B</option></select></header>{[["08:15", "Class 5A", "Mathematics", "Meera Kapoor", "Room 204", "Clear"], ["09:10", "Class 5B", "Mathematics", "Meera Kapoor", "Room 204", "Clear"], ["10:30", "Class 4A", "Science", "Meera Kapoor", "Lab 02", "Clear"], ["10:30", "Class 4B", "Science", "Sonia Patel", "Lab 02", "Conflict"]].map(([time, className, subject, teacher, room, state]) => <article key={`${time}-${className}`}><time>{time}</time><b>{className}</b><span>{subject}</span><span>{teacher}</span><em>{room}</em><i className={state.toLowerCase()}>{state}</i><button onClick={() => setNotice(`${className} timetable slot opened.`)}>Edit →</button></article>)}</section></>;
 }
 
+function documentFileSize(sizeBytes) {
+  if (!Number.isFinite(Number(sizeBytes)) || Number(sizeBytes) <= 0) return "Size unavailable";
+  const bytes = Number(sizeBytes);
+  if (bytes < 1024 * 1024) return `${Math.max(1, Math.round(bytes / 1024))} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
 function Documents({ setNotice }) {
   const { session } = useCognitoAuth();
   const [reviewDocuments, setReviewDocuments] = useState([]);
-  useEffect(() => {
-    getAdminDocuments(session?.accessToken)
-      .then(setReviewDocuments)
-      .catch(() => setReviewDocuments(getAdmissionDocuments()));
+  const [isLoading, setIsLoading] = useState(true);
+  const [loadError, setLoadError] = useState("");
+  const [reviewError, setReviewError] = useState("");
+  const [downloadError, setDownloadError] = useState("");
+  const [reviewingId, setReviewingId] = useState(null);
+  const [downloadingId, setDownloadingId] = useState(null);
+
+  const loadDocuments = useCallback(async () => {
+    if (!session?.accessToken) {
+      setReviewDocuments([]);
+      setLoadError("Your admin session is unavailable. Please sign in again.");
+      setIsLoading(false);
+      return;
+    }
+
+    setIsLoading(true);
+    setLoadError("");
+    setReviewError("");
+    setDownloadError("");
+    try {
+      const documents = await getAdminDocuments(session.accessToken);
+      setReviewDocuments(Array.isArray(documents) ? documents : []);
+    } catch (error) {
+      setReviewDocuments([]);
+      setLoadError(error.message || "Documents could not be loaded.");
+    } finally {
+      setIsLoading(false);
+    }
   }, [session?.accessToken]);
-  const pendingCount = reviewDocuments.filter((document) => document.status !== "Approved").length;
-  const reviewDocument = (document, status) => {
-    const reason = status === "Re-upload Required" ? "Please upload a clear, readable copy." : "";
-    setReviewDocuments(updateAdmissionDocument(document.id, status, reason));
-    setNotice(status === "Approved" ? `${document.name} approved. Parent dashboard updated.` : `${document.name} marked for re-upload. Parent has been notified.`);
+
+  useEffect(() => {
+    loadDocuments();
+  }, [loadDocuments]);
+
+  const pendingCount = reviewDocuments.filter((document) => document.status_code === "submitted").length;
+  const reviewDocument = async (document, decision) => {
+    if (!session?.accessToken || reviewingId !== null || downloadingId !== null) return;
+    const reason = decision === "reupload_required" ? "Please upload a clear, readable copy." : "";
+    setReviewError("");
+    setReviewingId(document.id);
+    try {
+      const updatedDocument = await reviewAdminDocument(session.accessToken, document.id, decision, reason);
+      setReviewDocuments((current) => current.map((item) => (item.id === updatedDocument.id ? updatedDocument : item)));
+      setNotice(decision === "approved" ? `${document.document || document.name} approved. The parent can now see the verified status.` : `${document.document || document.name} marked for re-upload. The parent can see the reason.`);
+    } catch (error) {
+      setReviewError(error.message || "Document review could not be saved.");
+    } finally {
+      setReviewingId(null);
+    }
   };
 
-  return <><AdminHeading eyebrow="DOCUMENT MANAGEMENT" title="Document Verification" text="Review uploads and approve documents or request a clear replacement from the parent." action={<AdminButton onClick={() => setNotice("All pending document owners have been notified.")}>Notify pending</AdminButton>} /><section className="admin-feature-card document-table"><header><div><p>VERIFICATION QUEUE</p><h2>New admission documents</h2></div><span>{pendingCount} awaiting review</span></header>{reviewDocuments.map((document) => { const isSubmitted = document.status === "Submitted"; return <article key={document.id}><i>▣</i><div><b>{document.name}</b><small>{document.file ? `${document.file} · Submitted for verification` : "No file uploaded yet"}</small></div><em className={document.status.toLowerCase().replaceAll(" ", "-")}>{document.status === "Submitted" ? "Waiting for approval" : document.status}</em><div className="document-review-actions">{isSubmitted && <><button onClick={() => reviewDocument(document, "Approved")}>Approve</button><button className="request" onClick={() => reviewDocument(document, "Re-upload Required")}>Request re-upload</button></>}</div></article>; })}</section></>;
+  const downloadDocument = async (uploadedDocument) => {
+    if (!session?.accessToken || downloadingId !== null || reviewingId !== null) return;
+    setDownloadError("");
+    setDownloadingId(uploadedDocument.id);
+    try {
+      const { blob, fileName } = await downloadAdminDocument(session.accessToken, uploadedDocument.id, uploadedDocument.file);
+      const objectUrl = URL.createObjectURL(blob);
+      const link = window.document.createElement("a");
+      link.href = objectUrl;
+      link.download = fileName;
+      window.document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.setTimeout(() => URL.revokeObjectURL(objectUrl), 0);
+    } catch (error) {
+      setDownloadError(error.message || "Document could not be downloaded.");
+    } finally {
+      setDownloadingId(null);
+    }
+  };
+
+  return <><AdminHeading eyebrow="DOCUMENT MANAGEMENT" title="Document Verification" text="Download the file stored in the admissions database before approving it. Decisions are saved immediately for the parent to see." action={<AdminButton onClick={loadDocuments}>Refresh queue</AdminButton>} /><section className="admin-feature-card document-table" aria-busy={isLoading}><header><div><p>VERIFICATION QUEUE</p><h2>New admission documents</h2></div><span>{isLoading ? "Loading documents…" : `${pendingCount} awaiting review`}</span></header>{loadError && <div className="document-review-message error" role="alert"><span>{loadError}</span><button type="button" onClick={loadDocuments}>Try again</button></div>}{reviewError && <div className="document-review-message error" role="alert">{reviewError}</div>}{downloadError && <div className="document-review-message error" role="alert">{downloadError}</div>}{isLoading && <p className="document-empty-state" role="status">Loading uploaded documents from the database…</p>}{!isLoading && !loadError && reviewDocuments.length === 0 && <p className="document-empty-state" role="status">No admission documents have been uploaded yet.</p>}{!isLoading && !loadError && reviewDocuments.map((document) => { const isSubmitted = document.status_code === "submitted"; const isSaving = reviewingId === document.id; const isDownloading = downloadingId === document.id; return <article key={document.id}><i aria-hidden="true">▣</i><div className="document-details"><b>{document.document || document.name || "Admission document"}</b><small className="document-metadata"><span>Application: {document.application_number || "—"}</span><span>Student: {document.student || "Applicant"}</span><span>File: {document.file || "—"} · {documentFileSize(document.size_bytes)}</span></small>{document.reason && <small className="document-review-reason">Admin note: {document.reason}</small>}</div><em className={`document-status ${(document.status_code || document.status || "").toLowerCase().replaceAll("_", "-").replaceAll(" ", "-")}`}>{document.status || "Unknown"}</em><div className="document-review-actions"><button type="button" className="download" onClick={() => downloadDocument(document)} disabled={downloadingId !== null || reviewingId !== null}>{isDownloading ? "Preparing…" : "Download"}</button>{isSubmitted && <><button type="button" onClick={() => reviewDocument(document, "approved")} disabled={reviewingId !== null || downloadingId !== null}>{isSaving ? "Saving…" : "Approve"}</button><button type="button" className="request" onClick={() => reviewDocument(document, "reupload_required")} disabled={reviewingId !== null || downloadingId !== null}>{isSaving ? "Saving…" : "Request re-upload"}</button></>}</div></article>; })}</section></>;
 }
 
 function Transport({ setNotice }) { return <><AdminHeading eyebrow="OPERATIONS" title="Transport & Hostel" text="Manage routes, buses, pickup points, hostel rooms and student allocation." action={<AdminButton onClick={() => setNotice("New transport route setup opened.")}>＋ Add route</AdminButton>} /><section className="admin-operations-grid"><article className="admin-feature-card"><p>TRANSPORT</p><h2>12 active routes</h2><span>18 buses · 864 students allocated</span><div className="operation-stat"><b>96%</b><small>Average bus occupancy</small></div><button onClick={() => setNotice("Transport route allocation opened.")}>Manage routes →</button></article><article className="admin-feature-card"><p>HOSTEL</p><h2>328 residents</h2><span>14 houses · 22 rooms available</span><div className="operation-stat"><b>91%</b><small>Room occupancy</small></div><button onClick={() => setNotice("Hostel room allocation opened.")}>Manage hostel →</button></article><article className="admin-feature-card"><p>ALERTS</p><h2>3 allocation requests</h2><span>Transport changes waiting for approval</span><button onClick={() => setNotice("Transport allocation requests opened.")}>Review requests →</button></article></section></>;

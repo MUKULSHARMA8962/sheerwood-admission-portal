@@ -1,13 +1,15 @@
 from contextlib import asynccontextmanager
 from datetime import UTC, datetime
+import hashlib
 import os
 import json
 from pathlib import Path
+import re
 from typing import Annotated, Any
 
 import httpx
 from dotenv import load_dotenv
-from fastapi import Depends, FastAPI, Header, HTTPException, Response, status
+from fastapi import Depends, FastAPI, File, Header, HTTPException, Response, UploadFile, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
@@ -20,6 +22,51 @@ from .dependencies import CurrentUser, require_roles
 from .schemas import AdmissionDecisionRequest, CognitoTokenExchangeRequest, CreateApplicationRequest, LoginRequest, RegisterRequest, SaveApplicationDraftRequest
 from .security import hash_password, new_session_token, session_expiry, verify_password
 from .routers import admin, ai, otp, parent, teacher
+
+
+MAX_ADMISSION_DOCUMENT_BYTES = max(1, int(os.getenv("MAX_ADMISSION_DOCUMENT_BYTES", str(5 * 1024 * 1024))))
+ADMISSION_DOCUMENT_KEYS = {
+    "report-card",
+    "aadhaar-card",
+    "birth-certificate",
+    "passport",
+    "national-id-card",
+    "student-photo",
+    "father-photo",
+    "mother-photo",
+}
+FINAL_APPLICATION_STATUSES = {"approved", "rejected", "needs_information"}
+
+
+def document_review_summary_for_rows(documents: list[Any]) -> tuple[str, dict[str, int]]:
+    """Calculate a parent-visible aggregate from database document rows."""
+    document_statuses = [row["status"] for row in documents]
+    counts = {
+        "uploaded": len(document_statuses),
+        "approved": document_statuses.count("approved"),
+        "pending": document_statuses.count("submitted"),
+        "reupload_required": document_statuses.count("reupload_required"),
+    }
+    if not document_statuses:
+        return "pending", counts
+    if counts["reupload_required"]:
+        return "reupload_required", counts
+    if counts["approved"] == counts["uploaded"]:
+        return "approved", counts
+    return "submitted", counts
+
+
+def document_review_summary(database: Any, application_number: str) -> tuple[str, dict[str, int]]:
+    """Return the authoritative aggregate from uploaded database documents.
+
+    Browser draft metadata is deliberately not used here: an admin decision must
+    never be replaced by an old localStorage draft submitted by a parent.
+    """
+    rows = database.execute(
+        "SELECT status FROM admission_documents WHERE application_number = ?",
+        (application_number,),
+    ).fetchall()
+    return document_review_summary_for_rows(rows)
 
 
 @asynccontextmanager
@@ -50,6 +97,60 @@ app.include_router(otp.router)
 
 def serialize_user(row: Any) -> dict[str, Any]:
     return {"id": row["id"], "email": row["email"], "full_name": row["full_name"], "role": row["role"]}
+
+
+def uploaded_file_content_type(content: bytes) -> str:
+    """Identify supported document formats without trusting browser MIME data."""
+    if content.startswith(b"%PDF-"):
+        return "application/pdf"
+    if content.startswith(b"\xff\xd8\xff"):
+        return "image/jpeg"
+    if content.startswith(b"\x89PNG\r\n\x1a\n"):
+        return "image/png"
+    raise HTTPException(
+        status_code=status.HTTP_415_UNSUPPORTED_MEDIA_TYPE,
+        detail="Upload a valid PDF, JPG, or PNG file.",
+    )
+
+
+def safe_upload_filename(filename: str | None, content_type: str) -> str:
+    name = Path(filename or "document").name
+    name = re.sub(r"[^A-Za-z0-9._ -]", "_", name).strip(" .") or "document"
+    extension = {"application/pdf": ".pdf", "image/jpeg": ".jpg", "image/png": ".png"}[content_type]
+    return name if name.lower().endswith(extension) else f"{name}{extension}"
+
+
+def owned_application(database: Any, application_number: str, parent_id: int) -> Any:
+    application = database.execute(
+        "SELECT id, status FROM applications WHERE application_number = ? AND parent_id = ?",
+        (application_number, parent_id),
+    ).fetchone()
+    if not application:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Admission application was not found.")
+    return application
+
+
+def parent_admission_status_payload(database: Any, application_number: str, parent_id: int) -> dict[str, Any] | None:
+    """Build the private live-status response for one parent-owned application."""
+    application = database.execute(
+        """SELECT application_number, student_name, desired_class, status, documents_status,
+                  submitted_on, class_section
+           FROM applications WHERE application_number = ? AND parent_id = ?""",
+        (application_number, parent_id),
+    ).fetchone()
+    if not application:
+        return None
+    documents = database.execute(
+        """SELECT id, document_key, file_name, content_type, size_bytes, status, reason,
+                  created_at, updated_at
+           FROM admission_documents
+           WHERE application_number = ? AND parent_id = ?
+           ORDER BY document_key""",
+        (application_number, parent_id),
+    ).fetchall()
+    document_list = [dict(document) for document in documents]
+    _, counts = document_review_summary_for_rows(document_list)
+    return {"application": dict(application), "documents": document_list, "document_summary": counts}
 
 
 @app.get("/api/health")
@@ -135,10 +236,10 @@ def register(payload: RegisterRequest) -> dict[str, Any]:
         if database.execute("SELECT id FROM users WHERE email = ?", (email,)).fetchone():
             raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="An account with this email already exists.")
         cursor = database.execute(
-            "INSERT INTO users (email, full_name, role, password_hash) VALUES (?, ?, 'parent', ?)",
+            "INSERT INTO users (email, full_name, role, password_hash) VALUES (?, ?, 'parent', ?) RETURNING id",
             (email, f"{payload.first_name.strip()} {payload.last_name.strip()}", hash_password(payload.password)),
         )
-        user = database.execute("SELECT id, email, full_name, role FROM users WHERE id = ?", (cursor.lastrowid,)).fetchone()
+        user = database.execute("SELECT id, email, full_name, role FROM users WHERE id = ?", (cursor.fetchone()["id"],)).fetchone()
     return {"message": "Parent account created successfully.", "user": serialize_user(user)}
 
 
@@ -206,10 +307,10 @@ def create_application(payload: CreateApplicationRequest, user: Annotated[dict[s
         application_number = f"AIS/2027-28/{next_number:06d}"
         cursor = database.execute(
             """INSERT INTO applications (application_number, student_name, parent_name, desired_class, status, documents_status, submitted_on, parent_id)
-            VALUES (?, ?, ?, ?, 'draft', 'pending', ?, ?)""",
+            VALUES (?, ?, ?, ?, 'draft', 'pending', ?, ?) RETURNING id""",
             (application_number, payload.student_name, user["full_name"], payload.desired_class, datetime.now(UTC).date().isoformat(), user["id"]),
         )
-        application = database.execute("SELECT * FROM applications WHERE id = ?", (cursor.lastrowid,)).fetchone()
+        application = database.execute("SELECT * FROM applications WHERE id = ?", (cursor.fetchone()["id"],)).fetchone()
     return dict(application)
 
 
@@ -217,32 +318,263 @@ def create_application(payload: CreateApplicationRequest, user: Annotated[dict[s
 def save_application_draft(payload: SaveApplicationDraftRequest, user: Annotated[dict[str, Any], Depends(require_roles("parent"))]) -> dict[str, Any]:
     application_data = json.dumps(payload.data, ensure_ascii=True)
     documents_json = json.dumps(payload.documents, ensure_ascii=True)
-    student_name = str(payload.data.get("studentName") or payload.data.get("firstName") or "Application in progress").strip()
-    desired_class = str(payload.data.get("class") or "Class 4").strip()
+    admission_details = payload.data.get("admissionDetails")
+    if not isinstance(admission_details, dict):
+        admission_details = {}
+    student_details = payload.data.get("student")
+    if not isinstance(student_details, dict):
+        student_details = {}
+
+    def admission_value(name: str, default: str = "") -> str:
+        return str(admission_details.get(name) or payload.data.get(name) or default).strip()
+
+    student_full_name = " ".join(part for part in (student_details.get("firstName"), student_details.get("lastName")) if part)
+    student_name = str(payload.data.get("studentName") or payload.data.get("firstName") or student_full_name or "Application in progress").strip()
+    desired_class = admission_value("class", "Class 4")
+    board = admission_value("boardOther") if admission_value("board") == "Other" else admission_value("board")
+    saved_on = datetime.now(UTC).date().isoformat()
     with connection() as database:
         existing = database.execute(
-            "SELECT id FROM applications WHERE application_number = ? AND parent_id = ?",
+            "SELECT id, status, documents_status FROM applications WHERE application_number = ? AND parent_id = ?",
             (payload.application_number, user["id"]),
         ).fetchone()
+        if not existing:
+            conflicting_application = database.execute(
+                "SELECT parent_id FROM applications WHERE application_number = ?",
+                (payload.application_number,),
+            ).fetchone()
+            if conflicting_application:
+                raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="This application number belongs to another parent.")
+        existing_new_admission = database.execute(
+            "SELECT parent_id, status, documents_status FROM new_admissions WHERE application_number = ?",
+            (payload.application_number,),
+        ).fetchone()
+        if existing_new_admission and existing_new_admission["parent_id"] != user["id"]:
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="This application number belongs to another parent.")
+
+        # A parent can keep editing a draft, but cannot overwrite a decision made
+        # by an administrator.  Document state is always derived from real BLOB
+        # uploads in admission_documents, never from browser-only preview data.
+        current_status = existing["status"] if existing else (existing_new_admission["status"] if existing_new_admission else "")
+        application_status = current_status if current_status in FINAL_APPLICATION_STATUSES else payload.status
+        documents_status, _ = document_review_summary(database, payload.application_number)
         if existing:
             database.execute(
                 """UPDATE applications
                 SET student_name = ?, desired_class = ?, status = ?, documents_status = ?,
                     application_data = ?, documents_json = ?, submitted_on = ?
                 WHERE id = ?""",
-                (student_name, desired_class, payload.status, "submitted" if payload.documents else "pending", application_data, documents_json, datetime.now(UTC).date().isoformat(), existing["id"]),
+                (student_name, desired_class, application_status, documents_status, application_data, documents_json, saved_on, existing["id"]),
             )
             application_id = existing["id"]
         else:
             cursor = database.execute(
                 """INSERT INTO applications
                 (application_number, student_name, parent_name, desired_class, status, documents_status, submitted_on, parent_id, application_data, documents_json)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
-                (payload.application_number, student_name, user["full_name"], desired_class, payload.status, "submitted" if payload.documents else "pending", datetime.now(UTC).date().isoformat(), user["id"], application_data, documents_json),
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id""",
+                (payload.application_number, student_name, user["full_name"], desired_class, application_status, documents_status, saved_on, user["id"], application_data, documents_json),
             )
-            application_id = cursor.lastrowid
+            application_id = cursor.fetchone()["id"]
+        database.execute(
+            """INSERT INTO new_admissions
+            (application_number, parent_id, academic_session, application_date, class_applying_for,
+             pen_number, previous_school, current_class, board, medium, student_name, status,
+             documents_status, application_data, documents_json, submitted_on, updated_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT(application_number) DO UPDATE SET
+                parent_id = excluded.parent_id,
+                academic_session = excluded.academic_session,
+                application_date = excluded.application_date,
+                class_applying_for = excluded.class_applying_for,
+                pen_number = excluded.pen_number,
+                previous_school = excluded.previous_school,
+                current_class = excluded.current_class,
+                board = excluded.board,
+                medium = excluded.medium,
+                student_name = excluded.student_name,
+                status = excluded.status,
+                documents_status = excluded.documents_status,
+                application_data = excluded.application_data,
+                documents_json = excluded.documents_json,
+                submitted_on = excluded.submitted_on,
+                updated_at = excluded.updated_at""",
+            (
+                payload.application_number,
+                user["id"],
+                admission_value("session"),
+                admission_value("date"),
+                desired_class,
+                admission_value("penNumber"),
+                admission_value("previousSchool"),
+                admission_value("currentClass"),
+                board,
+                admission_value("medium"),
+                student_name,
+                application_status,
+                documents_status,
+                application_data,
+                documents_json,
+                saved_on,
+                saved_on,
+            ),
+        )
         application = database.execute("SELECT * FROM applications WHERE id = ?", (application_id,)).fetchone()
     return dict(application)
+
+
+@app.get("/api/applications/{application_number}/documents")
+def list_admission_documents(
+    application_number: str,
+    user: Annotated[dict[str, Any], Depends(require_roles("parent"))],
+) -> list[dict[str, Any]]:
+    """List metadata only; document bytes remain private in the database."""
+    with connection() as database:
+        owned_application(database, application_number, user["id"])
+        rows = database.execute(
+            """SELECT id, document_key, file_name, content_type, size_bytes, sha256,
+                      status, reason, created_at, updated_at
+            FROM admission_documents
+            WHERE application_number = ? AND parent_id = ?
+            ORDER BY document_key""",
+            (application_number, user["id"]),
+        ).fetchall()
+    return [dict(row) for row in rows]
+
+
+@app.get("/api/applications/{application_number}/status")
+def admission_status(
+    application_number: str,
+    user: Annotated[dict[str, Any], Depends(require_roles("parent"))],
+) -> dict[str, Any]:
+    """Return the parent-visible, database-backed application and document status."""
+    with connection() as database:
+        application = database.execute(
+            """SELECT application_number, student_name, desired_class, status, documents_status,
+                      submitted_on, class_section
+               FROM applications WHERE application_number = ? AND parent_id = ?""",
+            (application_number, user["id"]),
+        ).fetchone()
+        if not application:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Admission application was not found.")
+        documents = database.execute(
+            """SELECT id, document_key, file_name, content_type, size_bytes, status, reason,
+                      created_at, updated_at
+               FROM admission_documents
+               WHERE application_number = ? AND parent_id = ?
+               ORDER BY document_key""",
+            (application_number, user["id"]),
+        ).fetchall()
+    document_list = [dict(document) for document in documents]
+    # This matches the aggregate that admin review and draft saves persist.
+    _, counts = document_review_summary_for_rows(document_list)
+    return {"application": dict(application), "documents": document_list, "document_summary": counts}
+
+
+@app.post("/api/applications/{application_number}/documents/{document_key}", status_code=status.HTTP_201_CREATED)
+async def upload_admission_document(
+    application_number: str,
+    document_key: str,
+    file: Annotated[UploadFile, File(...)],
+    user: Annotated[dict[str, Any], Depends(require_roles("parent"))],
+) -> dict[str, Any]:
+    """Store an authenticated parent's admission document directly in the database."""
+    if document_key not in ADMISSION_DOCUMENT_KEYS:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Unknown admission document type.")
+
+    try:
+        content = await file.read(MAX_ADMISSION_DOCUMENT_BYTES + 1)
+    finally:
+        await file.close()
+
+    if not content:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Choose a file to upload.")
+    if len(content) > MAX_ADMISSION_DOCUMENT_BYTES:
+        raise HTTPException(
+            status_code=status.HTTP_413_CONTENT_TOO_LARGE,
+            detail=f"Each document must be no larger than {MAX_ADMISSION_DOCUMENT_BYTES // (1024 * 1024)} MB.",
+        )
+
+    content_type = uploaded_file_content_type(content)
+    file_name = safe_upload_filename(file.filename, content_type)
+    uploaded_at = datetime.now(UTC).isoformat()
+    digest = hashlib.sha256(content).hexdigest()
+
+    with connection() as database:
+        application = owned_application(database, application_number, user["id"])
+        if application["status"] in {"approved", "rejected"}:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="This admission has already received a final decision and its documents can no longer be changed.",
+            )
+        row = database.execute(
+            """INSERT INTO admission_documents
+            (application_number, parent_id, document_key, file_name, content_type, size_bytes,
+             sha256, file_content, status, updated_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'submitted', ?)
+            ON CONFLICT(application_number, document_key) DO UPDATE SET
+                parent_id = excluded.parent_id,
+                file_name = excluded.file_name,
+                content_type = excluded.content_type,
+                size_bytes = excluded.size_bytes,
+                sha256 = excluded.sha256,
+                file_content = excluded.file_content,
+                status = 'submitted',
+                reason = '',
+                updated_at = excluded.updated_at
+            RETURNING id, document_key, file_name, content_type, size_bytes, status, updated_at""",
+            (
+                application_number,
+                user["id"],
+                document_key,
+                file_name,
+                content_type,
+                len(content),
+                digest,
+                content,
+                uploaded_at,
+            ),
+        ).fetchone()
+        database.execute(
+            "UPDATE applications SET documents_status = 'submitted' WHERE application_number = ? AND parent_id = ?",
+            (application_number, user["id"]),
+        )
+        database.execute(
+            "UPDATE new_admissions SET documents_status = 'submitted', updated_at = ? WHERE application_number = ? AND parent_id = ?",
+            (uploaded_at, application_number, user["id"]),
+        )
+    return dict(row)
+
+
+@app.get("/api/applications/{application_number}/documents/{document_key}")
+def download_admission_document(
+    application_number: str,
+    document_key: str,
+    user: Annotated[dict[str, Any], Depends(require_roles("parent"))],
+) -> Response:
+    """Return a parent's stored document without exposing it publicly."""
+    if document_key not in ADMISSION_DOCUMENT_KEYS:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Admission document was not found.")
+
+    with connection() as database:
+        owned_application(database, application_number, user["id"])
+        document = database.execute(
+            """SELECT file_name, content_type, file_content
+            FROM admission_documents
+            WHERE application_number = ? AND parent_id = ? AND document_key = ?""",
+            (application_number, user["id"], document_key),
+        ).fetchone()
+    if not document:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Admission document was not found.")
+
+    return Response(
+        content=bytes(document["file_content"]),
+        media_type=document["content_type"],
+        headers={
+            "Content-Disposition": f'attachment; filename="{document["file_name"]}"',
+            "Cache-Control": "private, no-store",
+            "X-Content-Type-Options": "nosniff",
+        },
+    )
 
 
 @app.patch("/api/applications/{application_id}/decision")
@@ -254,6 +586,10 @@ def decide_application(application_id: int, payload: AdmissionDecisionRequest, _
         database.execute(
             "UPDATE applications SET status = ?, class_section = COALESCE(?, class_section) WHERE id = ?",
             (payload.decision, payload.class_section, application_id),
+        )
+        database.execute(
+            "UPDATE new_admissions SET status = ?, updated_at = ? WHERE application_number = ?",
+            (payload.decision, datetime.now(UTC).isoformat(), application["application_number"]),
         )
         updated = database.execute("SELECT * FROM applications WHERE id = ?", (application_id,)).fetchone()
     return dict(updated)

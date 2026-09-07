@@ -355,6 +355,135 @@
 .next-step:hover { background: var(--admission-deep); }
 .next-step span { margin-left: 7px; font-size: 16px; }
 
+.admission-live-status { background: linear-gradient(135deg, #fbfdfb, #f4faf5); }
+
+.admission-live-status .admission-form-block-header {
+  align-items: center;
+  margin-bottom: 14px;
+}
+
+.live-status-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.live-application-status {
+  padding: 7px 9px;
+  border-radius: 99px;
+  color: #8d621b;
+  background: #fff3dc;
+  font-size: 9px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.live-application-status.is-approved { color: #176b3b; background: #e4f5e8; }
+.live-application-status.is-rejected,
+.live-application-status.is-needs-information { color: #a7473d; background: #ffebe8; }
+
+.live-status-header-actions button {
+  padding: 7px 9px;
+  border: 1px solid #bfdec7;
+  border-radius: 6px;
+  color: var(--admission-green);
+  background: #fff;
+  font-size: 10px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.live-status-header-actions button:disabled { cursor: wait; opacity: .65; }
+.live-status-header-actions button:hover:not(:disabled) { background: #eef8f0; }
+
+.live-status-description,
+.live-status-empty,
+.live-status-error {
+  margin: 0 0 14px;
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+.live-status-description,
+.live-status-empty { color: var(--admission-muted); }
+.live-status-error { color: #a7473d; }
+
+.live-status-summary {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 9px;
+  margin-bottom: 14px;
+}
+
+.live-status-summary span {
+  display: grid;
+  gap: 3px;
+  padding: 10px;
+  border: 1px solid #deebe1;
+  border-radius: 8px;
+  background: #fff;
+}
+
+.live-status-summary b { color: var(--admission-ink); font-size: 17px; }
+.live-status-summary small { color: var(--admission-muted); font-size: 9px; font-weight: 700; }
+
+.live-document-list { display: grid; gap: 8px; }
+
+.live-document-list article {
+  display: grid;
+  grid-template-columns: 25px minmax(0, 1fr) minmax(116px, auto);
+  align-items: center;
+  gap: 9px;
+  padding: 10px;
+  border: 1px solid #deebe1;
+  border-radius: 8px;
+  background: #fff;
+}
+
+.live-document-list article > i {
+  width: 24px;
+  height: 24px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  color: #94651d;
+  background: #fff1d9;
+  font-size: 10px;
+  font-style: normal;
+  font-weight: 800;
+}
+
+.live-document-list article.is-approved > i { color: #fff; background: #1b974d; }
+.live-document-list article.is-reupload-required > i { color: #ba4c42; background: #ffebe8; }
+
+.live-document-name { min-width: 0; display: grid; gap: 3px; }
+.live-document-name b { overflow: hidden; color: #365342; font-size: 11px; text-overflow: ellipsis; white-space: nowrap; }
+.live-document-name small { overflow: hidden; color: var(--admission-muted); font-size: 9px; text-overflow: ellipsis; white-space: nowrap; }
+
+.live-document-status {
+  justify-self: end;
+  padding: 5px 7px;
+  border-radius: 99px;
+  color: #8d621b;
+  background: #fff3dc;
+  font-size: 9px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.live-document-list article.is-approved .live-document-status { color: #176b3b; background: #e4f5e8; }
+.live-document-list article.is-reupload-required .live-document-status { color: #a7473d; background: #ffebe8; }
+
+.live-document-list article > p {
+  grid-column: 2 / -1;
+  margin: -2px 0 0;
+  color: #a7473d;
+  font-size: 10px;
+  line-height: 1.4;
+}
+
+.live-document-list article > p b { font-weight: 800; }
+
 .admission-help { display: grid; gap: 17px; }
 .help-assistant { padding: 17px; }
 .help-assistant > div { display: flex; align-items: center; gap: 9px; }
@@ -438,6 +567,7 @@
   .admission-form { gap: 18px; padding: 23px 19px 25px; }
   .admission-form-block { padding: 18px; }
   .admission-fields { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px 14px; }
+  .live-status-summary { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .admission-help { grid-template-columns: 1fr; gap: 13px; }
 }
 
@@ -448,6 +578,10 @@
   .admission-form-block-header h2 { font-size: 16px; }
   .admission-form-block-header small { display: none; }
   .admission-fields { grid-template-columns: 1fr; }
+  .admission-live-status .admission-form-block-header { align-items: flex-start; flex-direction: column; }
+  .live-document-list article { grid-template-columns: 25px minmax(0, 1fr); }
+  .live-document-status { grid-column: 2; justify-self: start; }
+  .live-document-list article > p { grid-column: 2; }
   .form-actions { padding-top: 4px; }
   .admission-brand strong { font-size: 15px; }
 }

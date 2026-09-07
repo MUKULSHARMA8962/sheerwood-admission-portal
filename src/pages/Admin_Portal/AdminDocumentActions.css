@@ -3,8 +3,45 @@
 .document-review-actions button:hover { color: #fff; background: #08783f; }
 .document-review-actions button.request { border-color: #e5beb8; color: #ad5147; }
 .document-review-actions button.request:hover { background: #b75247; }
+.document-review-actions button.download { border-color: #a9c7db; color: #316c91; }
+.document-review-actions button.download:hover { background: #39779d; }
+.document-review-actions button:disabled { cursor: wait; opacity: .58; }
 .document-table em.re-upload-required { color: #ad5147; background: #ffebe8; }
+.document-table .document-status.submitted { color: #996d25; background: #fff4df; }
+.document-table .document-status.approved { color: #277443; background: #e8f7ed; }
+.document-details { min-width: 0; }
+.document-metadata { display: flex !important; flex-wrap: wrap; gap: 3px 9px; }
+.document-metadata span + span::before { content: "·"; margin-right: 9px; color: #a2afa7; }
+.document-review-reason { color: #ad5147 !important; }
+.document-empty-state { margin: 0; padding: 22px 20px; color: #6c8073; font-size: 11px; }
+.document-review-message { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 14px 20px 0; padding: 10px 12px; border-radius: 7px; font-size: 10px; font-weight: 700; }
+.document-review-message.error { color: #983c35; background: #ffebe8; }
+.document-review-message button { padding: 0; border: 0; color: inherit; background: transparent; font: inherit; text-decoration: underline; cursor: pointer; }
+.admissions-live-table .admin-control-head,.admissions-live-table .admin-control-row { grid-template-columns: 1.15fr 1fr .68fr .9fr .95fr .85fr 1.45fr; min-width: 940px; }
+.admissions-live-table em.document-state { color: #996d25; background: #fff4df; }
+.admissions-live-table em.document-state.approved { color: #277443; background: #e8f7ed; }
+.admissions-live-table em.document-state.reupload-required { color: #ad5147; background: #ffebe8; }
+.admissions-live-table em.admission-state.approved { color: #277443; background: #e8f7ed; }
+.admissions-live-table em.admission-state.rejected { color: #ad5147; background: #ffebe8; }
+.admissions-live-table em.admission-state.needs-information { color: #996d25; background: #fff4df; }
+.admission-decision-actions { display: flex; gap: 5px; justify-content: flex-end; }
+.admission-decision-actions button { padding: 6px 7px; border: 1px solid #b9ddc2; border-radius: 6px; color: #1e7540; background: #fff; font-size: 9px; font-weight: 800; white-space: nowrap; cursor: pointer; }
+.admission-decision-actions button:hover:not(:disabled) { color: #fff; background: #08783f; }
+.admission-decision-actions button.information { border-color: #e8d2a8; color: #996d25; }
+.admission-decision-actions button.information:hover:not(:disabled) { background: #a9782b; }
+.admission-decision-actions button.reject { border-color: #e5beb8; color: #ad5147; }
+.admission-decision-actions button.reject:hover:not(:disabled) { background: #b75247; }
+.admission-decision-actions button:disabled { cursor: wait; opacity: .58; }
+.admission-empty-state { margin: 0; padding: 22px 18px; color: #6c8073; font-size: 11px; }
+.admission-table-message { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 0 18px 14px; padding: 10px 12px; border-radius: 7px; font-size: 10px; font-weight: 700; }
+.admission-table-message.error { color: #983c35; background: #ffebe8; }
+.admission-table-message button { padding: 0; border: 0; color: inherit; background: transparent; font: inherit; text-decoration: underline; cursor: pointer; }
 
 @media (max-width: 480px) {
   .document-review-actions { grid-column: 2; justify-self: start; }
+  .document-table .document-status { display: inline-flex; }
+  .document-metadata { display: block !important; }
+  .document-metadata span { display: block; }
+  .document-metadata span + span::before { display: none; }
+  .admission-decision-actions { justify-content: flex-start; }
 }

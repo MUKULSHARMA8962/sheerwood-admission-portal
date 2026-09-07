@@ -1,5 +1,13 @@
+import { useCallback, useEffect, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import { getAdmissionDocuments, getNewAdmissionId } from "../services/admission";
+import {
+  getAdmissionDocumentLabel,
+  getAdmissionStatus,
+  getApplicationStatusLabel,
+  getDocumentStatusLabel,
+  getNewAdmissionId,
+} from "../services/admission";
+import { useCognitoAuth } from "../auth/useCognitoAuth";
 import "./NewUserDashboard.css";
 import "./DocumentVerification.css";
 
@@ -13,13 +21,63 @@ const journey = [
   ["7", "Approval", "pending"],
 ];
 
+function documentStatusClass(status) {
+  if (status === "submitted") return "pending";
+  if (status === "reupload_required") return "re-upload-required";
+  return String(status || "unknown").replaceAll("_", "-");
+}
+
+function documentStatusIcon(status) {
+  if (status === "approved") return "✓";
+  if (status === "reupload_required") return "!";
+  return "◷";
+}
+
 export default function NewUserDashboard() {
   const navigate = useNavigate();
   const location = useLocation();
+  const { session } = useCognitoAuth();
   const applicationId = getNewAdmissionId();
   const phone = location.state?.phone || "your verified mobile";
-  const documents = getAdmissionDocuments();
-  const approvedDocuments = documents.filter((document) => document.status === "Approved").length;
+  const [liveStatus, setLiveStatus] = useState(null);
+  const [isLiveStatusLoading, setIsLiveStatusLoading] = useState(true);
+  const [liveStatusError, setLiveStatusError] = useState("");
+
+  const loadLiveStatus = useCallback(async () => {
+    if (!session?.accessToken) {
+      setIsLiveStatusLoading(false);
+      return;
+    }
+
+    setIsLiveStatusLoading(true);
+    try {
+      const nextStatus = await getAdmissionStatus(session.accessToken, applicationId);
+      setLiveStatus(nextStatus);
+      setLiveStatusError("");
+    } catch (error) {
+      setLiveStatusError(error.message || "Live status is temporarily unavailable.");
+    } finally {
+      setIsLiveStatusLoading(false);
+    }
+  }, [applicationId, session?.accessToken]);
+
+  useEffect(() => {
+    void loadLiveStatus();
+    const refreshTimer = window.setInterval(loadLiveStatus, 15_000);
+    return () => window.clearInterval(refreshTimer);
+  }, [loadLiveStatus]);
+
+  const documents = liveStatus?.documents || [];
+  const documentSummary = liveStatus?.document_summary || { uploaded: 0, approved: 0 };
+  const approvedDocuments = documentSummary.approved;
+  const uploadedDocuments = documentSummary.uploaded;
+  const applicationStatus = liveStatus?.application?.status;
+  const documentHeading = uploadedDocuments
+    ? `${approvedDocuments} of ${uploadedDocuments} uploaded documents verified`
+    : "No documents uploaded yet";
+  const statusText = liveStatus
+    ? getApplicationStatusLabel(applicationStatus)
+    : isLiveStatusLoading ? "Checking live status…" : "Save your first draft";
 
   return <main className="new-user-page">
     <header className="new-user-header">
@@ -39,11 +97,13 @@ export default function NewUserDashboard() {
       </section>
 
       <section className="new-document-card">
-        <header><div><p>DOCUMENT VERIFICATION</p><h2>{approvedDocuments} of {documents.length} documents approved</h2></div><span>{approvedDocuments === documents.length ? "Documents verified ✓" : "Team review in progress"}</span></header>
-        <p>Our admissions team will approve each document or request a replacement if something needs correction.</p>
+        <header><div><p>LIVE DOCUMENT VERIFICATION</p><h2>{documentHeading}</h2></div><span className={`new-document-overall-status is-${String(applicationStatus || "not-started").replaceAll("_", "-")}`}>{statusText}</span></header>
+        <p>These statuses come directly from your saved application and refresh automatically every 15 seconds.</p>
+        {liveStatusError && <p className="new-document-live-error" role="status">{liveStatusError} We will try again automatically.</p>}
         <div className="new-document-list">
-          {documents.map((document) => <article className={`status-${document.status.toLowerCase().replaceAll(" ", "-")}`} key={document.id}><i>{document.status === "Approved" ? "✓" : document.status === "Re-upload Required" ? "!" : "◷"}</i><span><b>{document.name}</b><small>{document.status}</small>{document.reason && <em>{document.reason}</em>}</span></article>)}
+          {documents.map((document) => <article className={`status-${documentStatusClass(document.status)}`} key={document.id}><i>{documentStatusIcon(document.status)}</i><span><b>{getAdmissionDocumentLabel(document.document_key)}</b><small>{getDocumentStatusLabel(document.status)}</small><em className="new-document-file" title={document.file_name}>{document.file_name}</em>{document.reason && <em className="new-document-reason"><b>Admin note:</b> {document.reason}</em>}</span></article>)}
         </div>
+        {!documents.length && !isLiveStatusLoading && <p className="new-document-empty">Upload documents in the Documents step. Once saved, each file and the admin verification result will appear here.</p>}
       </section>
 
       <section className="new-user-info-grid">
