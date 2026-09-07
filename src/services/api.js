@@ -9,8 +9,8 @@ export async function getAdminUsers(accessToken) {
   return data;
 }
 
-export async function updateAdminUserRole(accessToken, userId, role) {
-  const response = await fetch(`${API_BASE_URL}/admin/users-roles/${userId}`, { method: "PATCH", headers: { "Content-Type": "application/json", Authorization: `Bearer ${accessToken}` }, body: JSON.stringify({ role }) });
+export async function updateAdminUserRole(accessToken, userId, user) {
+  const response = await fetch(`${API_BASE_URL}/admin/users-roles/${encodeURIComponent(userId)}`, { method: "PATCH", headers: { "Content-Type": "application/json", Authorization: `Bearer ${accessToken}` }, body: JSON.stringify({ role: user.role, full_name: user.full_name, email: user.email }) });
   const data = await response.json().catch(() => ({}));
   if (!response.ok) throw new Error(data.detail || "User role could not be updated.");
   return data;
