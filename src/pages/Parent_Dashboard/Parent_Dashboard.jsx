@@ -26,9 +26,13 @@ function getNextAcademicSession() {
 }
 
 const nextAcademicSession = getNextAcademicSession();
-const classRank = { Nursery: 0, "Class 1": 1, "Class 2": 2, "Class 3": 3, "Class 4": 4, "Class 5": 5, "Class 6": 6, "Class 7": 7, "Class 8": 8, "Class 9": 9, "Class 10": 10, "Class 11": 11 };
-const admissionClassOptions = Object.entries(classRank).filter(([, rank]) => rank >= 4);
-const currentClassOptions = Object.entries(classRank).filter(([, rank]) => rank >= 4);
+const classOrder = ["Class 4", "Class 5", "Class 6", "Class 7", "Class 8", "Class 9", "Class 10", "Class 11"];
+const classRank = Object.fromEntries(classOrder.map((className, index) => [className, index + 4]));
+const admissionClassOptions = classOrder;
+const currentClassOptions = classOrder;
+
+const currentClassChoices = (selectedClass) =>
+  currentClassOptions.filter((className) => selectedClass === "Select class" || classRank[className] <= classRank[selectedClass]);
 
 const initialForm = {
   session: nextAcademicSession,
@@ -124,7 +128,7 @@ export default function ParentDashboard() {
               <header className="admission-form-block-header"><div><p>APPLICATION INFORMATION</p><h2 id="application-information-heading">Admission application</h2></div><small>Fields marked <em>*</em> are required.</small></header>
               <div className="admission-fields">
                 <label>Academic Session<input value={form.session} readOnly /></label>
-                <label>Class Applying For <em>*</em><select name="class" value={form.class} onChange={update} required><option disabled>Select class</option>{admissionClassOptions.map(([className]) => <option key={className}>{className}</option>)}</select></label>
+                <label>Class Applying For <em>*</em><select name="class" value={form.class} onChange={update} required><option disabled>Select class</option>{admissionClassOptions.map((className) => <option key={className}>{className}</option>)}</select></label>
                 {form.class === "Class 11" && <label>Stream <em>*</em><select name="stream" value={form.stream} onChange={update} required><option disabled>Select stream</option><option>PCMB</option><option>PCM</option><option>PCB</option><option>Commerce with Mathematics</option><option>Commerce without Mathematics</option><option>Humanities</option></select></label>}
                 <label>Application Date<input name="date" type="date" value={form.date} readOnly /></label>
                 <label>Application ID<input value={applicationId} readOnly /></label>
@@ -136,7 +140,7 @@ export default function ParentDashboard() {
               <header className="admission-form-block-header"><div><p>ACADEMIC BACKGROUND</p><h2 id="academic-background-heading">Previous school details</h2></div></header>
               <div className="admission-fields">
                 <label>Previous School<input name="previousSchool" value={form.previousSchool} onChange={update} placeholder="Enter previous school name" /></label>
-                <label>Current Class <em>*</em><select name="currentClass" value={form.currentClass} onChange={update} required><option disabled>Select current class</option>{currentClassOptions.filter(([, rank]) => form.class === "Select class" || rank <= classRank[form.class]).map(([className]) => <option key={className}>{className}</option>)}</select></label>
+                <label>Current Class <em>*</em><select name="currentClass" value={form.currentClass} onChange={update} required><option disabled>Select current class</option>{currentClassChoices(form.class).map((className) => <option key={className}>{className}</option>)}</select></label>
                 <label>Board<select name="board" value={form.board} onChange={update}><option disabled>Select board</option><option>CBSE</option><option>ICSE</option><option>State Board</option><option>IB</option><option>Other</option></select></label>
                 {form.board === "Other" && <label>Specify Board <em>*</em><input name="boardOther" value={form.boardOther} onChange={update} placeholder="Enter board name" required /></label>}
                 <label>Medium<select name="medium" value={form.medium} onChange={update}><option>English</option><option>Hindi</option><option>Other</option></select></label>
