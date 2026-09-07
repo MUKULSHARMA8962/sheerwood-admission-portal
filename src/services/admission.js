@@ -11,24 +11,33 @@ export function getNewAdmissionId() {
 }
 
 const defaultDocuments = [
-  { id: "photo", name: "Student Photo", status: "Approved" },
-  { id: "birth-certificate", name: "Birth Certificate", status: "Under Verification" },
-  { id: "student-id", name: "Student Aadhaar", status: "Approved" },
-  { id: "parent-id", name: "Parent ID", status: "Approved" },
-  { id: "address-proof", name: "Address Proof", status: "Re-upload Required", reason: "Image is unclear" },
-  { id: "report-card", name: "Previous Report Card", status: "Under Verification" },
-  { id: "transfer-certificate", name: "Transfer Certificate", status: "Pending" },
+  { id: "report-card", name: "Report Card", status: "Not Uploaded", file: "" },
+  { id: "aadhaar-card", name: "Aadhaar Card", status: "Not Uploaded", file: "" },
+  { id: "birth-certificate", name: "Birth Certificate", status: "Not Uploaded", file: "" },
+  { id: "passport", name: "Passport", status: "Not Uploaded", file: "" },
+  { id: "national-id-card", name: "National ID Card", status: "Not Uploaded", file: "" },
+  { id: "other", name: "Other Document", status: "Not Uploaded", file: "" },
 ];
 
 export function getAdmissionDocuments() {
   const savedDocuments = localStorage.getItem(DOCUMENTS_KEY);
-  if (savedDocuments) return JSON.parse(savedDocuments);
+  if (savedDocuments) {
+    const documents = JSON.parse(savedDocuments).map((document) => {
+      if (document.status === "Verified" || document.status === "Under Verification" || document.status === "Pending") {
+        return { ...document, status: document.file ? "Submitted" : "Not Uploaded" };
+      }
+      if (document.status === "Approved" && !document.file) return { ...document, status: "Not Uploaded" };
+      return { ...document, file: document.file || "" };
+    });
+    localStorage.setItem(DOCUMENTS_KEY, JSON.stringify(documents));
+    return documents;
+  }
   localStorage.setItem(DOCUMENTS_KEY, JSON.stringify(defaultDocuments));
   return defaultDocuments;
 }
 
-export function updateAdmissionDocument(documentId, status, reason = "") {
-  const updatedDocuments = getAdmissionDocuments().map((document) => document.id === documentId ? { ...document, status, reason } : document);
+export function updateAdmissionDocument(documentId, status, reason = "", file) {
+  const updatedDocuments = getAdmissionDocuments().map((document) => document.id === documentId ? { ...document, status, reason, ...(file ? { file } : {}) } : document);
   localStorage.setItem(DOCUMENTS_KEY, JSON.stringify(updatedDocuments));
   return updatedDocuments;
 }

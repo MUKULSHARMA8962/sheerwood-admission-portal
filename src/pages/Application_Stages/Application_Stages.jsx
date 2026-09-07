@@ -1,5 +1,6 @@
 import { useRef, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
+import { getAdmissionDocuments, updateAdmissionDocument } from "../../services/admission";
 import "./Application_Stages.css";
 import "./ResidentialAddress.css";
 import "../DocumentUploadStatus.css";
@@ -79,15 +80,10 @@ function AcademicForm({ setMessage }) {
 
 function DocumentsForm({ setMessage }) {
   const fileRef = useRef(null);
-  const [documents, setDocuments] = useState([
-    { title: "Birth Certificate", file: "birth_certificate.pdf", status: "Verified" },
-    { title: "Aadhaar Card", file: "aadhaar_card.pdf", status: "Verified" },
-    { title: "Passport Size Photo", file: "passport_photo.jpg", status: "Verified" },
-    { title: "Transfer Certificate", file: "Upload document", status: "Required" },
-  ]);
+  const [documents, setDocuments] = useState(getAdmissionDocuments);
   const chooseFile = (index) => { fileRef.current.dataset.index = index; fileRef.current.click(); };
-  const uploaded = (event) => { const file = event.target.files?.[0]; const index = Number(event.target.dataset.index); if (!file) return; setDocuments((current) => current.map((document, documentIndex) => documentIndex === index ? { ...document, file: file.name, status: "Uploaded" } : document)); setMessage(`${file.name} uploaded and sent for verification.`); };
-  return <><p className="document-intro">Upload Required Documents <small>Documents marked verified have already been approved by the admissions team.</small></p><div className="document-list">{documents.map((document, index) => <button className={document.status.toLowerCase()} type="button" key={document.title} onClick={() => chooseFile(index)}><span>▣</span><b>{document.title}</b><em>{document.file}</em><i>{document.status === "Verified" ? "✓" : document.status === "Uploaded" ? "↟" : "⇧"}</i><small>{document.status}</small></button>)}</div><input ref={fileRef} type="file" hidden onChange={uploaded} /></>;
+  const uploaded = (event) => { const file = event.target.files?.[0]; const index = Number(event.target.dataset.index); if (!file) return; const document = documents[index]; const updatedDocuments = updateAdmissionDocument(document.id, "Submitted", "", file.name); setDocuments(updatedDocuments); setMessage(`${file.name} submitted and waiting for admin approval.`); event.target.value = ""; };
+  return <><p className="document-intro">Upload Required Documents <small>Uploaded documents are submitted for admin approval. Documents not uploaded remain marked Not Uploaded.</small></p><div className="document-list">{documents.map((document, index) => <button className={document.status.toLowerCase().replaceAll(" ", "-")} type="button" key={document.id} onClick={() => chooseFile(index)}><span>▣</span><b>{document.name}</b><em>{document.file || "Not uploaded"}</em><i>{document.status === "Approved" ? "✓" : document.status === "Submitted" ? "◷" : "⇧"}</i><small>{document.status === "Submitted" ? "Waiting for approval" : document.status}</small></button>)}</div><input ref={fileRef} type="file" accept=".pdf,.jpg,.jpeg,.png" hidden onChange={uploaded} /></>;
 }
 
 function ReviewForm({ navigate }) {
