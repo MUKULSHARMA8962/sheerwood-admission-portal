@@ -2,6 +2,7 @@ const SESSION_KEY = "sheerwood.cognito.session";
 const TRANSACTION_PREFIX = "sheerwood.cognito.transaction.";
 const DEFAULT_SCOPES = "openid email";
 const ROLE_NAMES = ["parent", "student", "teacher", "admin", "admission"];
+const GROUP_ROLE_PRIORITY = ["admin", "teacher", "student", "parent", "admission"];
 
 function base64UrlEncode(bytes) {
   let binary = "";
@@ -45,7 +46,7 @@ export function deriveRole(claims) {
   const groups = Array.isArray(claims?.["cognito:groups"]) ? claims["cognito:groups"] : [];
   const normalize = (value) => String(value || "").trim().toLowerCase().replace(/[^a-z]/g, "");
   const normalizedGroups = groups.map(normalize);
-  const groupRole = ROLE_NAMES.find((role) => normalizedGroups.includes(role));
+  const groupRole = GROUP_ROLE_PRIORITY.find((role) => normalizedGroups.includes(role));
   return groupRole || normalize(claimValue) || normalize(import.meta.env.VITE_COGNITO_DEFAULT_ROLE || "admission");
 }
 
