@@ -1,4 +1,5 @@
 import os
+import logging
 
 from fastapi import APIRouter, Depends, HTTPException, status
 import boto3
@@ -11,6 +12,7 @@ from ..schemas import AIRequest, AnnouncementRequest, UserRoleUpdate
 
 router = APIRouter(prefix="/api/admin", tags=["Admin UI"])
 AdminUser = Depends(require_roles("admin"))
+logger = logging.getLogger(__name__)
 
 
 def cognito_admin_client():
@@ -125,7 +127,9 @@ def users_roles(_: dict = AdminUser) -> list[dict]:
             result.append({"id": f"cognito:{cognito_user['Username']}", "email": attributes.get("email", ""), "full_name": attributes.get("name") or attributes.get("email", cognito_user["Username"]), "role": role, "cognito_subject": attributes.get("sub"), "groups": group_names, "status": cognito_user.get("UserStatus", "")})
         return result
     except (BotoCoreError, ClientError) as error:
-        raise HTTPException(status_code=503, detail="Cognito users could not be loaded. Check the server IAM permissions.") from error
+        error_code = error.response.get("Error", {}).get("Code", "AWS credentials or permissions error") if isinstance(error, ClientError) else str(error)
+        logger.exception("Cognito user listing failed: %s", error_code)
+        raise HTTPException(status_code=503, detail=f"Cognito users could not be loaded: {error_code}") from error
 
 
 @router.patch("/users-roles/{user_id}")
@@ -142,7 +146,9 @@ def update_user_role(user_id: str, payload: UserRoleUpdate, _: dict = AdminUser)
             client.admin_update_user_attributes(UserPoolId=user_pool_id, Username=username, UserAttributes=[{"Name": "name", "Value": payload.full_name}, {"Name": "email", "Value": payload.email}])
             return {"id": user_id, "email": payload.email, "full_name": payload.full_name, "role": payload.role, "cognito_subject": "", "groups": [payload.role]}
         except (BotoCoreError, ClientError) as error:
-            raise HTTPException(status_code=503, detail="Cognito role could not be updated. Check the server IAM permissions.") from error
+            error_code = error.response.get("Error", {}).get("Code", "AWS credentials or permissions error") if isinstance(error, ClientError) else str(error)
+            logger.exception("Cognito role update failed: %s", error_code)
+            raise HTTPException(status_code=503, detail=f"Cognito role could not be updated: {error_code}") from error
     with connection() as database:
         cursor = database.execute("UPDATE users SET role = ?, full_name = ?, email = ? WHERE id = ?", (payload.role, payload.full_name, payload.email, user_id))
         if cursor.rowcount == 0:
