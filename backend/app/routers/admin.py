@@ -3,7 +3,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from ..ai import AIConfigurationError, AIProviderRateLimitError, AIProviderUnavailableError, generate_ai_reply
 from ..database import connection
 from ..dependencies import require_roles
-from ..schemas import AIRequest, AnnouncementRequest
+from ..schemas import AIRequest, AnnouncementRequest, UserRoleUpdate
 
 router = APIRouter(prefix="/api/admin", tags=["Admin UI"])
 AdminUser = Depends(require_roles("admin"))
@@ -90,7 +90,19 @@ def reports(_: dict = AdminUser) -> list[dict]:
 
 @router.get("/users-roles")
 def users_roles(_: dict = AdminUser) -> list[dict]:
-    return [{"role": "admin", "users": 6, "access": "full"}, {"role": "teacher", "users": 74, "access": "academic"}, {"role": "parent", "users": 1248, "access": "limited"}, {"role": "student", "users": 206, "access": "limited"}]
+    with connection() as database:
+        rows = database.execute("SELECT id, email, full_name, role, cognito_subject FROM users ORDER BY full_name").fetchall()
+    return [dict(row) for row in rows]
+
+
+@router.patch("/users-roles/{user_id}")
+def update_user_role(user_id: int, payload: UserRoleUpdate, _: dict = AdminUser) -> dict:
+    with connection() as database:
+        cursor = database.execute("UPDATE users SET role = ? WHERE id = ?", (payload.role, user_id))
+        if cursor.rowcount == 0:
+            raise HTTPException(status_code=404, detail="User was not found.")
+        row = database.execute("SELECT id, email, full_name, role, cognito_subject FROM users WHERE id = ?", (user_id,)).fetchone()
+    return dict(row)
 
 
 @router.get("/settings")

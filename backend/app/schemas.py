@@ -33,6 +33,10 @@ class CreateApplicationRequest(BaseModel):
     desired_class: str = Field(min_length=2, max_length=40)
 
 
+class UserRoleUpdate(BaseModel):
+    role: Literal["parent", "teacher", "admin"]
+
+
 class AttendanceRecord(BaseModel):
     student_name: str = Field(min_length=2, max_length=120)
     status: Literal["Present", "Late", "Absent"]

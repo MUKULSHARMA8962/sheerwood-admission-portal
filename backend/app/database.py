@@ -3,7 +3,6 @@ import sqlite3
 from contextlib import contextmanager
 from pathlib import Path
 
-from .security import hash_password
 
 DATABASE_PATH = Path(os.getenv("DATABASE_PATH", Path(__file__).resolve().parents[1] / "sheerwood.db"))
 
@@ -90,47 +89,3 @@ def initialize_database() -> None:
         if "cognito_subject" not in existing_columns:
             database.execute("ALTER TABLE users ADD COLUMN cognito_subject TEXT")
             database.execute("CREATE UNIQUE INDEX IF NOT EXISTS users_cognito_subject_idx ON users(cognito_subject) WHERE cognito_subject IS NOT NULL")
-        _seed_data(database)
-
-
-def _seed_data(database: sqlite3.Connection) -> None:
-    demo_users = [
-        ("rajesh.sharma@demo.edu", "Rajesh Sharma", "parent", "Parent@123"),
-        ("meera.kapoor@demo.edu", "Meera Kapoor", "teacher", "Teacher@123"),
-        ("admin@demo.edu", "Sheerwood Admin", "admin", "Admin@123"),
-    ]
-    for email, name, role, password in demo_users:
-        existing = database.execute("SELECT id FROM users WHERE email = ?", (email,)).fetchone()
-        if not existing:
-            database.execute(
-                "INSERT INTO users (email, full_name, role, password_hash) VALUES (?, ?, ?, ?)",
-                (email, name, role, hash_password(password)),
-            )
-
-    parent = database.execute("SELECT id FROM users WHERE email = ?", ("rajesh.sharma@demo.edu",)).fetchone()
-    application_count = database.execute("SELECT COUNT(*) AS count FROM applications").fetchone()["count"]
-    if application_count == 0:
-        database.executemany(
-            """INSERT INTO applications
-            (application_number, student_name, parent_name, desired_class, status, documents_status, submitted_on, class_section, parent_id)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
-            [
-                ("AIS/2027-28/000124", "Aadhya Sharma", "Rajesh Sharma", "Class 2", "document_verification", "verified", "2027-05-26", None, parent["id"]),
-                ("AIS/2027-28/000123", "Ananya Gupta", "Nitin Gupta", "Class 3", "new_application", "pending", "2027-05-25", None, None),
-                ("AIS/2027-28/000125", "Vivaan Singh", "Pooja Singh", "Class 1", "pending_approval", "verified", "2027-05-24", "Class 1A", None),
-                ("AIS/2027-28/000122", "Myra Patel", "Ravi Patel", "Class 2", "approved", "verified", "2027-05-22", "Class 2A", None),
-            ],
-        )
-
-    student_count = database.execute("SELECT COUNT(*) AS count FROM students").fetchone()["count"]
-    if student_count == 0:
-        database.executemany(
-            """INSERT INTO students (student_code, full_name, class_section, attendance_percent, parent_name, parent_phone)
-            VALUES (?, ?, ?, ?, ?, ?)""",
-            [
-                ("STU-10424", "Aarav Sharma", "5A", 96, "Mrs. Sharma", "+91 98765 23120"),
-                ("STU-10425", "Saanvi Gupta", "5A", 92, "Mr. Gupta", "+91 98765 16780"),
-                ("STU-10426", "Vivaan Singh", "5A", 88, "Mrs. Singh", "+91 98765 44321"),
-                ("STU-10427", "Riya Patel", "5B", 98, "Mr. Patel", "+91 98765 98001"),
-            ],
-        )

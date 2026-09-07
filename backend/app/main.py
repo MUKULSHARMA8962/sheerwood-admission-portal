@@ -172,10 +172,16 @@ def dashboard(role: str, user: CurrentUser) -> dict[str, Any]:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Unknown dashboard role.")
     if user["role"] != role and user["role"] != "admin":
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="You cannot access this dashboard.")
+    with connection() as database:
+        applications = database.execute("SELECT COUNT(*) AS count FROM applications WHERE parent_id = ?", (user["id"],)).fetchone()["count"]
+        total_applications = database.execute("SELECT COUNT(*) AS count FROM applications").fetchone()["count"]
+        students = database.execute("SELECT COUNT(*) AS count FROM students").fetchone()["count"]
+        teachers = database.execute("SELECT COUNT(*) AS count FROM users WHERE role = 'teacher'").fetchone()["count"]
+        pending_approvals = database.execute("SELECT COUNT(*) AS count FROM applications WHERE status IN ('pending', 'pending_approval', 'document_verification')").fetchone()["count"]
     data = {
-        "parent": {"applications": 1, "documents_pending": 1, "payment_due": 1900, "application_progress": 60},
-        "teacher": {"students": 128, "classes_today": 4, "pending_assignments": 12, "attendance": 94},
-        "admin": {"students": 1248, "teachers": 74, "new_applications": 126, "pending_approvals": 38, "fees_collected": 840000, "attendance": 93.6},
+        "parent": {"applications": applications, "documents_pending": 0, "payment_due": 0, "application_progress": 0},
+        "teacher": {"students": students, "classes_today": 0, "pending_assignments": 0, "attendance": 0},
+        "admin": {"students": students, "teachers": teachers, "new_applications": total_applications, "pending_approvals": pending_approvals, "fees_collected": 0, "attendance": 0},
     }
     return {"role": role, "user": user, "data": data[role]}
 
@@ -229,17 +235,11 @@ def list_students(_: Annotated[dict[str, Any], Depends(require_roles("admin", "t
 
 @app.get("/api/teachers")
 def list_teachers(_: Annotated[dict[str, Any], Depends(require_roles("admin"))]) -> list[dict[str, Any]]:
-    return [
-        {"id": "T-1042", "name": "Meera Kapoor", "subject": "Mathematics & Science", "class_teacher": "Class 5A", "attendance": 96},
-        {"id": "T-1043", "name": "Rohan Arora", "subject": "English", "class_teacher": "Class 6B", "attendance": 94},
-        {"id": "T-1044", "name": "Sonia Patel", "subject": "Biology", "class_teacher": "Class 9A", "attendance": 91},
-    ]
+    with connection() as database:
+        rows = database.execute("SELECT id, full_name AS name, role FROM users WHERE role = 'teacher' ORDER BY full_name").fetchall()
+    return [dict(row) for row in rows]
 
 
 @app.get("/api/documents")
 def list_documents(_: Annotated[dict[str, Any], Depends(require_roles("admin"))]) -> list[dict[str, str]]:
-    return [
-        {"student": "Aadhya Sharma", "document": "Birth Certificate", "status": "verified"},
-        {"student": "Aadhya Sharma", "document": "Aadhaar Card", "status": "verified"},
-        {"student": "Vivaan Singh", "document": "Transfer Certificate", "status": "pending"},
-    ]
+    return []
