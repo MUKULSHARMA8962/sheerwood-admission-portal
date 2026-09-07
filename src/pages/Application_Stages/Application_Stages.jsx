@@ -1,6 +1,7 @@
 import { useRef, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { getAdmissionDocuments, updateAdmissionDocument } from "../../services/admission";
+import AccountMenu from "../../components/AccountMenu";
 import "./Application_Stages.css";
 import "./ResidentialAddress.css";
 import "../DocumentUploadStatus.css";
@@ -21,7 +22,7 @@ const quickAnswers = {
 };
 
 function PortalHeader() {
-  return <header className="stage-header"><Link className="stage-brand" to="/dashboard"><span>S</span><div><strong>Sheerwood</strong><small>International School</small></div></Link><div className="stage-account"><span>Academic session <b>2027–28</b></span><i>SP</i></div></header>;
+  return <header className="stage-header"><Link className="stage-brand" to="/dashboard"><span>S</span><div><strong>Sheerwood</strong><small>International School</small></div></Link><AccountMenu /></header>;
 }
 
 function Progress({ index }) {

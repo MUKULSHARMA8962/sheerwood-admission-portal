@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { getNewAdmissionId } from "../../services/admission";
+import AccountMenu from "../../components/AccountMenu";
 import "./Parent_Dashboard.css";
 
 const steps = [
@@ -25,7 +26,7 @@ function getNextAcademicSession() {
 
 const nextAcademicSession = getNextAcademicSession();
 const classRank = { Nursery: 0, "Class 1": 1, "Class 2": 2, "Class 3": 3, "Class 4": 4, "Class 5": 5, "Class 6": 6, "Class 7": 7, "Class 8": 8, "Class 9": 9, "Class 10": 10, "Class 11": 11 };
-const admissionClassOptions = Object.entries(classRank).filter(([, rank]) => rank >= 5 && rank !== 10);
+const admissionClassOptions = Object.entries(classRank).filter(([, rank]) => rank >= 5);
 const currentClassOptions = Object.entries(classRank).filter(([, rank]) => rank >= 5);
 
 const initialForm = {
@@ -90,7 +91,7 @@ export default function ParentDashboard() {
     <main className="admission-page">
       <header className="admission-header">
         <Link className="admission-brand" to="/new-user-dashboard"><span>S</span><div><strong>Sheerwood</strong><small>International School</small></div></Link>
-        <div className="admission-account"><span>Academic session <b>{form.session}</b></span><i>SP</i></div>
+        <AccountMenu />
       </header>
 
       <section className="admission-shell">

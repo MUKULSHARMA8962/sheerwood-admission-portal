@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import "./Parent_Guardian.css";
+import AccountMenu from "../../components/AccountMenu";
 
 const steps = ["Admission Details", "Student Information", "Parent / Guardian", "Residential Background", "Academic Background", "Documents", "Review & Submit"];
 
@@ -93,7 +94,7 @@ export default function ParentGuardian() {
     <main className="guardian-page">
       <header className="guardian-header">
         <Link className="guardian-brand" to="/dashboard"><span>S</span><div><strong>Sheerwood</strong><small>International School</small></div></Link>
-        <div className="guardian-account"><span>Academic session <b>2027–28</b></span><i>SP</i></div>
+        <AccountMenu />
       </header>
 
       <section className="guardian-shell">

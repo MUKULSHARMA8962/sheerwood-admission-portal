@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import "./Student_Information.css";
+import AccountMenu from "../../components/AccountMenu";
 import "./StudentBirthDate.css";
 
 const steps = [
@@ -55,6 +56,7 @@ const initialForm = {
   motherTongue: "",
   nationality: "Indian",
   nationalityOther: "",
+  nationalityCountryId: "",
   religion: "Hindu",
   religionOther: "",
   category: "General",
@@ -138,6 +140,10 @@ export default function StudentInformation() {
       setMessage("Please specify the student's nationality.");
       return;
     }
+    if (form.nationality === "Other" && !form.nationalityCountryId.trim()) {
+      setMessage("Please enter the student's Country ID or Passport Number.");
+      return;
+    }
     if (form.religion === "Other" && !form.religionOther.trim()) {
       setMessage("Please specify the student's religion.");
       return;
@@ -161,7 +167,7 @@ export default function StudentInformation() {
     <main className="student-page">
       <header className="student-header">
         <Link className="student-brand" to="/dashboard"><span>S</span><div><strong>Sheerwood</strong><small>International School</small></div></Link>
-        <div className="student-account"><span>Academic session <b>2027–28</b></span><i>SP</i></div>
+        <AccountMenu />
       </header>
 
       <section className="student-shell">
@@ -186,7 +192,7 @@ export default function StudentInformation() {
               <label>Blood Group <em>*</em><select name="bloodGroup" value={form.bloodGroup} onChange={update} required><option>A+</option><option>A-</option><option>B+</option><option>B-</option><option>AB+</option><option>AB-</option><option>O+</option><option>O-</option></select></label>
               <label>Mother Tongue <em>*</em><input name="motherTongue" value={form.motherTongue} onChange={update} placeholder="Enter mother tongue" required /></label>
               <label>Nationality <em>*</em><select name="nationality" value={form.nationality} onChange={update}><option>Indian</option><option>Other</option></select></label>
-              {form.nationality === "Other" && <label>Specify Nationality <em>*</em><input name="nationalityOther" value={form.nationalityOther} onChange={update} placeholder="Enter nationality" required /></label>}
+              {form.nationality === "Other" && <><label>Specify Nationality <em>*</em><input name="nationalityOther" value={form.nationalityOther} onChange={update} placeholder="Enter nationality" required /></label><label>Country ID / Passport Number <em>*</em><input name="nationalityCountryId" value={form.nationalityCountryId} onChange={update} placeholder="Enter country ID or passport number" required /></label></>}
               <label>Religion<select name="religion" value={form.religion} onChange={update}><option>Hindu</option><option>Muslim</option><option>Christian</option><option>Sikh</option><option>Other</option></select></label>
               {form.religion === "Other" && <label>Specify Religion <em>*</em><input name="religionOther" value={form.religionOther} onChange={update} placeholder="Enter religion" required /></label>}
               <label>Category <em>*</em><select name="category" value={form.category} onChange={update}><option>General</option><option>SC</option><option>ST</option><option>OBC</option><option>Others</option></select></label>
