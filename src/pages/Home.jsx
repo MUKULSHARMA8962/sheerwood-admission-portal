@@ -11,6 +11,7 @@ import principalDeskPortrait from "../assets/principal-desk-portrait.png";
 import homeHeroVideo from "../assets/home-hero-background.mp4";
 import campusFilm from "../assets/campus-film.mp4";
 import ThemeToggle from "../components/ThemeToggle";
+import { useCognitoAuth } from "../auth/useCognitoAuth";
 import "./Home.css";
 import "./HomeFooter.css";
 import "./HomeAbout.css";
@@ -19,6 +20,7 @@ import "./HomeGallery.css";
 import "./HomeHero.css";
 import "./HomeAi.css";
 import "./HomePrincipalUpdates.css";
+import "./HomeAuth.css";
 
 const features = [
   { number: "01", icon: "✦", title: "Smart Classrooms", text: "Interactive learning spaces created for curiosity and collaboration." },
@@ -52,6 +54,7 @@ const homeEvents = {
 
 export default function Home() {
   const navigate = useNavigate();
+  const { user, signOut } = useCognitoAuth();
   const [menuOpen, setMenuOpen] = useState(false);
   const [campusFilmOpen, setCampusFilmOpen] = useState(true);
   const [admissionCodeOpen, setAdmissionCodeOpen] = useState(false);
@@ -115,7 +118,7 @@ export default function Home() {
             <a href="#gallery">Gallery</a>
             <a href="#admission">Admissions</a>
             <a href="#contact">Contact</a>
-            <Link className="login-link" to="/login">Parent Login</Link>
+            {user ? <button className="login-link logout-link" type="button" onClick={signOut}>Logout ({user.role})</button> : <Link className="login-link" to="/login">Login with Cognito</Link>}
           </nav>
           <ThemeToggle />
           <button className="menu" onClick={() => setMenuOpen(!menuOpen)} aria-label="Toggle navigation">☰</button>

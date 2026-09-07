@@ -1,0 +1,9 @@
+.logout-link {
+  font: inherit;
+  background: transparent;
+  cursor: pointer;
+}
+
+.logout-link:hover {
+  color: var(--home-green);
+}
