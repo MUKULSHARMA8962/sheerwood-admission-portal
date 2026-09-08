@@ -1,0 +1,61 @@
+.new-admission-dashboard-menu {
+  position: sticky;
+  z-index: 10;
+  top: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  min-height: 54px;
+  padding: 0 clamp(18px, 6vw, 90px);
+  border-bottom: 1px solid #dce8df;
+  background: #ffffffed;
+  backdrop-filter: blur(12px);
+}
+
+.new-admission-dashboard-menu > div {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  overflow-x: auto;
+}
+
+.new-admission-dashboard-menu a {
+  flex: 0 0 auto;
+  padding: 8px 10px;
+  border-radius: 7px;
+  color: #5d7164;
+  font-size: 11px;
+  font-weight: 800;
+  text-decoration: none;
+}
+
+.new-admission-dashboard-menu a:hover,
+.new-admission-dashboard-menu a.active {
+  color: #08783f;
+  background: #e8f5eb;
+}
+
+.new-admission-dashboard-menu button {
+  flex: 0 0 auto;
+  min-height: 32px;
+  padding: 0 11px;
+  border: 1px solid #b9ddc2;
+  border-radius: 7px;
+  color: #08783f;
+  background: #fff;
+  font-size: 10px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.new-admission-dashboard-menu button:hover { background: #edf8ef; }
+.new-admission-dashboard-anchor { display: block; height: 1px; scroll-margin-top: 70px; }
+.admission-stage-cards { scroll-margin-top: 72px; }
+
+@media (max-width: 700px) {
+  .new-admission-dashboard-menu { padding: 0 12px; }
+  .new-admission-dashboard-menu > div { gap: 1px; }
+  .new-admission-dashboard-menu a { padding: 8px; font-size: 10px; }
+  .new-admission-dashboard-menu button { display: none; }
+}

@@ -52,7 +52,7 @@ export default function AdmissionStageCards({ application, documents = [] }) {
   const reuploadReason = application.reupload_reason || documents.find((document) => document.reason)?.reason || "";
   const parentContact = Object.values(guardians).find((guardian) => guardian?.mobile || guardian?.email) || {};
 
-  return <section className="admission-stage-cards" aria-labelledby="filled-form-heading">
+  return <section className="admission-stage-cards" id="filled-application-form" aria-labelledby="filled-form-heading">
     <header className="admission-stage-cards-heading"><div><p>FILLED APPLICATION FORM</p><h2 id="filled-form-heading">Stage-wise saved details</h2><small>These values come directly from your saved admission application.</small></div><span>Application {application.application_number}</span></header>
     <div className="admission-stage-cards-grid">
       <StageCard number="1" title="OTP Verified" caption="Sign-in verification">
