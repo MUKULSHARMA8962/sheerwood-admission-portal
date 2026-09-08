@@ -183,6 +183,10 @@ def parent_admission_status_payload(database: Any, application_number: str, pare
     guardians = application_data.get("guardians") if isinstance(application_data, dict) else {}
     guardian_details = next((details for details in guardians.values() if isinstance(details, dict) and details.get("mobile")), {}) if isinstance(guardians, dict) else {}
     application_payload["parent_mobile"] = str(guardian_details.get("mobile") or application_data.get("parentPhone") or "")
+    # This endpoint is private to the parent who owns the application. Returning
+    # their saved form data lets the dashboard render the same stage-wise values
+    # after a refresh or sign-in on another device.
+    application_payload["form_data"] = application_data
     document_list = [dict(document) for document in documents]
     _, counts = document_review_summary_for_rows(document_list)
     return {"application": application_payload, "documents": document_list, "document_summary": counts}

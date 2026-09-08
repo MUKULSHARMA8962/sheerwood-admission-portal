@@ -1,0 +1,125 @@
+.admission-stage-cards {
+  margin-top: 18px;
+  padding: clamp(18px, 3vw, 28px);
+  border: 1px solid #dce8df;
+  border-radius: 15px;
+  color: #173d2d;
+  background: #fff;
+  box-shadow: 0 8px 26px #174b2a0b;
+}
+
+.admission-stage-cards-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  padding-bottom: 18px;
+  border-bottom: 1px solid #e7efea;
+}
+
+.admission-stage-cards-heading p,
+.admission-stage-card header p {
+  margin: 0 0 6px;
+  color: #4d9168;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 1.2px;
+}
+
+.admission-stage-cards-heading h2 { margin: 0; font: 600 21px Georgia, serif; }
+.admission-stage-cards-heading small { display: block; margin-top: 6px; color: #718078; font-size: 12px; }
+.admission-stage-cards-heading > span { padding: 7px 9px; border-radius: 999px; color: #176b3b; background: #e5f4e8; font-size: 10px; font-weight: 800; white-space: nowrap; }
+
+.admission-stage-cards-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+  padding-top: 18px;
+}
+
+.admission-stage-card {
+  overflow: hidden;
+  border: 1px solid #dfeae2;
+  border-radius: 12px;
+  background: linear-gradient(135deg, #fcfefc, #f6fbf7);
+}
+
+.admission-stage-card:nth-child(2),
+.admission-stage-card:nth-child(3),
+.admission-stage-card:nth-child(4),
+.admission-stage-card:nth-child(5) { grid-column: 1 / -1; }
+
+.admission-stage-card > header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 15px;
+  border-bottom: 1px solid #e3eee6;
+  background: #fff;
+}
+
+.admission-stage-card > header > span {
+  display: grid;
+  width: 27px;
+  height: 27px;
+  place-items: center;
+  border-radius: 50%;
+  color: #fff;
+  background: #08783f;
+  font-size: 11px;
+  font-weight: 900;
+}
+
+.admission-stage-card h3 { margin: 0; font: 600 17px Georgia, serif; }
+.admission-stage-card header small { display: block; margin-top: 3px; color: #718078; font-size: 10px; }
+
+.admission-stage-field-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 9px;
+  padding: 14px 15px;
+  margin: 0;
+}
+
+.admission-stage-field-grid > div {
+  min-width: 0;
+  padding: 9px 10px;
+  border: 1px solid #e0eae3;
+  border-radius: 8px;
+  background: #fff;
+}
+
+.admission-stage-field-grid dt { margin: 0; color: #718078; font-size: 9px; font-weight: 800; }
+.admission-stage-field-grid dd { overflow: hidden; margin: 5px 0 0; color: #234333; font-size: 11px; font-weight: 800; line-height: 1.35; text-overflow: ellipsis; white-space: nowrap; }
+
+.admission-guardian-cards { display: grid; gap: 12px; padding: 14px 15px; }
+.admission-guardian-cards > section { border: 1px solid #e0eae3; border-radius: 9px; background: #fff; }
+.admission-guardian-cards h4 { padding: 11px 12px; margin: 0; border-bottom: 1px solid #e9f0eb; color: #286542; font-size: 12px; }
+.admission-guardian-cards .admission-stage-field-grid { padding: 11px 12px; }
+.admission-stage-not-filled { margin: 0; padding: 18px 15px; color: #718078; font-size: 12px; }
+
+.admission-stage-document-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 9px; padding: 14px 15px; }
+.admission-stage-document-grid article { display: grid; grid-template-columns: 25px minmax(0, 1fr) auto; align-items: center; gap: 8px; min-width: 0; padding: 10px; border: 1px solid #e0eae3; border-radius: 8px; background: #fff; }
+.admission-stage-document-grid article > span { display: grid; width: 23px; height: 23px; place-items: center; border-radius: 5px; color: #08783f; background: #e4f4e8; font-size: 12px; }
+.admission-stage-document-grid b { display: block; overflow: hidden; color: #254535; font-size: 11px; text-overflow: ellipsis; white-space: nowrap; }
+.admission-stage-document-grid small { display: block; overflow: hidden; margin-top: 3px; color: #718078; font-size: 9px; text-overflow: ellipsis; white-space: nowrap; }
+.admission-stage-document-grid em { padding: 4px 6px; border-radius: 999px; color: #886219; background: #fff3dc; font-size: 8px; font-style: normal; font-weight: 800; white-space: nowrap; }
+.admission-stage-document-grid em.is-uploaded,
+.admission-stage-document-grid em.is-under-verification { color: #145d94; background: #e3f1fc; }
+.admission-stage-document-grid em.is-verified { color: #176b3b; background: #e4f5e8; }
+.admission-stage-document-grid em.is-reupload-required,
+.admission-stage-document-grid em.is-rejected { color: #a7473d; background: #ffebe8; }
+
+@media (max-width: 800px) {
+  .admission-stage-cards-grid { grid-template-columns: 1fr; }
+  .admission-stage-card { grid-column: auto !important; }
+  .admission-stage-field-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+@media (max-width: 540px) {
+  .admission-stage-cards-heading { flex-direction: column; }
+  .admission-stage-field-grid,
+  .admission-stage-document-grid { grid-template-columns: 1fr; }
+  .admission-stage-document-grid article { grid-template-columns: 25px minmax(0, 1fr); }
+  .admission-stage-document-grid em { grid-column: 2; justify-self: start; }
+}
