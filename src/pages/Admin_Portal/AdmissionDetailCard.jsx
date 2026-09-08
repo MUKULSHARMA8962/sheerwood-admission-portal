@@ -1,4 +1,4 @@
-import { getApplicationStatusLabel } from "../../services/admission";
+import { getApplicationStatusLabel, getDocumentStatusLabel } from "../../services/admission";
 import AdmissionStageCards from "../AdmissionStageCards";
 import "./AdmissionDetailCard.css";
 
@@ -8,7 +8,7 @@ function formatDate(value) {
   return Number.isNaN(date.getTime()) ? String(value) : new Intl.DateTimeFormat("en-IN", { day: "2-digit", month: "short", year: "numeric" }).format(date);
 }
 
-export default function AdmissionDetailCard({ application, onClose, onOpenDocuments, onApprove, onReject, saving }) {
+export default function AdmissionDetailCard({ application, onClose, onApprove, onReject, saving, documentBusyId, onOpenDocument, onReviewDocument, onDeleteDocument }) {
   if (!application) return null;
   const canApprove = application.documents_status === "documents_verified" && application.status !== "approved";
 
@@ -26,8 +26,15 @@ export default function AdmissionDetailCard({ application, onClose, onOpenDocume
         <div><small>Application date</small><b>{formatDate(application.submitted_on)}</b><span>{application.admin_remark || "No admin remark"}</span></div>
       </section>
 
-      <div className="admin-admission-detail-body"><AdmissionStageCards application={application} documents={application.documents || []} /></div>
-      <footer><button type="button" className="admin-admission-detail-documents" onClick={onOpenDocuments}>Open Document Verification</button><button type="button" className="admin-admission-detail-approve" onClick={onApprove} disabled={!canApprove || saving}>{saving ? "Saving…" : "Approve Admission"}</button><button type="button" className="admin-admission-detail-reject" onClick={onReject} disabled={saving}>Reject Application</button><button type="button" className="admin-admission-detail-close" onClick={onClose}>Close details</button></footer>
+      <div className="admin-admission-detail-body">
+        <section className="admin-admission-detail-documents" aria-labelledby="admin-detail-documents-title"><header><div><p>DOCUMENT VERIFICATION</p><h3 id="admin-detail-documents-title">Uploaded documents</h3><small>Open a file to preview it, then verify, request a replacement, reject, or delete it.</small></div><span>{application.documents?.length || 0} uploaded</span></header>{application.documents?.length ? <div className="admin-admission-detail-document-list">{application.documents.map((document) => {
+          const status = document.status_code || document.status;
+          const busy = documentBusyId === document.id;
+          return <article key={document.id}><div><b>{document.document_key.replaceAll("-", " ")}</b><small>{document.file_name}</small>{document.reason && <em>Remark: {document.reason}</em>}</div><span className={`admin-admission-detail-document-status is-${String(status || "pending").replaceAll("_", "-")}`}>{getDocumentStatusLabel(status)}</span><div className="admin-admission-detail-document-actions"><button type="button" onClick={() => onOpenDocument(document)} disabled={busy}>Open</button><button type="button" className="verify" onClick={() => onReviewDocument(document, "verified")} disabled={busy}>Verify</button><button type="button" onClick={() => onReviewDocument(document, "reupload_required")} disabled={busy}>Re-upload</button><button type="button" className="reject" onClick={() => onReviewDocument(document, "rejected")} disabled={busy}>Reject</button><button type="button" className="delete" onClick={() => onDeleteDocument(document)} disabled={busy}>Delete</button></div></article>;
+        })}</div> : <p className="admin-admission-detail-no-documents">No documents are uploaded yet.</p>}</section>
+        <AdmissionStageCards application={application} documents={application.documents || []} />
+      </div>
+      <footer><button type="button" className="admin-admission-detail-approve" onClick={onApprove} disabled={!canApprove || saving}>{saving ? "Saving…" : "Approve Admission"}</button><button type="button" className="admin-admission-detail-reject" onClick={onReject} disabled={saving}>Reject Application</button><button type="button" className="admin-admission-detail-close" onClick={onClose}>Close details</button></footer>
     </section>
   </div>;
 }

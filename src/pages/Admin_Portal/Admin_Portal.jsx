@@ -160,7 +160,6 @@ function DocumentQueue({ setNotice }) {
 }
 
 export default function AdminPortal() {
-  const navigate = useNavigate();
   const { screen = "admissions" } = useParams();
   const [notice, setNotice] = useState("");
   const currentScreen = screens.some(([, , value]) => value === screen) ? screen : "admissions";
@@ -168,7 +167,7 @@ export default function AdminPortal() {
     ? <DocumentQueue setNotice={setNotice} />
     : currentScreen === "users"
       ? <AdminUsers setNotice={setNotice} />
-      : <NewAdmissionTable onOpenDocuments={() => navigate("/admin/documents")} setNotice={setNotice} />;
+      : <NewAdmissionTable setNotice={setNotice} />;
 
   return <main className="admin-page"><Sidebar screen={currentScreen} /><section className="admin-content"><header className="admin-feature-heading"><div><p>ADMISSION OPERATIONS</p><h1>{currentScreen === "documents" ? "Document Verification" : currentScreen === "users" ? "Users & Roles" : "New Admission Dashboard"}</h1><small>Manage verification and admission approvals using live application data.</small></div></header>{notice && <div className="admin-notice admin-global-notice" role="status">{notice}<button onClick={() => setNotice("")} aria-label="Dismiss notice">×</button></div>}{content}</section></main>;
 }

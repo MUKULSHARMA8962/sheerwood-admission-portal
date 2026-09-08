@@ -1,7 +1,8 @@
-import { Fragment, useCallback, useEffect, useMemo, useState } from "react";
-import { decideAdminAdmission, getAdminAdmissions } from "../../services/api";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { decideAdminAdmission, deleteAdminDocument, downloadAdminDocument, getAdminAdmissions, reviewAdminDocument } from "../../services/api";
 import { useCognitoAuth } from "../../auth/useCognitoAuth";
 import AdmissionDetailCard from "./AdmissionDetailCard";
+import DocumentPreviewModal from "../DocumentPreviewModal";
 import "./NewAdmissionTable.css";
 
 const statusLabels = {
@@ -9,6 +10,7 @@ const statusLabels = {
   submitted: "Pending",
   uploaded: "Uploaded",
   under_verification: "Under Verification",
+  verified: "Verified",
   documents_verified: "Documents Verified",
   approved: "Approved",
   needs_information: "Needs Information",
@@ -38,7 +40,7 @@ function Badge({ value }) {
   return <span className={`new-admission-badge ${String(normalizedValue || "pending").replaceAll("_", "-")}`}>{label(normalizedValue)}</span>;
 }
 
-export default function NewAdmissionTable({ onOpenDocuments, setNotice }) {
+export default function NewAdmissionTable({ setNotice }) {
   const { session } = useCognitoAuth();
   const [applications, setApplications] = useState([]);
   const [query, setQuery] = useState("");
@@ -46,6 +48,8 @@ export default function NewAdmissionTable({ onOpenDocuments, setNotice }) {
   const [loading, setLoading] = useState(true);
   const [savingId, setSavingId] = useState(null);
   const [selectedApplication, setSelectedApplication] = useState(null);
+  const [documentPreview, setDocumentPreview] = useState(null);
+  const [documentBusyId, setDocumentBusyId] = useState(null);
 
   const loadApplications = useCallback(async () => {
     if (!session?.accessToken) return;
@@ -53,15 +57,22 @@ export default function NewAdmissionTable({ onOpenDocuments, setNotice }) {
     setError("");
     try {
       const data = await getAdminAdmissions(session.accessToken);
-      setApplications(Array.isArray(data) ? data : []);
+      const normalized = Array.isArray(data) ? data : [];
+      setApplications(normalized);
+      return normalized;
     } catch (reason) {
       setError(reason.message || "Admissions could not be loaded.");
+      return [];
     } finally {
       setLoading(false);
     }
   }, [session?.accessToken]);
 
   useEffect(() => { void loadApplications(); }, [loadApplications]);
+
+  useEffect(() => () => {
+    if (documentPreview?.fileUrl) URL.revokeObjectURL(documentPreview.fileUrl);
+  }, [documentPreview?.fileUrl]);
 
   const visibleApplications = useMemo(() => applications.filter((application) => {
     const searchable = [application.application_number, application.student_name, application.parent_name, application.parent_mobile, application.desired_class].join(" ").toLowerCase();
@@ -77,24 +88,14 @@ export default function NewAdmissionTable({ onOpenDocuments, setNotice }) {
       setApplications((current) => current.map((item) => item.id === updated.id ? { ...item, ...updated } : item));
       setSelectedApplication((current) => current?.id === updated.id ? { ...current, ...updated } : current);
       setNotice(`${application.student_name || "Applicant"}: ${label(decision)} saved.`);
-      await loadApplications();
+      const refreshed = await loadApplications();
+      const refreshedApplication = refreshed.find((item) => item.id === application.id);
+      if (refreshedApplication) setSelectedApplication(refreshedApplication);
     } catch (reason) {
       setError(reason.message || "The admission could not be updated.");
     } finally {
       setSavingId(null);
     }
-  }
-
-  function addRemark(application) {
-    const remark = window.prompt("Add an admin remark", application.admin_remark || "");
-    if (remark === null || !remark.trim()) return;
-    void updateAdmission(application, "remark", { adminRemark: remark.trim() });
-  }
-
-  function needsInformation(application) {
-    const remark = window.prompt("What information is required from the parent?", application.admin_remark || "");
-    if (remark === null) return;
-    void updateAdmission(application, "needs_information", { adminRemark: remark.trim() });
   }
 
   function approve(application) {
@@ -103,6 +104,70 @@ export default function NewAdmissionTable({ onOpenDocuments, setNotice }) {
     const sectionAllocation = window.prompt("Section allocation (for example, A)", application.section_allocation || "");
     if (sectionAllocation === null || !sectionAllocation.trim()) return;
     void updateAdmission(application, "approved", { classSection: classSection.trim(), sectionAllocation: sectionAllocation.trim() });
+  }
+
+  async function refreshSelectedApplication(applicationNumber) {
+    const refreshed = await loadApplications();
+    const refreshedApplication = refreshed.find((item) => item.application_number === applicationNumber);
+    if (refreshedApplication) setSelectedApplication(refreshedApplication);
+  }
+
+  async function openDocumentPreview(document) {
+    if (!session?.accessToken) return;
+    setDocumentPreview({ document, loading: true, fileUrl: "", contentType: "", error: "" });
+    try {
+      const { blob } = await downloadAdminDocument(session.accessToken, document.id, document.file_name);
+      setDocumentPreview((current) => current?.document?.id === document.id ? {
+        ...current,
+        loading: false,
+        fileUrl: URL.createObjectURL(blob),
+        contentType: blob.type || document.content_type,
+      } : current);
+    } catch (reason) {
+      setDocumentPreview((current) => current?.document?.id === document.id ? { ...current, loading: false, error: reason.message || "Document could not be opened." } : current);
+    }
+  }
+
+  function downloadPreview() {
+    if (!documentPreview?.fileUrl) return;
+    const link = window.document.createElement("a");
+    link.href = documentPreview.fileUrl;
+    link.download = documentPreview.document.file_name || "admission-document";
+    link.click();
+  }
+
+  async function reviewDocument(document, decision) {
+    if (!document || !session?.accessToken || documentBusyId) return;
+    const reason = ["reupload_required", "rejected"].includes(decision)
+      ? window.prompt("Add a reason for the parent", document.reason || "")
+      : "";
+    if (reason === null) return;
+    setDocumentBusyId(document.id);
+    try {
+      await reviewAdminDocument(session.accessToken, document.id, decision, reason);
+      setNotice(`${document.document_key.replaceAll("-", " ")}: ${label(decision)} saved.`);
+      setDocumentPreview(null);
+      await refreshSelectedApplication(document.application_number);
+    } catch (reasonError) {
+      setError(reasonError.message || "Document review could not be saved.");
+    } finally {
+      setDocumentBusyId(null);
+    }
+  }
+
+  async function deleteDocument(document) {
+    if (!document || !session?.accessToken || documentBusyId || !window.confirm(`Delete ${document.file_name}? This removes it from the application.`)) return;
+    setDocumentBusyId(document.id);
+    try {
+      await deleteAdminDocument(session.accessToken, document.id);
+      setNotice(`${document.document_key.replaceAll("-", " ")}: deleted.`);
+      setDocumentPreview(null);
+      await refreshSelectedApplication(document.application_number);
+    } catch (reason) {
+      setError(reason.message || "Document could not be deleted.");
+    } finally {
+      setDocumentBusyId(null);
+    }
   }
 
   return <section className="new-admission-admin-panel">
@@ -120,11 +185,7 @@ export default function NewAdmissionTable({ onOpenDocuments, setNotice }) {
           {!loading && !visibleApplications.length && <tr><td colSpan="9" className="new-admission-empty">No real admission records found.</td></tr>}
           {!loading && visibleApplications.map((application) => {
             const summary = application.document_summary || {};
-            const isApproved = application.status === "approved";
-            const canApprove = application.documents_status === "documents_verified" && !isApproved;
-            const isSaving = savingId === application.id;
-            return <Fragment key={application.id}>
-              <tr key={application.id}>
+            return <tr key={application.id}>
                 <td><button type="button" className="new-admission-student-button" onClick={() => setSelectedApplication(application)}>{application.application_number}</button></td>
                 <td><button type="button" className="new-admission-student-button" onClick={() => setSelectedApplication(application)}>{application.student_name || "Application in progress"}</button></td>
                 <td>{application.desired_class || "—"}</td>
@@ -133,20 +194,18 @@ export default function NewAdmissionTable({ onOpenDocuments, setNotice }) {
                 <td><Badge value={application.documents_status} /></td>
                 <td><Badge value={application.status} /></td>
                 <td>{formatDate(application.submitted_on)}</td>
-                <td><div className="new-admission-actions">
-                  <button type="button" onClick={() => setSelectedApplication(application)}>View</button>
-                  <button type="button" onClick={onOpenDocuments}>Verify documents</button>
-                  <button type="button" onClick={() => addRemark(application)} disabled={isSaving}>Remark</button>
-                  <button type="button" onClick={() => needsInformation(application)} disabled={isSaving}>Needs info</button>
-                  <button type="button" className="approve" onClick={() => approve(application)} disabled={!canApprove || isSaving}>{isSaving ? "Saving…" : "Approve"}</button>
-                  <button type="button" className="reject" onClick={() => updateAdmission(application, "rejected")} disabled={isSaving}>Reject</button>
-                </div></td>
-              </tr>
-            </Fragment>;
+                <td><button type="button" className="new-admission-view" onClick={() => setSelectedApplication(application)}>View details</button></td>
+              </tr>;
           })}
         </tbody>
       </table>
     </div>
-    <AdmissionDetailCard application={selectedApplication} onClose={() => setSelectedApplication(null)} onOpenDocuments={onOpenDocuments} onApprove={() => approve(selectedApplication)} onReject={() => updateAdmission(selectedApplication, "rejected")} saving={savingId === selectedApplication?.id} />
+    <AdmissionDetailCard application={selectedApplication} onClose={() => setSelectedApplication(null)} onApprove={() => approve(selectedApplication)} onReject={() => updateAdmission(selectedApplication, "rejected")} saving={savingId === selectedApplication?.id} documentBusyId={documentBusyId} onOpenDocument={(document) => void openDocumentPreview(document)} onReviewDocument={(document, decision) => void reviewDocument(document, decision)} onDeleteDocument={(document) => void deleteDocument(document)} />
+    <DocumentPreviewModal preview={documentPreview} deleting={documentBusyId === documentPreview?.document?.id} onClose={() => setDocumentPreview(null)} onDownload={downloadPreview} onDelete={() => void deleteDocument(documentPreview?.document)} actions={[
+      { label: "Mark under review", className: "admission-document-review", onClick: () => void reviewDocument(documentPreview?.document, "under_verification"), disabled: documentBusyId !== null },
+      { label: "Verify", className: "admission-document-verify", onClick: () => void reviewDocument(documentPreview?.document, "verified"), disabled: documentBusyId !== null },
+      { label: "Edit / Re-upload", className: "admission-document-replace", onClick: () => void reviewDocument(documentPreview?.document, "reupload_required"), disabled: documentBusyId !== null },
+      { label: "Reject", className: "admission-document-delete", onClick: () => void reviewDocument(documentPreview?.document, "rejected"), disabled: documentBusyId !== null },
+    ]} />
   </section>;
 }
