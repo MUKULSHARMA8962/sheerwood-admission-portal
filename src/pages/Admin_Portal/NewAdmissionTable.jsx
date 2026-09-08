@@ -75,6 +75,7 @@ export default function NewAdmissionTable({ onOpenDocuments, setNotice }) {
     try {
       const updated = await decideAdminAdmission(session.accessToken, application.id, decision, options);
       setApplications((current) => current.map((item) => item.id === updated.id ? { ...item, ...updated } : item));
+      setSelectedApplication((current) => current?.id === updated.id ? { ...current, ...updated } : current);
       setNotice(`${application.student_name || "Applicant"}: ${label(decision)} saved.`);
       await loadApplications();
     } catch (reason) {
@@ -124,7 +125,7 @@ export default function NewAdmissionTable({ onOpenDocuments, setNotice }) {
             const isSaving = savingId === application.id;
             return <Fragment key={application.id}>
               <tr key={application.id}>
-                <td><b>{application.application_number}</b></td>
+                <td><button type="button" className="new-admission-student-button" onClick={() => setSelectedApplication(application)}>{application.application_number}</button></td>
                 <td><button type="button" className="new-admission-student-button" onClick={() => setSelectedApplication(application)}>{application.student_name || "Application in progress"}</button></td>
                 <td>{application.desired_class || "—"}</td>
                 <td className="new-admission-parent-cell"><b>{parentDisplayName(application.parent_name)}</b><small>Mobile: {application.parent_mobile || "Not saved"}</small></td>
@@ -146,6 +147,6 @@ export default function NewAdmissionTable({ onOpenDocuments, setNotice }) {
         </tbody>
       </table>
     </div>
-    <AdmissionDetailCard application={selectedApplication} onClose={() => setSelectedApplication(null)} onOpenDocuments={onOpenDocuments} />
+    <AdmissionDetailCard application={selectedApplication} onClose={() => setSelectedApplication(null)} onOpenDocuments={onOpenDocuments} onApprove={() => approve(selectedApplication)} onReject={() => updateAdmission(selectedApplication, "rejected")} saving={savingId === selectedApplication?.id} />
   </section>;
 }

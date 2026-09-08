@@ -8,8 +8,9 @@ function formatDate(value) {
   return Number.isNaN(date.getTime()) ? String(value) : new Intl.DateTimeFormat("en-IN", { day: "2-digit", month: "short", year: "numeric" }).format(date);
 }
 
-export default function AdmissionDetailCard({ application, onClose, onOpenDocuments }) {
+export default function AdmissionDetailCard({ application, onClose, onOpenDocuments, onApprove, onReject, saving }) {
   if (!application) return null;
+  const canApprove = application.documents_status === "documents_verified" && application.status !== "approved";
 
   return <div className="admin-admission-detail-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}>
     <section className="admin-admission-detail-card" role="dialog" aria-modal="true" aria-labelledby="admin-admission-detail-title">
@@ -26,7 +27,7 @@ export default function AdmissionDetailCard({ application, onClose, onOpenDocume
       </section>
 
       <div className="admin-admission-detail-body"><AdmissionStageCards application={application} documents={application.documents || []} /></div>
-      <footer><button type="button" className="admin-admission-detail-documents" onClick={onOpenDocuments}>Open Document Verification</button><button type="button" className="admin-admission-detail-close" onClick={onClose}>Close details</button></footer>
+      <footer><button type="button" className="admin-admission-detail-documents" onClick={onOpenDocuments}>Open Document Verification</button><button type="button" className="admin-admission-detail-approve" onClick={onApprove} disabled={!canApprove || saving}>{saving ? "Saving…" : "Approve Admission"}</button><button type="button" className="admin-admission-detail-reject" onClick={onReject} disabled={saving}>Reject Application</button><button type="button" className="admin-admission-detail-close" onClick={onClose}>Close details</button></footer>
     </section>
   </div>;
 }
