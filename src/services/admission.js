@@ -189,6 +189,34 @@ export async function getAdmissionDocumentRecords(accessToken) {
   return records || [];
 }
 
+export async function getAdmissionDocumentFile(accessToken, applicationNumber, documentKey) {
+  if (!accessToken || !applicationNumber || !documentKey) throw new Error("Please sign in again before opening this document.");
+  const response = await fetch(`${API_BASE_URL}/applications/${encodeURIComponent(applicationNumber)}/documents/${encodeURIComponent(documentKey)}`, {
+    cache: "no-store",
+    headers: { Authorization: `Bearer ${accessToken}` },
+  });
+  if (!response.ok) {
+    const result = await response.json().catch(() => ({}));
+    throw new Error(result.detail || "Document could not be opened.");
+  }
+  return {
+    blob: await response.blob(),
+    contentType: response.headers.get("content-type") || "application/octet-stream",
+  };
+}
+
+export async function deleteAdmissionDocument(accessToken, applicationNumber, documentKey) {
+  if (!accessToken || !applicationNumber || !documentKey) throw new Error("Please sign in again before deleting this document.");
+  const response = await fetch(`${API_BASE_URL}/applications/${encodeURIComponent(applicationNumber)}/documents/${encodeURIComponent(documentKey)}`, {
+    method: "DELETE",
+    headers: { Authorization: `Bearer ${accessToken}` },
+  });
+  if (!response.ok) {
+    const result = await response.json().catch(() => ({}));
+    throw new Error(result.detail || "Document could not be deleted.");
+  }
+}
+
 async function requestAdmissionStatus(accessToken, path) {
   const response = await fetch(`${API_BASE_URL}${path}`, {
     cache: "no-store",

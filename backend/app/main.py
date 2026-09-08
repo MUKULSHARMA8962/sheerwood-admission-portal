@@ -619,6 +619,48 @@ def download_admission_document(
     )
 
 
+@app.delete("/api/applications/{application_number}/documents/{document_key}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_admission_document(
+    application_number: str,
+    document_key: str,
+    user: Annotated[dict[str, Any], Depends(require_roles("parent"))],
+) -> Response:
+    """Remove one parent-owned document before the admission receives a final decision."""
+    if document_key not in ADMISSION_DOCUMENT_KEYS:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Admission document was not found.")
+
+    with connection() as database:
+        application = owned_application(database, application_number, user["id"])
+        if application["status"] in FINAL_APPLICATION_STATUSES:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="This admission has received a final decision, so its documents can no longer be deleted.",
+            )
+        deleted = database.execute(
+            "DELETE FROM admission_documents WHERE application_number = ? AND parent_id = ? AND document_key = ? RETURNING id",
+            (application_number, user["id"], document_key),
+        ).fetchone()
+        if not deleted:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Admission document was not found.")
+
+        documents_status, _ = document_review_summary(database, application_number)
+        database.execute(
+            """UPDATE applications
+            SET documents_status = ?, verification_status = ?, reupload_reason = '',
+                verification_date = NULL, verified_by = ''
+            WHERE application_number = ? AND parent_id = ?""",
+            (documents_status, documents_status, application_number, user["id"]),
+        )
+        database.execute(
+            """UPDATE new_admissions
+            SET documents_status = ?, verification_status = ?, reupload_reason = '',
+                verification_date = NULL, verified_by = '', updated_at = ?
+            WHERE application_number = ? AND parent_id = ?""",
+            (documents_status, documents_status, datetime.now(UTC).isoformat(), application_number, user["id"]),
+        )
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
 @app.patch("/api/applications/{application_id}/decision")
 def decide_application(application_id: int, payload: AdmissionDecisionRequest, user: Annotated[dict[str, Any], Depends(require_roles("admin"))]) -> dict[str, Any]:
     with connection() as database:

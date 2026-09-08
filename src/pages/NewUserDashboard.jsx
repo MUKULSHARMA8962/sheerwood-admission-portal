@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { getAdmissionStatus, getApplicationStatusLabel, getDocumentStatusLabel, getNewAdmissionId } from "../services/admission";
+import { deleteAdmissionDocument, getAdmissionDocumentFile, getAdmissionStatus, getApplicationStatusLabel, getDocumentStatusLabel, getNewAdmissionId } from "../services/admission";
 import { useCognitoAuth } from "../auth/useCognitoAuth";
 import AdmissionStageCards from "./AdmissionStageCards";
+import DocumentPreviewModal from "./DocumentPreviewModal";
 import "./NewAdmissionDashboard.css";
 import "./NewAdmissionDashboardLive.css";
 import "./AdmissionDashboardMenu.css";
@@ -33,6 +34,8 @@ export default function NewUserDashboard() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [lastUpdated, setLastUpdated] = useState(null);
+  const [preview, setPreview] = useState(null);
+  const [deletingDocument, setDeletingDocument] = useState(false);
 
   const loadStatus = useCallback(async () => {
     if (!session?.accessToken) return;
@@ -55,12 +58,54 @@ export default function NewUserDashboard() {
     return () => window.clearInterval(refreshTimer);
   }, [loadStatus]);
 
+  useEffect(() => () => {
+    if (preview?.fileUrl) URL.revokeObjectURL(preview.fileUrl);
+  }, [preview?.fileUrl]);
+
   const application = liveStatus?.application || null;
   const summary = liveStatus?.document_summary || { required: 5, uploaded: 0, verified: 0 };
   const currentStage = stageIndex(application);
   const tableRows = useMemo(() => application ? [application] : [], [application]);
 
   const documentsNeedUpload = (summary.uploaded || 0) < (summary.required || 5);
+
+  async function openDocumentPreview(document) {
+    if (!application?.application_number) return;
+    setPreview({ document, loading: true, fileUrl: "", contentType: "", error: "" });
+    try {
+      const file = await getAdmissionDocumentFile(session?.accessToken, application.application_number, document.document_key);
+      setPreview((current) => current?.document?.id === document.id ? {
+        ...current,
+        loading: false,
+        fileUrl: URL.createObjectURL(file.blob),
+        contentType: file.contentType,
+      } : current);
+    } catch (reason) {
+      setPreview((current) => current?.document?.id === document.id ? { ...current, loading: false, error: reason.message || "Document could not be opened." } : current);
+    }
+  }
+
+  function downloadPreview() {
+    if (!preview?.fileUrl) return;
+    const link = window.document.createElement("a");
+    link.href = preview.fileUrl;
+    link.download = preview.document.file_name || "admission-document";
+    link.click();
+  }
+
+  async function deletePreviewDocument() {
+    if (!preview?.document || !application?.application_number || !window.confirm(`Delete ${preview.document.file_name}? You can upload it again later.`)) return;
+    setDeletingDocument(true);
+    try {
+      await deleteAdmissionDocument(session?.accessToken, application.application_number, preview.document.document_key);
+      setPreview(null);
+      await loadStatus();
+    } catch (reason) {
+      setPreview((current) => current ? { ...current, error: reason.message || "Document could not be deleted." } : current);
+    } finally {
+      setDeletingDocument(false);
+    }
+  }
 
   return <main className="new-admission-dashboard" id="admission-dashboard">
     <header className="new-admission-dashboard-header"><Link to="/" className="new-admission-dashboard-brand"><span>S</span><b>Sheerwood International School</b></Link><div><span>{user?.name || "Parent"}</span><button onClick={() => navigate("/admission-details")}>+ New Admission</button></div></header>
@@ -73,7 +118,8 @@ export default function NewUserDashboard() {
       <section className="new-admission-dashboard-table-card"><header><div><p>APPLICATIONS</p><h2>Your New Admission</h2></div><span>{loading ? "Loading…" : `${tableRows.length} application`}</span></header><div className="new-admission-dashboard-table-scroll"><table><thead><tr><th>Student Name</th><th>Admission No.</th><th>Class</th><th>Mobile</th><th>Documents</th><th>Document Verification</th><th>Admission Status</th><th>Action</th></tr></thead><tbody>{loading && <tr><td colSpan="8" className="new-admission-dashboard-empty">Loading your saved application…</td></tr>}{!loading && !tableRows.length && <tr><td colSpan="8" className="new-admission-dashboard-empty">No submitted application yet. Use “New Admission” to start.</td></tr>}{!loading && tableRows.map((item) => <tr key={item.application_number}><td><b>{item.student_name || "Application in progress"}</b></td><td>{item.application_number}</td><td>{item.desired_class || "—"}</td><td>{item.parent_mobile || "—"}</td><td>{summary.uploaded || 0}/{summary.required || 5} uploaded<br /><small>{summary.verified || 0}/{summary.required || 5} verified</small></td><td><Badge status={item.documents_status} document /></td><td><Badge status={item.status} /></td><td><button className="new-admission-view" onClick={() => navigate(documentsNeedUpload ? "/application/documents" : "/admission-details")}>{documentsNeedUpload ? "Upload documents" : "View"}</button></td></tr>)}</tbody></table></div></section>
       <AdmissionStageCards application={application} documents={liveStatus?.documents || []} />
       <span id="document-status" className="new-admission-dashboard-anchor" />
-      {liveStatus?.documents?.length > 0 && <section className="new-admission-document-list"><header><p>DOCUMENT STATUS</p><h2>Verification updates</h2></header>{liveStatus.documents.map((document) => <article key={document.id}><div><b>{document.document_key.replaceAll("-", " ")}</b><small>{document.file_name}</small>{document.reason && <small className="new-admission-document-reason">Admin remark: {document.reason}</small>}</div><Badge status={document.status} document /></article>)}</section>}
+      {liveStatus?.documents?.length > 0 && <section className="new-admission-document-list"><header><div><p>DOCUMENT STATUS</p><h2>Verification updates</h2></div><small>Click a document to preview, replace, or delete it.</small></header>{liveStatus.documents.map((document) => <article key={document.id}><button type="button" className="new-admission-document-open" onClick={() => void openDocumentPreview(document)}><div><b>{document.document_key.replaceAll("-", " ")}</b><small>{document.file_name}</small>{document.reason && <small className="new-admission-document-reason">Admin remark: {document.reason}</small>}</div><Badge status={document.status} document /><span>Open preview →</span></button></article>)}</section>}
     </section>
+    <DocumentPreviewModal preview={preview} deleting={deletingDocument} onClose={() => setPreview(null)} onDownload={downloadPreview} onReplace={() => { setPreview(null); navigate("/application/documents"); }} onDelete={() => void deletePreviewDocument()} />
   </main>;
 }
