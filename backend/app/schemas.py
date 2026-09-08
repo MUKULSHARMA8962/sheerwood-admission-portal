@@ -24,12 +24,14 @@ class CognitoTokenExchangeRequest(BaseModel):
 
 
 class AdmissionDecisionRequest(BaseModel):
-    decision: Literal["approved", "rejected", "needs_information"]
+    decision: Literal["approved", "rejected", "needs_information", "remark"]
     class_section: str | None = Field(default=None, max_length=30)
+    section_allocation: str | None = Field(default=None, max_length=30)
+    admin_remark: str = Field(default="", max_length=1000)
 
 
 class DocumentReviewRequest(BaseModel):
-    decision: Literal["approved", "reupload_required"]
+    decision: Literal["under_verification", "verified", "reupload_required", "rejected"]
     reason: str = Field(default="", max_length=500)
 
 

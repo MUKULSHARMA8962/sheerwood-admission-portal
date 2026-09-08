@@ -200,10 +200,10 @@ export function clearCognitoSession() {
 
 export function getDefaultRouteForRole(role) {
   return {
-    parent: "/dashboard",
+    parent: "/admission-details",
     student: "/student/dashboard",
     teacher: "/teacher/dashboard",
-    admin: "/admin/dashboard",
+    admin: "/admin/admissions",
     admission: "/admission-details",
   }[role] || "/dashboard";
 }

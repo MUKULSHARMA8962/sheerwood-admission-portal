@@ -6,15 +6,7 @@ import "./StudentBirthDate.css";
 import { getAdmissionData, saveAdmissionDraft, uploadAdmissionDocument } from "../../services/admission";
 import { useCognitoAuth } from "../../auth/useCognitoAuth";
 
-const steps = [
-  "Admission Details",
-  "Student Information",
-  "Parent / Guardian",
-  "Residential Background",
-  "Academic Background",
-  "Documents",
-  "Review & Submit",
-];
+const steps = ["OTP Verified", "Admission Details", "Student Details", "Parent Details", "Documents", "Verification", "Approval"];
 
 function getLocalDate() {
   const date = new Date();
@@ -191,7 +183,7 @@ export default function StudentInformation() {
           <div className="student-title"><div><p className="student-kicker">NEW APPLICATION</p><h1>Student Information</h1><p>Tell us about the student applying for admission.</p></div><button onClick={() => navigate("/dashboard")}>← Back to dashboard</button></div>
 
           <ol className="student-steps" aria-label="Application progress">
-            {steps.map((step, index) => <li className={index === 1 ? "current" : index < 1 ? "complete" : ""} key={step}><span>{index < 1 ? "✓" : index + 1}</span><b>{step}</b></li>)}
+            {steps.map((step, index) => <li className={index === 2 ? "current" : index < 2 ? "complete" : ""} key={step}><span>{index < 2 ? "✓" : index + 1}</span><b>{step}</b></li>)}
           </ol>
 
           {message && <div className="student-message" role="status">{message}<button aria-label="Dismiss notification" onClick={() => setMessage("")}>×</button></div>}

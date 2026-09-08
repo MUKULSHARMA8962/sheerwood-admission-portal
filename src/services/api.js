@@ -70,11 +70,11 @@ export async function getAdminAdmissions(accessToken) {
   return data;
 }
 
-export async function decideAdminAdmission(accessToken, applicationId, decision, classSection = null) {
+export async function decideAdminAdmission(accessToken, applicationId, decision, { classSection = null, sectionAllocation = null, adminRemark = "" } = {}) {
   const response = await fetch(API_ROUTES.applicationDecision(applicationId), {
     method: "PATCH",
     headers: { "Content-Type": "application/json", Authorization: `Bearer ${accessToken}` },
-    body: JSON.stringify({ decision, class_section: classSection }),
+    body: JSON.stringify({ decision, class_section: classSection, section_allocation: sectionAllocation, admin_remark: adminRemark }),
   });
   const data = await response.json().catch(() => ({}));
   if (!response.ok) throw new Error(data.detail || "Admission decision could not be saved.");

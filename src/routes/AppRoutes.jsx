@@ -43,10 +43,10 @@ export default function AppRoutes() {
       <Route path={ROUTES.applicationSuccess} element={<Protected roles={parent}><SuccessScreen /></Protected>} />
       <Route path={ROUTES.application("medical")} element={<Protected roles={parent}><Navigate to={ROUTES.applicationDocuments} replace /></Protected>} />
       <Route path={ROUTES.application("transport")} element={<Protected roles={parent}><Navigate to={ROUTES.applicationDocuments} replace /></Protected>} />
-      <Route path="/application/:stage" element={<Protected roles={parent}><ApplicationStages /></Protected>} />
+      <Route path={ROUTES.applicationDocuments} element={<Protected roles={parent}><ApplicationStages /></Protected>} />
 
       <Route path={ROUTES.studentDashboard} element={<Protected roles={["student"]}><StudentDashboard /></Protected>} />
-      <Route path={ROUTES.admissionDetails} element={<Protected roles={["admission", "parent"]}><AdmissionDetails /></Protected>} />
+      <Route path={ROUTES.admissionDetails} element={<Protected roles={parent}><AdmissionDetails /></Protected>} />
       <Route path="/admin/:screen" element={<Protected roles={["admin"]}><AdminPortal /></Protected>} />
       <Route path={ROUTES.teacherDashboard} element={<Protected roles={["teacher"]}><TeacherPortal /></Protected>} />
       <Route path="*" element={<Navigate to={ROUTES.home} replace />} />

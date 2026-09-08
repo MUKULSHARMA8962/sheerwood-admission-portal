@@ -5,7 +5,7 @@ import AccountMenu from "../../components/AccountMenu";
 import { getAdmissionData, saveAdmissionDraft, uploadAdmissionDocument } from "../../services/admission";
 import { useCognitoAuth } from "../../auth/useCognitoAuth";
 
-const steps = ["Admission Details", "Student Information", "Parent / Guardian", "Residential Background", "Academic Background", "Documents", "Review & Submit"];
+const steps = ["OTP Verified", "Admission Details", "Student Details", "Parent Details", "Documents", "Verification", "Approval"];
 
 const families = {
   Father: { fullName: "Rajesh Sharma", occupation: "TCS", mobile: "9876543210", email: "rajesh.sharma@example.com", aadhaar: "" },
@@ -88,7 +88,7 @@ export default function ParentGuardian() {
       }
     }
     saveAdmissionDraft(session?.accessToken, { guardians: family })
-      .then(() => navigate("/application/residential"))
+      .then(() => navigate("/application/documents"))
       .catch((error) => setMessage(error.message));
   }
 
@@ -123,7 +123,7 @@ export default function ParentGuardian() {
           <div className="guardian-title"><div><p className="guardian-kicker">NEW APPLICATION</p><h1>Parent Information</h1><p>Please provide the parent contact details for the student.</p></div><button onClick={() => navigate("/dashboard")}>← Back to dashboard</button></div>
 
           <ol className="guardian-steps" aria-label="Application progress">
-            {steps.map((step, index) => <li className={index === 2 ? "current" : index < 2 ? "complete" : ""} key={step}><span>{index < 2 ? "✓" : index + 1}</span><b>{step}</b></li>)}
+            {steps.map((step, index) => <li className={index === 3 ? "current" : index < 3 ? "complete" : ""} key={step}><span>{index < 3 ? "✓" : index + 1}</span><b>{step}</b></li>)}
           </ol>
 
           {message && <div className="guardian-message" role="status">{message}<button aria-label="Dismiss notification" onClick={() => setMessage("")}>×</button></div>}

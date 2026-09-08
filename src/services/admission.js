@@ -15,17 +15,23 @@ const admissionDocumentLabels = {
 };
 
 const documentStatusLabels = {
-  submitted: "Waiting for verification",
-  approved: "Verified",
+  uploaded: "Uploaded",
+  under_verification: "Under Verification",
+  verified: "Verified",
   reupload_required: "Re-upload required",
+  rejected: "Rejected",
 };
 
 const applicationStatusLabels = {
   draft: "Draft — not submitted",
   new_application: "Application started",
-  submitted: "Submitted — awaiting review",
-  document_verification: "Documents under verification",
-  pending_approval: "Pending admission approval",
+  submitted: "Pending",
+  pending: "Pending",
+  document_verification: "Under Verification",
+  pending_approval: "Documents Verified",
+  uploaded: "Documents uploaded",
+  under_verification: "Under Verification",
+  documents_verified: "Documents Verified",
   needs_information: "Information required",
   approved: "Admission approved",
   rejected: "Admission not approved",
@@ -40,7 +46,7 @@ export function getAdmissionDocumentLabel(documentKey) {
 }
 
 export function getDocumentStatusLabel(status) {
-  return documentStatusLabels[status] || readableStatus(status) || "Awaiting upload";
+  return documentStatusLabels[status === "submitted" ? "uploaded" : status === "approved" ? "verified" : status] || readableStatus(status) || "Not Uploaded";
 }
 
 export function getApplicationStatusLabel(status) {
@@ -75,10 +81,8 @@ export function getAdmissionDocuments() {
   const savedDocuments = localStorage.getItem(DOCUMENTS_KEY);
   if (savedDocuments) {
     const documents = JSON.parse(savedDocuments).filter((document) => document.id !== "other").map((document) => {
-      if (document.status === "Verified" || document.status === "Under Verification" || document.status === "Pending") {
-        return { ...document, status: document.file ? "Submitted" : "Not Uploaded" };
-      }
-      if (document.status === "Approved" && !document.file) return { ...document, status: "Not Uploaded" };
+      if (document.status === "Submitted") return { ...document, status: document.file ? "Uploaded" : "Not Uploaded" };
+      if (document.status === "Approved") return { ...document, status: document.file ? "Verified" : "Not Uploaded" };
       return { ...document, file: document.file || "" };
     });
     localStorage.setItem(DOCUMENTS_KEY, JSON.stringify(documents));

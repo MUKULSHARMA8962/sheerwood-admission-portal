@@ -35,25 +35,50 @@ ADMISSION_DOCUMENT_KEYS = {
     "father-photo",
     "mother-photo",
 }
-FINAL_APPLICATION_STATUSES = {"approved", "rejected", "needs_information"}
+FINAL_APPLICATION_STATUSES = {"approved", "rejected"}
+REQUIRED_ADMISSION_DOCUMENT_KEYS = {
+    "report-card",
+    "aadhaar-card",
+    "birth-certificate",
+    "passport",
+    "national-id-card",
+}
+LEGACY_DOCUMENT_STATUSES = {"submitted": "uploaded", "approved": "verified"}
+
+
+def normalized_document_status(value: str) -> str:
+    return LEGACY_DOCUMENT_STATUSES.get(value, value or "pending")
 
 
 def document_review_summary_for_rows(documents: list[Any]) -> tuple[str, dict[str, int]]:
-    """Calculate a parent-visible aggregate from database document rows."""
-    document_statuses = [row["status"] for row in documents]
+    """Calculate the required-document aggregate used by verification and approval."""
+    required_documents = [
+        row for row in documents
+        if "document_key" not in row.keys() or row["document_key"] in REQUIRED_ADMISSION_DOCUMENT_KEYS
+    ]
+    document_statuses = [normalized_document_status(row["status"]) for row in required_documents]
     counts = {
-        "uploaded": len(document_statuses),
-        "approved": document_statuses.count("approved"),
-        "pending": document_statuses.count("submitted"),
+        "required": len(REQUIRED_ADMISSION_DOCUMENT_KEYS),
+        "uploaded": len(required_documents),
+        "verified": document_statuses.count("verified"),
+        # Keep this alias while the existing parent status UI is updated.
+        "approved": document_statuses.count("verified"),
+        "pending": document_statuses.count("uploaded"),
+        "under_verification": document_statuses.count("under_verification"),
         "reupload_required": document_statuses.count("reupload_required"),
+        "rejected": document_statuses.count("rejected"),
     }
+    if counts["rejected"] or counts["reupload_required"]:
+        return "reupload_required", counts
+    if counts["verified"] == counts["required"]:
+        return "documents_verified", counts
+    if counts["under_verification"]:
+        return "under_verification", counts
+    if counts["uploaded"]:
+        return "uploaded", counts
     if not document_statuses:
         return "pending", counts
-    if counts["reupload_required"]:
-        return "reupload_required", counts
-    if counts["approved"] == counts["uploaded"]:
-        return "approved", counts
-    return "submitted", counts
+    return "pending", counts
 
 
 def document_review_summary(database: Any, application_number: str) -> tuple[str, dict[str, int]]:
@@ -63,7 +88,7 @@ def document_review_summary(database: Any, application_number: str) -> tuple[str
     never be replaced by an old localStorage draft submitted by a parent.
     """
     rows = database.execute(
-        "SELECT status FROM admission_documents WHERE application_number = ?",
+        "SELECT document_key, status FROM admission_documents WHERE application_number = ?",
         (application_number,),
     ).fetchall()
     return document_review_summary_for_rows(rows)
@@ -133,8 +158,10 @@ def owned_application(database: Any, application_number: str, parent_id: int) ->
 def parent_admission_status_payload(database: Any, application_number: str, parent_id: int) -> dict[str, Any] | None:
     """Build the private live-status response for one parent-owned application."""
     application = database.execute(
-        """SELECT application_number, student_name, desired_class, status, documents_status,
-                  submitted_on, class_section
+        """SELECT application_number, student_name, parent_name, desired_class, status,
+                  documents_status, verification_status, admin_remark, reupload_reason,
+                  verification_date, verified_by, approval_date, approved_by,
+                  submitted_on, class_section, section_allocation, application_data
            FROM applications WHERE application_number = ? AND parent_id = ?""",
         (application_number, parent_id),
     ).fetchone()
@@ -148,9 +175,17 @@ def parent_admission_status_payload(database: Any, application_number: str, pare
            ORDER BY document_key""",
         (application_number, parent_id),
     ).fetchall()
+    application_payload = dict(application)
+    try:
+        application_data = json.loads(application_payload.pop("application_data") or "{}")
+    except (TypeError, ValueError):
+        application_data = {}
+    guardians = application_data.get("guardians") if isinstance(application_data, dict) else {}
+    guardian_details = next((details for details in guardians.values() if isinstance(details, dict) and details.get("mobile")), {}) if isinstance(guardians, dict) else {}
+    application_payload["parent_mobile"] = str(guardian_details.get("mobile") or application_data.get("parentPhone") or "")
     document_list = [dict(document) for document in documents]
     _, counts = document_review_summary_for_rows(document_list)
-    return {"application": dict(application), "documents": document_list, "document_summary": counts}
+    return {"application": application_payload, "documents": document_list, "document_summary": counts}
 
 
 @app.get("/api/health")
@@ -356,7 +391,8 @@ def save_application_draft(payload: SaveApplicationDraftRequest, user: Annotated
         # by an administrator.  Document state is always derived from real BLOB
         # uploads in admission_documents, never from browser-only preview data.
         current_status = existing["status"] if existing else (existing_new_admission["status"] if existing_new_admission else "")
-        application_status = current_status if current_status in FINAL_APPLICATION_STATUSES else payload.status
+        incoming_status = "pending" if payload.status == "submitted" else payload.status
+        application_status = current_status if current_status in FINAL_APPLICATION_STATUSES else incoming_status
         documents_status, _ = document_review_summary(database, payload.application_number)
         if existing:
             database.execute(
@@ -441,6 +477,24 @@ def list_admission_documents(
     return [dict(row) for row in rows]
 
 
+@app.get("/api/applications/current/status")
+def current_admission_status(
+    user: Annotated[dict[str, Any], Depends(require_roles("parent"))],
+) -> dict[str, Any]:
+    """Return the newest application for the signed-in parent after a refresh."""
+    with connection() as database:
+        row = database.execute(
+            "SELECT application_number FROM applications WHERE parent_id = ? ORDER BY id DESC LIMIT 1",
+            (user["id"],),
+        ).fetchone()
+        if not row:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="No admission application was found.")
+        payload = parent_admission_status_payload(database, row["application_number"], user["id"])
+    if not payload:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="No admission application was found.")
+    return payload
+
+
 @app.get("/api/applications/{application_number}/status")
 def admission_status(
     application_number: str,
@@ -448,26 +502,10 @@ def admission_status(
 ) -> dict[str, Any]:
     """Return the parent-visible, database-backed application and document status."""
     with connection() as database:
-        application = database.execute(
-            """SELECT application_number, student_name, desired_class, status, documents_status,
-                      submitted_on, class_section
-               FROM applications WHERE application_number = ? AND parent_id = ?""",
-            (application_number, user["id"]),
-        ).fetchone()
-        if not application:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Admission application was not found.")
-        documents = database.execute(
-            """SELECT id, document_key, file_name, content_type, size_bytes, status, reason,
-                      created_at, updated_at
-               FROM admission_documents
-               WHERE application_number = ? AND parent_id = ?
-               ORDER BY document_key""",
-            (application_number, user["id"]),
-        ).fetchall()
-    document_list = [dict(document) for document in documents]
-    # This matches the aggregate that admin review and draft saves persist.
-    _, counts = document_review_summary_for_rows(document_list)
-    return {"application": dict(application), "documents": document_list, "document_summary": counts}
+        payload = parent_admission_status_payload(database, application_number, user["id"])
+    if not payload:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Admission application was not found.")
+    return payload
 
 
 @app.post("/api/applications/{application_number}/documents/{document_key}", status_code=status.HTTP_201_CREATED)
@@ -510,7 +548,7 @@ async def upload_admission_document(
             """INSERT INTO admission_documents
             (application_number, parent_id, document_key, file_name, content_type, size_bytes,
              sha256, file_content, status, updated_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'submitted', ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'uploaded', ?)
             ON CONFLICT(application_number, document_key) DO UPDATE SET
                 parent_id = excluded.parent_id,
                 file_name = excluded.file_name,
@@ -518,7 +556,7 @@ async def upload_admission_document(
                 size_bytes = excluded.size_bytes,
                 sha256 = excluded.sha256,
                 file_content = excluded.file_content,
-                status = 'submitted',
+                status = 'uploaded',
                 reason = '',
                 updated_at = excluded.updated_at
             RETURNING id, document_key, file_name, content_type, size_bytes, status, updated_at""",
@@ -535,11 +573,11 @@ async def upload_admission_document(
             ),
         ).fetchone()
         database.execute(
-            "UPDATE applications SET documents_status = 'submitted' WHERE application_number = ? AND parent_id = ?",
+            "UPDATE applications SET documents_status = 'uploaded', verification_status = 'uploaded' WHERE application_number = ? AND parent_id = ?",
             (application_number, user["id"]),
         )
         database.execute(
-            "UPDATE new_admissions SET documents_status = 'submitted', updated_at = ? WHERE application_number = ? AND parent_id = ?",
+            "UPDATE new_admissions SET documents_status = 'uploaded', verification_status = 'uploaded', updated_at = ? WHERE application_number = ? AND parent_id = ?",
             (uploaded_at, application_number, user["id"]),
         )
     return dict(row)
@@ -578,18 +616,36 @@ def download_admission_document(
 
 
 @app.patch("/api/applications/{application_id}/decision")
-def decide_application(application_id: int, payload: AdmissionDecisionRequest, _: Annotated[dict[str, Any], Depends(require_roles("admin"))]) -> dict[str, Any]:
+def decide_application(application_id: int, payload: AdmissionDecisionRequest, user: Annotated[dict[str, Any], Depends(require_roles("admin"))]) -> dict[str, Any]:
     with connection() as database:
         application = database.execute("SELECT * FROM applications WHERE id = ?", (application_id,)).fetchone()
         if not application:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Application not found.")
+        documents_status, _ = document_review_summary(database, application["application_number"])
+        if payload.decision == "approved" and documents_status != "documents_verified":
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Approve Admission is available only after all required documents are verified.",
+            )
+        next_status = application["status"] if payload.decision == "remark" else payload.decision
+        updated_at = datetime.now(UTC).isoformat()
+        approval_date = updated_at if payload.decision == "approved" else application["approval_date"]
+        approved_by = user["full_name"] if payload.decision == "approved" else application["approved_by"]
+        admin_remark = payload.admin_remark.strip() or application["admin_remark"]
         database.execute(
-            "UPDATE applications SET status = ?, class_section = COALESCE(?, class_section) WHERE id = ?",
-            (payload.decision, payload.class_section, application_id),
+            """UPDATE applications
+            SET status = ?, documents_status = ?, class_section = COALESCE(?, class_section),
+                section_allocation = COALESCE(?, section_allocation), admin_remark = ?,
+                approval_date = ?, approved_by = ?
+            WHERE id = ?""",
+            (next_status, documents_status, payload.class_section, payload.section_allocation, admin_remark, approval_date, approved_by, application_id),
         )
         database.execute(
-            "UPDATE new_admissions SET status = ?, updated_at = ? WHERE application_number = ?",
-            (payload.decision, datetime.now(UTC).isoformat(), application["application_number"]),
+            """UPDATE new_admissions
+            SET status = ?, documents_status = ?, section_allocation = COALESCE(?, section_allocation),
+                admin_remark = ?, approval_date = ?, approved_by = ?, updated_at = ?
+            WHERE application_number = ?""",
+            (next_status, documents_status, payload.section_allocation, admin_remark, approval_date, approved_by, updated_at, application["application_number"]),
         )
         updated = database.execute("SELECT * FROM applications WHERE id = ?", (application_id,)).fetchone()
     return dict(updated)

@@ -1,4 +1,5 @@
 from datetime import UTC, datetime
+import json
 import logging
 import os
 import secrets
@@ -28,14 +29,43 @@ DOCUMENT_LABELS = {
     "mother-photo": "Mother's Photograph",
 }
 DOCUMENT_STATUS_LABELS = {
-    "submitted": "Submitted",
-    "approved": "Approved",
+    "uploaded": "Uploaded",
+    "under_verification": "Under Verification",
+    "verified": "Verified",
     "reupload_required": "Re-upload Required",
+    "rejected": "Rejected",
 }
+REQUIRED_DOCUMENT_KEYS = {"report-card", "aadhaar-card", "birth-certificate", "passport", "national-id-card"}
+LEGACY_DOCUMENT_STATUSES = {"submitted": "uploaded", "approved": "verified"}
+
+
+def document_status(value: str) -> str:
+    return LEGACY_DOCUMENT_STATUSES.get(value, value or "pending")
+
+
+def document_summary(rows: list[dict]) -> tuple[str, dict[str, int]]:
+    required_rows = [row for row in rows if row["document_key"] in REQUIRED_DOCUMENT_KEYS]
+    statuses = [document_status(row["status"]) for row in required_rows]
+    verified = statuses.count("verified")
+    summary = {
+        "required": len(REQUIRED_DOCUMENT_KEYS),
+        "uploaded": len(required_rows),
+        "verified": verified,
+        "under_verification": statuses.count("under_verification"),
+        "reupload_required": statuses.count("reupload_required"),
+        "rejected": statuses.count("rejected"),
+    }
+    if summary["rejected"] or summary["reupload_required"]:
+        return "reupload_required", summary
+    if verified == summary["required"]:
+        return "documents_verified", summary
+    if summary["under_verification"]:
+        return "under_verification", summary
+    return ("uploaded" if summary["uploaded"] else "pending"), summary
 
 
 def serialize_document(row: dict) -> dict:
-    status_value = row["status"]
+    status_value = document_status(row["status"])
     return {
         "id": row["id"],
         "application_number": row["application_number"],
@@ -84,7 +114,27 @@ def dashboard(_: dict = AdminUser) -> dict:
 def admissions(_: dict = AdminUser) -> list[dict]:
     with connection() as database:
         rows = database.execute("SELECT * FROM applications ORDER BY id DESC").fetchall()
-    return [dict(row) for row in rows]
+        result = []
+        for row in rows:
+            application = dict(row)
+            documents = database.execute(
+                "SELECT document_key, status FROM admission_documents WHERE application_number = ?",
+                (application["application_number"],),
+            ).fetchall()
+            documents_status, summary = document_summary(documents)
+            try:
+                application_data = json.loads(application.get("application_data") or "{}")
+            except (TypeError, ValueError):
+                application_data = {}
+            guardians = application_data.get("guardians") if isinstance(application_data, dict) else {}
+            guardian = next((details for details in guardians.values() if isinstance(details, dict) and details.get("mobile")), {}) if isinstance(guardians, dict) else {}
+            application.update({
+                "documents_status": documents_status,
+                "document_summary": summary,
+                "parent_mobile": str(guardian.get("mobile") or application_data.get("parentPhone") or ""),
+            })
+            result.append(application)
+    return result
 
 
 @router.get("/students")
@@ -140,7 +190,7 @@ def documents(_: dict = AdminUser) -> list[dict]:
 
 
 @router.patch("/documents/{document_id}")
-def review_document(document_id: int, payload: DocumentReviewRequest, _: dict = AdminUser) -> dict:
+def review_document(document_id: int, payload: DocumentReviewRequest, user: dict = AdminUser) -> dict:
     updated_at = datetime.now(UTC).isoformat()
     with connection() as database:
         existing = database.execute(
@@ -153,18 +203,25 @@ def review_document(document_id: int, payload: DocumentReviewRequest, _: dict = 
             "UPDATE admission_documents SET status = ?, reason = ?, updated_at = ? WHERE id = ?",
             (payload.decision, payload.reason.strip(), updated_at, document_id),
         )
-        all_statuses = [row["status"] for row in database.execute(
-            "SELECT status FROM admission_documents WHERE application_number = ?",
+        all_documents = database.execute(
+            "SELECT document_key, status FROM admission_documents WHERE application_number = ?",
             (existing["application_number"],),
-        ).fetchall()]
-        document_status = "approved" if all_statuses and all(value == "approved" for value in all_statuses) else "reupload_required" if "reupload_required" in all_statuses else "submitted"
+        ).fetchall()
+        document_status, _ = document_summary(all_documents)
+        reupload_reason = payload.reason.strip() if payload.decision in {"reupload_required", "rejected"} else ""
         database.execute(
-            "UPDATE applications SET documents_status = ? WHERE application_number = ?",
-            (document_status, existing["application_number"]),
+            """UPDATE applications
+            SET documents_status = ?, verification_status = ?, reupload_reason = ?,
+                verification_date = ?, verified_by = ?
+            WHERE application_number = ?""",
+            (document_status, document_status, reupload_reason, updated_at, user["full_name"], existing["application_number"]),
         )
         database.execute(
-            "UPDATE new_admissions SET documents_status = ?, updated_at = ? WHERE application_number = ?",
-            (document_status, updated_at, existing["application_number"]),
+            """UPDATE new_admissions
+            SET documents_status = ?, verification_status = ?, reupload_reason = ?,
+                verification_date = ?, verified_by = ?, updated_at = ?
+            WHERE application_number = ?""",
+            (document_status, document_status, reupload_reason, updated_at, user["full_name"], updated_at, existing["application_number"]),
         )
         updated = document_row(database, document_id)
     return serialize_document(updated)

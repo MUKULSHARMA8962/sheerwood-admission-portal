@@ -1,234 +1,114 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
-import { askSchoolAI, decideAdminAdmission, downloadAdminDocument, getAdminAdmissions, getAdminDocuments, reviewAdminDocument } from "../../services/api";
+import { downloadAdminDocument, getAdminDocuments, reviewAdminDocument } from "../../services/api";
 import { useCognitoAuth } from "../../auth/useCognitoAuth";
 import AdminUsers from "./AdminUsers";
+import NewAdmissionTable from "./NewAdmissionTable";
 import "./Admin_Portal.css";
-import "./AdminFeatures.css";
-import "./AdminDocumentActions.css";
+import "./NewAdmissionTable.css";
 
-const navItems = [["▦", "Dashboard", "dashboard"], ["▤", "Admissions", "admissions"], ["♙", "Students", "students"], ["♧", "Teachers", "teachers"], ["▤", "Classes", "classes"], ["✓", "Attendance", "attendance"], ["◫", "Fees", "fees"], ["▥", "Exams & Results", "exams"], ["◷", "Timetable", "timetable"], ["▣", "Documents", "documents"], ["▰", "Transport / Hostel", "transport"], ["♙", "Parents", "parents"], ["✉", "Notifications", "notifications"], ["◉", "Reports", "reports"], ["✦", "AI Assistant", "ai"], ["◈", "Users & Roles", "users"], ["⚙", "Settings", "settings"]];
-const students = [];
-const teachers = [];
+const screens = [
+  ["▤", "Admissions", "admissions"],
+  ["▣", "Documents", "documents"],
+  ["◈", "Users & Roles", "users"],
+];
 
-function AdminHeading({ eyebrow, title, text, action }) { return <header className="admin-feature-heading"><div><p>{eyebrow}</p><h1>{title}</h1>{text && <small>{text}</small>}</div>{action}</header>; }
-function AdminButton({ children, onClick, outline = false }) { return <button className={outline ? "admin-feature-button outline" : "admin-feature-button"} onClick={onClick}>{children}</button>; }
+function StatusBadge({ status }) {
+  const labels = { uploaded: "Uploaded", under_verification: "Under Verification", verified: "Verified", reupload_required: "Re-upload Required", rejected: "Rejected" };
+  return <span className={`new-admission-badge ${String(status || "uploaded").replaceAll("_", "-")}`}>{labels[status] || status || "Uploaded"}</span>;
+}
 
 function Sidebar({ screen }) {
   const navigate = useNavigate();
   const { signOut } = useCognitoAuth();
-  return <aside className="admin-sidebar"><Link className="admin-brand" to="/admin/dashboard"><span>S</span><div><strong>Sheerwood</strong><small>Admin Portal</small></div></Link><nav aria-label="Admin portal navigation">{navItems.map(([icon, label, target]) => <button className={screen === target ? "active" : ""} key={label} onClick={() => navigate(`/admin/${target}`)}><span>{icon}</span>{label}</button>)}</nav><button className="admin-logout" onClick={signOut}><span>↪</span> Logout</button></aside>;
+  return <aside className="admin-sidebar">
+    <Link className="admin-brand" to="/admin/admissions"><span>S</span><div><strong>Sheerwood</strong><small>Admissions Admin</small></div></Link>
+    <nav aria-label="Admin portal navigation">{screens.map(([icon, label, target]) => <button className={screen === target ? "active" : ""} key={target} onClick={() => navigate(`/admin/${target}`)}><span>{icon}</span>{label}</button>)}</nav>
+    <button className="admin-logout" onClick={signOut}><span>↪</span> Logout</button>
+  </aside>;
 }
 
-function DashboardView({ openScreen, setNotice }) {
-  return <><AdminHeading eyebrow="SCHOOL OPERATIONS" title="Admin Dashboard" text="A complete view of admissions, academics and school operations." action={<AdminButton onClick={() => openScreen("notifications")}>✉ Send notification</AdminButton>} /><section className="admin-control-stats">{[["♙", "Students", "1,248", "Across classes 2–12"], ["♧", "Teachers", "74", "68 active today"], ["▤", "New Applications", "126", "This admission cycle"], ["✓", "Pending Approvals", "38", "Need action"], ["◫", "Fees Collected", "₹8.4L", "This month"], ["◉", "Attendance", "93.6%", "School average"]].map(([icon, label, value, note]) => <article key={label}><i>{icon}</i><div><span>{label}</span><strong>{value}</strong><small>{note}</small></div></article>)}</section><section className="admin-overview-grid"><article className="admin-feature-card admin-activity-chart"><header><div><p>ADMISSIONS ANALYTICS</p><h2>Applications overview</h2></div><button onClick={() => openScreen("reports")}>View report →</button></header><div className="admin-bar-chart">{[38, 62, 53, 82, 70, 56, 90].map((height, index) => <span key={index}><i style={{ height: `${height}%` }} /><b>{["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul"][index]}</b></span>)}</div></article><article className="admin-feature-card admin-pie-card"><header><div><p>ADMISSION STATUS</p><h2>Applications by status</h2></div></header><div className="admin-pie-row"><div className="admin-pie"><b>1,245<small>Total</small></b></div><ul><li><i className="submitted" />Submitted <b>625</b></li><li><i className="review" />Under review <b>320</b></li><li><i className="approved" />Approved <b>210</b></li><li><i className="pending" />Draft <b>90</b></li></ul></div></article></section><section className="admin-overview-grid admin-overview-bottom"><article className="admin-feature-card admin-action-panel"><header><div><p>PRIORITY TASKS</p><h2>Need your attention</h2></div></header>{[["38", "Admission approvals pending", "Review applications"], ["12", "Documents awaiting verification", "Verify documents"], ["6", "Fee payment follow-ups", "Review dues"]].map(([count, title, action]) => <article key={title}><b>{count}</b><span>{title}</span><button onClick={() => setNotice(`${action} workspace opened.`)}>{action} →</button></article>)}</article><article className="admin-feature-card admin-notification-feed"><header><div><p>RECENT NOTIFICATIONS</p><h2>School updates</h2></div><button onClick={() => openScreen("notifications")}>View all →</button></header>{[["New application received", "Class 3 · Ananya Gupta", "8 min ago"], ["Teacher leave request", "Sonia Patel · Biology", "24 min ago"], ["Fee payment received", "Aarav Sharma · ₹24,500", "1 hour ago"]].map(([title, detail, time]) => <article key={title}><i>●</i><div><b>{title}</b><small>{detail}</small></div><time>{time}</time></article>)}</article></section></>;
-}
-
-function admissionStatusLabel(status) {
-  return ({ draft: "Draft", submitted: "Submitted", approved: "Approved", rejected: "Rejected", needs_information: "Needs information", submitted_for_review: "Submitted", not_uploaded: "Not uploaded", reupload_required: "Re-upload required" })[status] || String(status || "Unknown").replaceAll("_", " ");
-}
-
-function applicationDate(value) {
-  if (!value) return "—";
-  const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? value : new Intl.DateTimeFormat("en-IN", { day: "2-digit", month: "short", year: "numeric" }).format(date);
-}
-
-function Admissions({ openScreen, setNotice }) {
+function DocumentQueue({ setNotice }) {
   const { session } = useCognitoAuth();
-  const [query, setQuery] = useState("");
-  const [statusFilter, setStatusFilter] = useState("all");
-  const [admissions, setAdmissions] = useState([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [loadError, setLoadError] = useState("");
-  const [decisionError, setDecisionError] = useState("");
-  const [decidingId, setDecidingId] = useState(null);
-
-  const loadAdmissions = useCallback(async () => {
-    if (!session?.accessToken) {
-      setAdmissions([]);
-      setLoadError("Your admin session is unavailable. Please sign in again.");
-      setIsLoading(false);
-      return;
-    }
-    setIsLoading(true);
-    setLoadError("");
-    setDecisionError("");
-    try {
-      const result = await getAdminAdmissions(session.accessToken);
-      setAdmissions(Array.isArray(result) ? result : []);
-    } catch (error) {
-      setAdmissions([]);
-      setLoadError(error.message || "Admissions could not be loaded.");
-    } finally {
-      setIsLoading(false);
-    }
-  }, [session?.accessToken]);
-
-  useEffect(() => {
-    loadAdmissions();
-  }, [loadAdmissions]);
-
-  const visible = useMemo(() => admissions.filter((application) => {
-    const searchable = [application.application_number, application.student_name, application.parent_name, application.desired_class].filter(Boolean).join(" ").toLowerCase();
-    return searchable.includes(query.toLowerCase()) && (statusFilter === "all" || application.status === statusFilter);
-  }), [admissions, query, statusFilter]);
-
-  const decideAdmission = async (application, decision) => {
-    if (!session?.accessToken || decidingId !== null) return;
-    setDecisionError("");
-    setDecidingId(application.id);
-    try {
-      const updatedApplication = await decideAdminAdmission(session.accessToken, application.id, decision);
-      setAdmissions((current) => current.map((item) => (item.id === updatedApplication.id ? updatedApplication : item)));
-      setNotice(`${application.student_name || "Applicant"}: ${admissionStatusLabel(decision)} decision saved. The parent dashboard will update automatically.`);
-    } catch (error) {
-      setDecisionError(error.message || "Admission decision could not be saved.");
-    } finally {
-      setDecidingId(null);
-    }
-  };
-
-  return <><AdminHeading eyebrow="ADMISSION MANAGEMENT" title="Admissions" text="Review documents and save the final admission decision directly to the applicant record." action={<AdminButton onClick={loadAdmissions}>Refresh admissions</AdminButton>} /><section className="admin-feature-card"><div className="admin-filter-row"><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search application, student or class..." /><select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)} aria-label="Filter admissions by final status"><option value="all">All statuses</option><option value="draft">Draft</option><option value="submitted">Submitted</option><option value="needs_information">Needs information</option><option value="approved">Approved</option><option value="rejected">Rejected</option></select><AdminButton outline onClick={loadAdmissions}>↻ Refresh</AdminButton></div>{loadError && <div className="admission-table-message error" role="alert"><span>{loadError}</span><button type="button" onClick={loadAdmissions}>Try again</button></div>}{decisionError && <div className="admission-table-message error" role="alert">{decisionError}</div>}<div className="admin-control-table admissions-table admissions-live-table" aria-busy={isLoading}><div className="admin-control-head"><span>Application no.</span><span>Student</span><span>Class</span><span>Documents</span><span>Admission status</span><span>Submitted</span><span>Decision</span></div>{isLoading && <p className="admission-empty-state" role="status">Loading admission records…</p>}{!isLoading && !loadError && visible.length === 0 && <p className="admission-empty-state" role="status">No admission records match this view.</p>}{!isLoading && !loadError && visible.map((application) => { const isSaving = decidingId === application.id; const admissionStatus = application.status || "draft"; const documentStatus = application.documents_status || "not_uploaded"; return <div className="admin-control-row" key={application.id}><span>{application.application_number}</span><b>{application.student_name || "Applicant"}</b><span>{application.desired_class || "—"}</span><em className={`document-state ${documentStatus.replaceAll("_", "-")}`}>{admissionStatusLabel(documentStatus)}</em><em className={`admission-state ${admissionStatus.replaceAll("_", "-")}`}>{admissionStatusLabel(admissionStatus)}</em><span>{applicationDate(application.submitted_on)}</span><div className="admission-decision-actions"><button type="button" className="approve" onClick={() => decideAdmission(application, "approved")} disabled={decidingId !== null}>{isSaving ? "Saving…" : "Approve"}</button><button type="button" className="information" onClick={() => decideAdmission(application, "needs_information")} disabled={decidingId !== null}>Needs info</button><button type="button" className="reject" onClick={() => decideAdmission(application, "rejected")} disabled={decidingId !== null}>Reject</button></div></div>; })}</div></section><section className="admin-mini-card-grid">{[["▣", "Document verification", "Review uploaded records before deciding the admission"], ["✓", "Final decisions", "Approval, information requests and rejections are saved live"], ["▤", "Class allocation", "Approved students can be assigned to a class section"]].map(([icon, title, detail]) => <article key={title}><i>{icon}</i><div><h2>{title}</h2><p>{detail}</p><button onClick={() => openScreen("documents")}>{title === "Document verification" ? "Open queue →" : "View admissions →"}</button></div></article>)}</section></>;
-}
-
-function StudentManagement({ setNotice }) {
-  const [query, setQuery] = useState("");
-  const visible = useMemo(() => students.filter((entry) => entry.join(" ").toLowerCase().includes(query.toLowerCase())), [query]);
-  return <><AdminHeading eyebrow="STUDENT MANAGEMENT" title="Students" text="Manage enrolment, class sections, parent records and academic history." action={<AdminButton onClick={() => setNotice("Add student form opened.")}>＋ Add student</AdminButton>} /><section className="admin-feature-card"><div className="admin-filter-row"><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search student, ID or parent..." /><select defaultValue="All classes"><option>All classes</option><option>Class 5A</option><option>Class 5B</option></select><AdminButton outline onClick={() => setNotice("Student list exported.")}>⇩ Export</AdminButton></div><div className="admin-control-table student-control-table"><div className="admin-control-head"><span>Student</span><span>Student ID</span><span>Class</span><span>Attendance</span><span>Parent</span><span /></div>{visible.map(([initials, name, studentId, className, attendance, parent]) => <div className="admin-control-row" key={studentId}><span className="admin-person"><i>{initials}</i><b>{name}</b></span><span>{studentId}</span><span>{className}</span><span>{attendance}</span><span>{parent}</span><button onClick={() => setNotice(`${name}’s profile opened.`)}>Edit →</button></div>)}</div></section></>;
-}
-
-function TeacherManagement({ setNotice }) {
-  return <><AdminHeading eyebrow="FACULTY MANAGEMENT" title="Teachers" text="Assign subjects, classes, timetables, attendance and leave management." action={<AdminButton onClick={() => setNotice("Add teacher form opened.")}>＋ Add teacher</AdminButton>} /><section className="admin-feature-card"><div className="admin-control-table teacher-control-table"><div className="admin-control-head"><span>Teacher</span><span>Subject</span><span>Class teacher</span><span>Attendance</span><span>Status</span><span /></div>{teachers.map(([initials, name, subject, classTeacher, attendance, status]) => <div className="admin-control-row" key={name}><span className="admin-person"><i>{initials}</i><b>{name}</b></span><span>{subject}</span><span>{classTeacher}</span><span>{attendance}</span><em className={status.toLowerCase().replaceAll(" ", "-")}>{status}</em><button onClick={() => setNotice(`${name}’s faculty record opened.`)}>Manage →</button></div>)}</div></section><section className="admin-mini-card-grid">{[["▤", "Subject allocation", "Map subjects to the 74 active teachers"], ["◷", "Teacher timetable", "2 potential room conflicts detected"], ["◒", "Leave requests", "4 staff requests awaiting decision"]].map(([icon, title, detail]) => <article key={title}><i>{icon}</i><div><h2>{title}</h2><p>{detail}</p><button onClick={() => setNotice(`${title} workspace opened.`)}>Open →</button></div></article>)}</section></>;
-}
-
-function Classes({ setNotice }) { return <><AdminHeading eyebrow="ACADEMIC STRUCTURE" title="Classes & Sections" text="Configure classes, sections, class teachers and student strength." action={<AdminButton onClick={() => setNotice("Create class section form opened.")}>＋ Add section</AdminButton>} /><section className="admin-class-grid">{[["Class 2", "A · B · C", "96 students", "Mrs. Anjali Mehta"], ["Class 5", "A · B · C · D", "142 students", "Ms. Meera Kapoor"], ["Class 8", "A · B · C", "112 students", "Mr. Rahul Jain"], ["Class 10", "A · B", "74 students", "Ms. Kavita Singh"], ["Class 12", "Science · Commerce", "58 students", "Mr. Aman Verma"]].map(([className, sections, strength, teacher]) => <article key={className}><i>▤</i><span>{sections}</span><h2>{className}</h2><p>{strength}</p><b>Class teacher · {teacher}</b><button onClick={() => setNotice(`${className} section settings opened.`)}>Manage →</button></article>)}</section></>;
-}
-
-function Attendance({ setNotice }) { return <><AdminHeading eyebrow="ATTENDANCE MANAGEMENT" title="Attendance" text="Monitor student and teacher attendance with daily, monthly and absent reports." action={<AdminButton onClick={() => setNotice("Attendance report downloaded.")}>⇩ Download report</AdminButton>} /><section className="admin-attendance-grid"><article className="admin-feature-card admin-attendance-summary"><p>SCHOOL ATTENDANCE</p><div className="admin-attendance-ring"><b>93.6%</b><small>Today</small></div><ul><li><i className="present" />Students present <b>1,168</b></li><li><i className="late" />Late arrivals <b>43</b></li><li><i className="absent" />Absent <b>37</b></li></ul></article><article className="admin-feature-card admin-attendance-table"><header><div><p>ABSENT ALERTS</p><h2>Needs follow-up</h2></div><button onClick={() => setNotice("Absent parent alerts sent.")}>Send alerts →</button></header>{[["Vivaan Singh", "Class 5A", "Second day absent"], ["Aarav Sharma", "Class 7B", "Medical leave pending"], ["Riya Kapoor", "Class 3A", "Parent not informed"]].map(([name, className, detail]) => <article key={name}><i>{name.split(" ").map((word) => word[0]).join("")}</i><div><b>{name} <small>{className}</small></b><span>{detail}</span></div><button onClick={() => setNotice(`Alert sent for ${name}.`)}>Alert parent</button></article>)}</article></section></>;
-}
-
-function Fees({ setNotice }) { return <><AdminHeading eyebrow="FINANCE MANAGEMENT" title="Fees & Payments" text="Track payments, pending dues, concessions, receipts and transaction reports." action={<AdminButton onClick={() => setNotice("Fee collection report downloaded.")}>⇩ Transaction report</AdminButton>} /><section className="admin-finance-stats">{[["₹8.4L", "Fees collected", "This month"], ["₹1.26L", "Pending dues", "42 students"], ["₹48K", "Concessions", "18 students"], ["1,036", "Receipts issued", "This session"]].map(([value, title, note]) => <article key={title}><strong>{value}</strong><span>{title}</span><small>{note}</small></article>)}</section><section className="admin-feature-card fee-table"><header><div><p>PAYMENT STATUS</p><h2>Recent transactions</h2></div><button onClick={() => setNotice("Fee reminder drafted for 42 parents.")}>Draft reminders →</button></header>{[["Aarav Sharma", "Class 5A", "₹24,500", "Paid", "Today, 10:21 AM"], ["Saanvi Gupta", "Class 5A", "₹24,500", "Due", "Due 14 Jun"], ["Vivaan Singh", "Class 5A", "₹12,000", "Partially paid", "Yesterday"]].map(([name, className, amount, status, time]) => <article key={name}><b>{name}<small>{className}</small></b><strong>{amount}</strong><em className={status.toLowerCase().replaceAll(" ", "-")}>{status}</em><span>{time}</span><button onClick={() => setNotice(`Receipt opened for ${name}.`)}>Receipt →</button></article>)}</section></>;
-}
-
-function Exams({ setNotice }) { return <><AdminHeading eyebrow="ASSESSMENT MANAGEMENT" title="Exams & Results" text="Set up exams, subjects, marks, grades, report cards and publishing workflows." action={<AdminButton onClick={() => setNotice("New examination setup opened.")}>＋ Create exam</AdminButton>} /><section className="admin-mini-card-grid exam-cards">{[["Unit Test 1", "Classes 2–8", "Marks entry · 82% complete", "Publish results"], ["Mid Term Exam", "Classes 9–12", "Timetable ready", "View schedule"], ["Science Quiz", "Class 5A", "Results need review", "Review marks"]].map(([title, classes, detail, action]) => <article key={title}><i>▥</i><div><h2>{title}</h2><b>{classes}</b><p>{detail}</p><button onClick={() => setNotice(`${title} workspace opened.`)}>{action} →</button></div></article>)}</section><section className="admin-feature-card report-card-panel"><div><p>RESULT ANALYTICS</p><h2>Class performance</h2><span>Average score across all subjects</span></div><div className="result-bars">{[["Class 5A", 86], ["Class 5B", 78], ["Class 8A", 74], ["Class 10A", 81]].map(([label, value]) => <span key={label}><b>{label}</b><i><em style={{ width: `${value}%` }} /></i><strong>{value}%</strong></span>)}</div></section></>;
-}
-
-function Timetable({ setNotice }) { return <><AdminHeading eyebrow="SCHEDULE MANAGEMENT" title="Timetable" text="Manage class, teacher and room schedules with conflict detection." action={<AdminButton onClick={() => setNotice("Timetable conflict scan completed: 2 potential conflicts found.")}>Scan conflicts</AdminButton>} /><section className="admin-feature-card timetable-admin"><header><div><p>WEDNESDAY SCHEDULE</p><h2>Class & teacher allocation</h2></div><select defaultValue="All classes"><option>All classes</option><option>Class 5A</option><option>Class 5B</option></select></header>{[["08:15", "Class 5A", "Mathematics", "Meera Kapoor", "Room 204", "Clear"], ["09:10", "Class 5B", "Mathematics", "Meera Kapoor", "Room 204", "Clear"], ["10:30", "Class 4A", "Science", "Meera Kapoor", "Lab 02", "Clear"], ["10:30", "Class 4B", "Science", "Sonia Patel", "Lab 02", "Conflict"]].map(([time, className, subject, teacher, room, state]) => <article key={`${time}-${className}`}><time>{time}</time><b>{className}</b><span>{subject}</span><span>{teacher}</span><em>{room}</em><i className={state.toLowerCase()}>{state}</i><button onClick={() => setNotice(`${className} timetable slot opened.`)}>Edit →</button></article>)}</section></>;
-}
-
-function documentFileSize(sizeBytes) {
-  if (!Number.isFinite(Number(sizeBytes)) || Number(sizeBytes) <= 0) return "Size unavailable";
-  const bytes = Number(sizeBytes);
-  if (bytes < 1024 * 1024) return `${Math.max(1, Math.round(bytes / 1024))} KB`;
-  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
-}
-
-function Documents({ setNotice }) {
-  const { session } = useCognitoAuth();
-  const [reviewDocuments, setReviewDocuments] = useState([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [loadError, setLoadError] = useState("");
-  const [reviewError, setReviewError] = useState("");
-  const [downloadError, setDownloadError] = useState("");
-  const [reviewingId, setReviewingId] = useState(null);
-  const [downloadingId, setDownloadingId] = useState(null);
+  const [documents, setDocuments] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const [busyId, setBusyId] = useState(null);
 
   const loadDocuments = useCallback(async () => {
-    if (!session?.accessToken) {
-      setReviewDocuments([]);
-      setLoadError("Your admin session is unavailable. Please sign in again.");
-      setIsLoading(false);
-      return;
-    }
-
-    setIsLoading(true);
-    setLoadError("");
-    setReviewError("");
-    setDownloadError("");
+    if (!session?.accessToken) return;
+    setLoading(true);
+    setError("");
     try {
-      const documents = await getAdminDocuments(session.accessToken);
-      setReviewDocuments(Array.isArray(documents) ? documents : []);
-    } catch (error) {
-      setReviewDocuments([]);
-      setLoadError(error.message || "Documents could not be loaded.");
+      const data = await getAdminDocuments(session.accessToken);
+      setDocuments(Array.isArray(data) ? data : []);
+    } catch (reason) {
+      setError(reason.message || "Documents could not be loaded.");
     } finally {
-      setIsLoading(false);
+      setLoading(false);
     }
   }, [session?.accessToken]);
 
-  useEffect(() => {
-    loadDocuments();
-  }, [loadDocuments]);
+  useEffect(() => { void loadDocuments(); }, [loadDocuments]);
 
-  const pendingCount = reviewDocuments.filter((document) => document.status_code === "submitted").length;
-  const reviewDocument = async (document, decision) => {
-    if (!session?.accessToken || reviewingId !== null || downloadingId !== null) return;
-    const reason = decision === "reupload_required" ? "Please upload a clear, readable copy." : "";
-    setReviewError("");
-    setReviewingId(document.id);
+  async function review(document, decision) {
+    if (!session?.accessToken || busyId) return;
+    const reason = ["reupload_required", "rejected"].includes(decision)
+      ? window.prompt("Add a reason for the parent", document.reason || "")
+      : "";
+    if (reason === null) return;
+    setBusyId(document.id);
+    setError("");
     try {
-      const updatedDocument = await reviewAdminDocument(session.accessToken, document.id, decision, reason);
-      setReviewDocuments((current) => current.map((item) => (item.id === updatedDocument.id ? updatedDocument : item)));
-      setNotice(decision === "approved" ? `${document.document || document.name} approved. The parent can now see the verified status.` : `${document.document || document.name} marked for re-upload. The parent can see the reason.`);
-    } catch (error) {
-      setReviewError(error.message || "Document review could not be saved.");
+      const updated = await reviewAdminDocument(session.accessToken, document.id, decision, reason);
+      setDocuments((current) => current.map((item) => item.id === updated.id ? updated : item));
+      setNotice(`${document.document}: ${decision.replaceAll("_", " ")} saved.`);
+    } catch (reasonError) {
+      setError(reasonError.message || "Document review could not be saved.");
     } finally {
-      setReviewingId(null);
+      setBusyId(null);
     }
-  };
+  }
 
-  const downloadDocument = async (uploadedDocument) => {
-    if (!session?.accessToken || downloadingId !== null || reviewingId !== null) return;
-    setDownloadError("");
-    setDownloadingId(uploadedDocument.id);
+  async function download(document) {
+    if (!session?.accessToken || busyId) return;
+    setBusyId(document.id);
     try {
-      const { blob, fileName } = await downloadAdminDocument(session.accessToken, uploadedDocument.id, uploadedDocument.file);
-      const objectUrl = URL.createObjectURL(blob);
+      const { blob, fileName } = await downloadAdminDocument(session.accessToken, document.id, document.file);
+      const url = URL.createObjectURL(blob);
       const link = window.document.createElement("a");
-      link.href = objectUrl;
+      link.href = url;
       link.download = fileName;
-      window.document.body.appendChild(link);
       link.click();
-      link.remove();
-      window.setTimeout(() => URL.revokeObjectURL(objectUrl), 0);
-    } catch (error) {
-      setDownloadError(error.message || "Document could not be downloaded.");
+      URL.revokeObjectURL(url);
+    } catch (reason) {
+      setError(reason.message || "Document could not be downloaded.");
     } finally {
-      setDownloadingId(null);
+      setBusyId(null);
     }
-  };
+  }
 
-  return <><AdminHeading eyebrow="DOCUMENT MANAGEMENT" title="Document Verification" text="Download the file stored in the admissions database before approving it. Decisions are saved immediately for the parent to see." action={<AdminButton onClick={loadDocuments}>Refresh queue</AdminButton>} /><section className="admin-feature-card document-table" aria-busy={isLoading}><header><div><p>VERIFICATION QUEUE</p><h2>New admission documents</h2></div><span>{isLoading ? "Loading documents…" : `${pendingCount} awaiting review`}</span></header>{loadError && <div className="document-review-message error" role="alert"><span>{loadError}</span><button type="button" onClick={loadDocuments}>Try again</button></div>}{reviewError && <div className="document-review-message error" role="alert">{reviewError}</div>}{downloadError && <div className="document-review-message error" role="alert">{downloadError}</div>}{isLoading && <p className="document-empty-state" role="status">Loading uploaded documents from the database…</p>}{!isLoading && !loadError && reviewDocuments.length === 0 && <p className="document-empty-state" role="status">No admission documents have been uploaded yet.</p>}{!isLoading && !loadError && reviewDocuments.map((document) => { const isSubmitted = document.status_code === "submitted"; const isSaving = reviewingId === document.id; const isDownloading = downloadingId === document.id; return <article key={document.id}><i aria-hidden="true">▣</i><div className="document-details"><b>{document.document || document.name || "Admission document"}</b><small className="document-metadata"><span>Application: {document.application_number || "—"}</span><span>Student: {document.student || "Applicant"}</span><span>File: {document.file || "—"} · {documentFileSize(document.size_bytes)}</span></small>{document.reason && <small className="document-review-reason">Admin note: {document.reason}</small>}</div><em className={`document-status ${(document.status_code || document.status || "").toLowerCase().replaceAll("_", "-").replaceAll(" ", "-")}`}>{document.status || "Unknown"}</em><div className="document-review-actions"><button type="button" className="download" onClick={() => downloadDocument(document)} disabled={downloadingId !== null || reviewingId !== null}>{isDownloading ? "Preparing…" : "Download"}</button>{isSubmitted && <><button type="button" onClick={() => reviewDocument(document, "approved")} disabled={reviewingId !== null || downloadingId !== null}>{isSaving ? "Saving…" : "Approve"}</button><button type="button" className="request" onClick={() => reviewDocument(document, "reupload_required")} disabled={reviewingId !== null || downloadingId !== null}>{isSaving ? "Saving…" : "Request re-upload"}</button></>}</div></article>; })}</section></>;
-}
-
-function Transport({ setNotice }) { return <><AdminHeading eyebrow="OPERATIONS" title="Transport & Hostel" text="Manage routes, buses, pickup points, hostel rooms and student allocation." action={<AdminButton onClick={() => setNotice("New transport route setup opened.")}>＋ Add route</AdminButton>} /><section className="admin-operations-grid"><article className="admin-feature-card"><p>TRANSPORT</p><h2>12 active routes</h2><span>18 buses · 864 students allocated</span><div className="operation-stat"><b>96%</b><small>Average bus occupancy</small></div><button onClick={() => setNotice("Transport route allocation opened.")}>Manage routes →</button></article><article className="admin-feature-card"><p>HOSTEL</p><h2>328 residents</h2><span>14 houses · 22 rooms available</span><div className="operation-stat"><b>91%</b><small>Room occupancy</small></div><button onClick={() => setNotice("Hostel room allocation opened.")}>Manage hostel →</button></article><article className="admin-feature-card"><p>ALERTS</p><h2>3 allocation requests</h2><span>Transport changes waiting for approval</span><button onClick={() => setNotice("Transport allocation requests opened.")}>Review requests →</button></article></section></>;
-}
-
-function Parents({ setNotice }) { return <><AdminHeading eyebrow="PARENT MANAGEMENT" title="Parents" text="Manage parent accounts, communication history, meetings and feedback." action={<AdminButton onClick={() => setNotice("New parent account invitation created.")}>＋ Invite parent</AdminButton>} /><section className="admin-feature-card parent-table"><header><div><p>COMMUNICATION</p><h2>Recent parent interactions</h2></div><button onClick={() => setNotice("Parent communication report exported.")}>Export →</button></header>{[["Mrs. Sharma", "Aarav Sharma · Class 5A", "Meeting request", "Today"], ["Mr. Gupta", "Saanvi Gupta · Class 5A", "Fee query", "Yesterday"], ["Mrs. Singh", "Vivaan Singh · Class 5A", "Attendance update", "Yesterday"]].map(([parent, student, type, time]) => <article key={parent}><i>{parent.split(" ").map((word) => word[0]).join("")}</i><div><b>{parent}</b><small>{student}</small></div><em>{type}</em><span>{time}</span><button onClick={() => setNotice(`Message history for ${parent} opened.`)}>Open →</button></article>)}</section></>;
-}
-
-function Notifications({ setNotice }) { const [text, setText] = useState(""); function send(event) { event.preventDefault(); if (!text.trim()) return; setNotice("School notification sent to the selected audience."); setText(""); } return <><AdminHeading eyebrow="SCHOOL COMMUNICATION" title="Notifications" text="Send school-wide, class-wise and targeted messages through app, email or SMS." action={null} /><section className="admin-message-grid"><form className="admin-feature-card notification-compose" onSubmit={send}><h2>Create notification</h2><label>Audience<select defaultValue="All parents & teachers"><option>All parents & teachers</option><option>Class 5A parents</option><option>Teachers only</option><option>Selected students</option></select></label><label>Delivery<select defaultValue="App notification + Email"><option>App notification + Email</option><option>SMS + App notification</option><option>Email only</option></select></label><label>Message<textarea value={text} onChange={(event) => setText(event.target.value)} placeholder="Write an important school update..." /></label><AdminButton>Send notification →</AdminButton></form><article className="admin-feature-card notification-history"><header><div><p>RECENTLY SENT</p><h2>Notifications</h2></div></header>{[["Admission deadline extended", "All applicants · App + Email", "2 hours ago"], ["Class 5A science project", "Class 5A parents · App", "Yesterday"], ["Staff meeting reminder", "Teachers · App + Email", "Yesterday"]].map(([title, audience, time]) => <article key={title}><i>✉</i><div><b>{title}</b><small>{audience}</small></div><time>{time}</time></article>)}</article></section></>;
-}
-
-function Reports({ setNotice }) { return <><AdminHeading eyebrow="REPORTS & ANALYTICS" title="Reports" text="Analyze admissions, attendance, fees, results, class performance and teacher workload." action={<AdminButton onClick={() => setNotice("Custom report builder opened.")}>＋ Build report</AdminButton>} /><section className="admin-report-grid">{[["Admissions report", "Applications by class, status and source", "1,245 records"], ["Attendance report", "Daily, monthly and absentee trends", "93.6% average"], ["Fees report", "Collections, pending dues and concessions", "₹8.4L collected"], ["Results report", "Subject scores and class performance", "78.6% average"], ["Teacher workload", "Classes, periods and assignments", "74 teachers"], ["Transport report", "Routes, occupancy and allocation", "864 riders"]].map(([title, detail, value]) => <article key={title}><i>◉</i><div><h2>{title}</h2><p>{detail}</p><b>{value}</b></div><button onClick={() => setNotice(`${title} generated.`)}>Generate →</button></article>)}</section></>;
-}
-
-function AIAssistant({ setNotice }) { const [prompt, setPrompt] = useState(""); const [answer, setAnswer] = useState("I can summarize an application, assist with document checks, generate fee reminders and prepare operations reports."); const [loading, setLoading] = useState(false); async function ask(question) { const value = question.trim(); if (!value || loading) return; setLoading(true); try { setAnswer(await askSchoolAI(value, "admin")); setNotice("AI response generated."); setPrompt(""); } catch (error) { setAnswer(error.message); } finally { setLoading(false); } } return <><AdminHeading eyebrow="SHEERWOOD AI FOR ADMIN" title="AI Assistant" text="Turn school data into useful summaries, reminders and reports." action={<Link className="admin-feature-button outline" to="/ai-assistant">Open full assistant ↗</Link>} /><section className="admin-ai-layout"><aside><span>✦</span><h2>School operations, simplified.</h2><p>Use AI to speed up daily admission and academic administration.</p>{["Summarize application", "Check documents", "Draft fee reminder", "Analyze performance", "Generate report"].map((item) => <button key={item} onClick={() => ask(item)} disabled={loading}>{item} →</button>)}</aside><section className="admin-feature-card admin-ai-chat"><div><small>✦ SHEERWOOD AI</small><p>{loading ? "Thinking…" : answer}</p></div><form onSubmit={(event) => { event.preventDefault(); ask(prompt); }}><input value={prompt} onChange={(event) => setPrompt(event.target.value)} placeholder="Ask about admissions, fees or school performance..." disabled={loading} /><button className="admin-feature-button" type="submit" disabled={loading}>{loading ? "Generating…" : "Generate →"}</button></form></section></section></>;
-}
-
-function Settings({ setNotice }) { return <><AdminHeading eyebrow="SCHOOL CONFIGURATION" title="Settings" text="Manage school profile, academic session, branches, classes, subjects, fee rules and notifications." action={<AdminButton onClick={() => setNotice("All school settings saved.")}>Save settings</AdminButton>} /><section className="admin-settings-grid">{[["School profile", "Sheerwood International School · Bengaluru"], ["Academic session", "2027–28 · Active"], ["Branches & classes", "1 branch · Classes 2–12"], ["Subjects", "42 subjects configured"], ["Fee rules", "8 fee structures active"], ["Notification settings", "App, email and SMS enabled"]].map(([title, detail]) => <article key={title}><i>⚙</i><div><h2>{title}</h2><p>{detail}</p><button onClick={() => setNotice(`${title} settings opened.`)}>Configure →</button></div></article>)}</section></>;
-}
-
-function ApplicationView({ openScreen, setNotice }) { return <><AdminHeading eyebrow="ADMISSION MANAGEMENT" title="Application Details" text="Review application progress, documents and final admission decision." action={<AdminButton outline onClick={() => openScreen("admissions")}>← Back to admissions</AdminButton>} /><section className="admin-application-detail"><article className="admin-feature-card application-summary"><div className="application-avatar">AS</div><div><h2>Aadhya Sharma</h2><b>AIS/2027-28/000124</b><span>Class 2 · Academic session 2027–28</span><small>Submitted on 26 May 2027</small></div></article><article className="admin-feature-card application-timeline"><h2>Application progress</h2>{[["Submitted", "26 May 2027, 10:30 AM", "done"], ["Document Verification", "30 May 2027, 09:45 AM", "done"], ["Class Allocation", "Ready for allocation", "active"], ["Admission Decision", "Pending", "pending"]].map(([title, date, state]) => <div className={state} key={title}><i>{state === "done" ? "✓" : ""}</i><p><b>{title}</b><span>{date}</span></p></div>)}</article></section><section className="admin-decision-panel"><div><b>Final admission decision</b><span>All documents are verified. Assign a class section before approval.</span></div><div><AdminButton onClick={() => setNotice("Application approved and Class 2A allocation started.")}>Approve & allocate</AdminButton><AdminButton outline onClick={() => setNotice("Request for additional information sent.")}>Request information</AdminButton><button onClick={() => setNotice("Application marked for rejection.")}>Reject</button></div></section></>;
+  return <section className="new-admission-admin-panel">
+    <header className="new-admission-table-header"><div><p>STAGE 6 OF 7</p><h2>Document verification</h2><span>Verify required documents before approving an admission.</span></div><button type="button" onClick={loadDocuments}>↻ Refresh</button></header>
+    {error && <p className="new-admission-table-error" role="alert">{error}</p>}
+    <div className="new-admission-table-scroll"><table className="new-admission-admin-table"><thead><tr><th>Application</th><th>Student</th><th>Document</th><th>File</th><th>Status</th><th>Admin action</th></tr></thead><tbody>
+      {loading && <tr><td colSpan="6" className="new-admission-empty">Loading documents…</td></tr>}
+      {!loading && !documents.length && <tr><td colSpan="6" className="new-admission-empty">No documents have been uploaded.</td></tr>}
+      {!loading && documents.map((document) => <tr key={document.id}><td>{document.application_number}</td><td>{document.student}</td><td><b>{document.document}</b></td><td>{document.file}</td><td><StatusBadge status={document.status_code} /><small>{document.reason}</small></td><td><div className="new-admission-actions"><button type="button" onClick={() => download(document)} disabled={busyId === document.id}>Download</button><button type="button" onClick={() => review(document, "under_verification")} disabled={busyId === document.id}>Review</button><button type="button" className="approve" onClick={() => review(document, "verified")} disabled={busyId === document.id}>Verify</button><button type="button" onClick={() => review(document, "reupload_required")} disabled={busyId === document.id}>Re-upload</button><button type="button" className="reject" onClick={() => review(document, "rejected")} disabled={busyId === document.id}>Reject</button></div></td></tr>)}
+    </tbody></table></div>
+  </section>;
 }
 
 export default function AdminPortal() {
   const navigate = useNavigate();
-  const { screen = "dashboard" } = useParams();
+  const { screen = "admissions" } = useParams();
   const [notice, setNotice] = useState("");
-  const openScreen = (target) => { setNotice(""); navigate(`/admin/${target}`); };
-  const views = { dashboard: <DashboardView openScreen={openScreen} setNotice={setNotice} />, admissions: <Admissions openScreen={openScreen} setNotice={setNotice} />, students: <StudentManagement setNotice={setNotice} />, teachers: <TeacherManagement setNotice={setNotice} />, classes: <Classes setNotice={setNotice} />, attendance: <Attendance setNotice={setNotice} />, fees: <Fees setNotice={setNotice} />, exams: <Exams setNotice={setNotice} />, timetable: <Timetable setNotice={setNotice} />, documents: <Documents setNotice={setNotice} />, transport: <Transport setNotice={setNotice} />, parents: <Parents setNotice={setNotice} />, notifications: <Notifications setNotice={setNotice} />, reports: <Reports setNotice={setNotice} />, ai: <AIAssistant setNotice={setNotice} />, users: <AdminUsers setNotice={setNotice} />, settings: <Settings setNotice={setNotice} />, application: <ApplicationView openScreen={openScreen} setNotice={setNotice} /> };
-  const activeScreen = screen === "application" ? "admissions" : screen;
-  return <main className="admin-page"><Sidebar screen={activeScreen} /><section className="admin-content">{notice && <div className="admin-notice admin-global-notice" role="status">{notice}<button onClick={() => setNotice("")} aria-label="Dismiss notice">×</button></div>}{views[screen] || views.dashboard}</section></main>;
+  const currentScreen = screens.some(([, , value]) => value === screen) ? screen : "admissions";
+  const content = currentScreen === "documents"
+    ? <DocumentQueue setNotice={setNotice} />
+    : currentScreen === "users"
+      ? <AdminUsers setNotice={setNotice} />
+      : <NewAdmissionTable onOpenDocuments={() => navigate("/admin/documents")} setNotice={setNotice} />;
+
+  return <main className="admin-page"><Sidebar screen={currentScreen} /><section className="admin-content"><header className="admin-feature-heading"><div><p>ADMISSION OPERATIONS</p><h1>{currentScreen === "documents" ? "Document Verification" : currentScreen === "users" ? "Users & Roles" : "New Admission Dashboard"}</h1><small>Manage verification and admission approvals using live application data.</small></div></header>{notice && <div className="admin-notice admin-global-notice" role="status">{notice}<button onClick={() => setNotice("")} aria-label="Dismiss notice">×</button></div>}{content}</section></main>;
 }
