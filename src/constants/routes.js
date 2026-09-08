@@ -25,6 +25,10 @@ export const ROUTES = {
 
 export const API_ROUTES = {
   adminUsers: `${API_BASE_URL}/admin/users-roles`,
+  adminStudents: `${API_BASE_URL}/admin/students`,
+  adminTeachers: `${API_BASE_URL}/admin/teachers`,
+  adminClasses: `${API_BASE_URL}/admin/classes`,
+  adminAttendance: `${API_BASE_URL}/admin/attendance`,
   adminDocuments: `${API_BASE_URL}/admin/documents`,
   adminAdmissions: `${API_BASE_URL}/admin/admissions`,
   applicationDecision: (applicationId) => `${API_BASE_URL}/applications/${encodeURIComponent(applicationId)}/decision`,

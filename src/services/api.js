@@ -81,6 +81,29 @@ export async function getAdminAdmissions(accessToken) {
   return data;
 }
 
+async function getAdminData(url, accessToken, errorMessage) {
+  const response = await fetch(url, { headers: { Authorization: `Bearer ${accessToken}` } });
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(data.detail || errorMessage);
+  return data;
+}
+
+export function getAdminStudents(accessToken) {
+  return getAdminData(API_ROUTES.adminStudents, accessToken, "Students could not be loaded.");
+}
+
+export function getAdminTeachers(accessToken) {
+  return getAdminData(API_ROUTES.adminTeachers, accessToken, "Teachers could not be loaded.");
+}
+
+export function getAdminClasses(accessToken) {
+  return getAdminData(API_ROUTES.adminClasses, accessToken, "Class allocations could not be loaded.");
+}
+
+export function getAdminAttendance(accessToken) {
+  return getAdminData(API_ROUTES.adminAttendance, accessToken, "Attendance could not be loaded.");
+}
+
 export async function decideAdminAdmission(accessToken, applicationId, decision, { classSection = null, sectionAllocation = null, adminRemark = "" } = {}) {
   const response = await fetch(API_ROUTES.applicationDecision(applicationId), {
     method: "PATCH",

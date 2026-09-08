@@ -3,14 +3,17 @@ import { Link, useNavigate, useParams } from "react-router-dom";
 import { deleteAdminDocument, downloadAdminDocument, getAdminDocuments, reviewAdminDocument } from "../../services/api";
 import { useCognitoAuth } from "../../auth/useCognitoAuth";
 import AdminUsers from "./AdminUsers";
+import AdminDashboard from "./AdminDashboard";
 import NewAdmissionTable from "./NewAdmissionTable";
 import DocumentPreviewModal from "../DocumentPreviewModal";
 import "./Admin_Portal.css";
 import "./NewAdmissionTable.css";
 
 const screens = [
+  ["▦", "Dashboard", "dashboard"],
   ["▤", "Admissions", "admissions"],
-  ["▣", "Documents", "documents"],
+  ["♙", "Teachers", "teachers"],
+  ["◉", "Students", "students"],
   ["◈", "Users & Roles", "users"],
 ];
 
@@ -23,7 +26,7 @@ function Sidebar({ screen }) {
   const navigate = useNavigate();
   const { signOut } = useCognitoAuth();
   return <aside className="admin-sidebar">
-    <Link className="admin-brand" to="/admin/admissions"><span>S</span><div><strong>Sheerwood</strong><small>Admissions Admin</small></div></Link>
+    <Link className="admin-brand" to="/admin/dashboard"><span>S</span><div><strong>Sheerwood</strong><small>School Admin</small></div></Link>
     <nav aria-label="Admin portal navigation">{screens.map(([icon, label, target]) => <button className={screen === target ? "active" : ""} key={target} onClick={() => navigate(`/admin/${target}`)}><span>{icon}</span>{label}</button>)}</nav>
     <button className="admin-logout" onClick={signOut}><span>↪</span> Logout</button>
   </aside>;
@@ -160,14 +163,26 @@ function DocumentQueue({ setNotice }) {
 }
 
 export default function AdminPortal() {
-  const { screen = "admissions" } = useParams();
+  const { screen = "dashboard" } = useParams();
+  const navigate = useNavigate();
   const [notice, setNotice] = useState("");
-  const currentScreen = screens.some(([, , value]) => value === screen) ? screen : "admissions";
+  const currentScreen = screens.some(([, , value]) => value === screen) ? screen : "dashboard";
   const content = currentScreen === "documents"
     ? <DocumentQueue setNotice={setNotice} />
     : currentScreen === "users"
       ? <AdminUsers setNotice={setNotice} />
-      : <NewAdmissionTable setNotice={setNotice} />;
+      : currentScreen === "admissions"
+        ? <NewAdmissionTable setNotice={setNotice} />
+        : <AdminDashboard view={currentScreen === "dashboard" ? "overview" : currentScreen} onNavigate={(target) => navigate(`/admin/${target}`)} />;
 
-  return <main className="admin-page"><Sidebar screen={currentScreen} /><section className="admin-content"><header className="admin-feature-heading"><div><p>ADMISSION OPERATIONS</p><h1>{currentScreen === "documents" ? "Document Verification" : currentScreen === "users" ? "Users & Roles" : "New Admission Dashboard"}</h1><small>Manage verification and admission approvals using live application data.</small></div></header>{notice && <div className="admin-notice admin-global-notice" role="status">{notice}<button onClick={() => setNotice("")} aria-label="Dismiss notice">×</button></div>}{content}</section></main>;
+  const headings = {
+    dashboard: ["SCHOOL OPERATIONS", "Admin Dashboard", "Live overview of admissions, teachers, students and activity."],
+    admissions: ["ADMISSION OPERATIONS", "New Admission Dashboard", "Manage verification and admission approvals using live application data."],
+    teachers: ["SCHOOL OPERATIONS", "Teacher Dashboard", "Review staff availability, subject allocation and attendance."],
+    students: ["SCHOOL OPERATIONS", "Student Dashboard", "Review student enrollment, class allocation and attendance."],
+    users: ["ACCESS CONTROL", "Users & Roles", "Manage database users and their portal roles."],
+  };
+  const [eyebrow, heading, description] = headings[currentScreen] || headings.admissions;
+
+  return <main className="admin-page"><Sidebar screen={currentScreen} /><section className="admin-content"><header className="admin-feature-heading"><div><p>{eyebrow}</p><h1>{heading}</h1><small>{description}</small></div></header>{notice && <div className="admin-notice admin-global-notice" role="status">{notice}<button onClick={() => setNotice("")} aria-label="Dismiss notice">×</button></div>}{content}</section></main>;
 }

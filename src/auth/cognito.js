@@ -203,7 +203,7 @@ export function getDefaultRouteForRole(role) {
     parent: "/admission-details",
     student: "/student/dashboard",
     teacher: "/teacher/dashboard",
-    admin: "/admin/admissions",
+    admin: "/admin/dashboard",
     admission: "/admission-details",
   }[role] || "/dashboard";
 }
