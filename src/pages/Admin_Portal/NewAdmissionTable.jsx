@@ -1,6 +1,7 @@
 import { Fragment, useCallback, useEffect, useMemo, useState } from "react";
 import { decideAdminAdmission, getAdminAdmissions } from "../../services/api";
 import { useCognitoAuth } from "../../auth/useCognitoAuth";
+import AdmissionDetailCard from "./AdmissionDetailCard";
 import "./NewAdmissionTable.css";
 
 const statusLabels = {
@@ -44,7 +45,7 @@ export default function NewAdmissionTable({ onOpenDocuments, setNotice }) {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
   const [savingId, setSavingId] = useState(null);
-  const [openId, setOpenId] = useState(null);
+  const [selectedApplication, setSelectedApplication] = useState(null);
 
   const loadApplications = useCallback(async () => {
     if (!session?.accessToken) return;
@@ -124,7 +125,7 @@ export default function NewAdmissionTable({ onOpenDocuments, setNotice }) {
             return <Fragment key={application.id}>
               <tr key={application.id}>
                 <td><b>{application.application_number}</b></td>
-                <td>{application.student_name || "Application in progress"}</td>
+                <td><button type="button" className="new-admission-student-button" onClick={() => setSelectedApplication(application)}>{application.student_name || "Application in progress"}</button></td>
                 <td>{application.desired_class || "—"}</td>
                 <td className="new-admission-parent-cell"><b>{parentDisplayName(application.parent_name)}</b><small>Mobile: {application.parent_mobile || "Not saved"}</small></td>
                 <td>{summary.uploaded || 0}/{summary.required || 5} uploaded<br /><small>{summary.verified || 0}/{summary.required || 5} verified</small></td>
@@ -132,7 +133,7 @@ export default function NewAdmissionTable({ onOpenDocuments, setNotice }) {
                 <td><Badge value={application.status} /></td>
                 <td>{formatDate(application.submitted_on)}</td>
                 <td><div className="new-admission-actions">
-                  <button type="button" onClick={() => setOpenId(openId === application.id ? null : application.id)}>View</button>
+                  <button type="button" onClick={() => setSelectedApplication(application)}>View</button>
                   <button type="button" onClick={onOpenDocuments}>Verify documents</button>
                   <button type="button" onClick={() => addRemark(application)} disabled={isSaving}>Remark</button>
                   <button type="button" onClick={() => needsInformation(application)} disabled={isSaving}>Needs info</button>
@@ -140,11 +141,11 @@ export default function NewAdmissionTable({ onOpenDocuments, setNotice }) {
                   <button type="button" className="reject" onClick={() => updateAdmission(application, "rejected")} disabled={isSaving}>Reject</button>
                 </div></td>
               </tr>
-              {openId === application.id && <tr className="new-admission-detail"><td colSpan="9"><b>Admin remark:</b> {application.admin_remark || "No remark added."} <span><b>Re-upload reason:</b> {application.reupload_reason || "—"}</span><span><b>Verified by:</b> {application.verified_by || "—"}</span><span><b>Class / section:</b> {application.class_section || "—"} / {application.section_allocation || "—"}</span><span><b>Approved by:</b> {application.approved_by || "—"}</span></td></tr>}
             </Fragment>;
           })}
         </tbody>
       </table>
     </div>
+    <AdmissionDetailCard application={selectedApplication} onClose={() => setSelectedApplication(null)} onOpenDocuments={onOpenDocuments} />
   </section>;
 }

@@ -124,7 +124,9 @@ def admissions(_: dict = AdminUser) -> list[dict]:
         for row in rows:
             application = dict(row)
             documents = database.execute(
-                "SELECT document_key, status FROM admission_documents WHERE application_number = ?",
+                """SELECT id, document_key, file_name, content_type, size_bytes, status, reason,
+                          created_at, updated_at
+                   FROM admission_documents WHERE application_number = ?""",
                 (application["application_number"],),
             ).fetchall()
             documents_status, summary = document_summary(documents)
@@ -139,11 +141,15 @@ def admissions(_: dict = AdminUser) -> list[dict]:
             parent_name = guardian_name or saved_parent_name
             if is_cognito_subject(parent_name):
                 parent_name = "Parent details pending"
+            application.pop("application_data", None)
+            application.pop("documents_json", None)
             application.update({
                 "documents_status": documents_status,
                 "document_summary": summary,
                 "parent_name": parent_name,
                 "parent_mobile": str(guardian.get("mobile") or application_data.get("parentPhone") or ""),
+                "form_data": application_data,
+                "documents": [dict(document) for document in documents],
             })
             result.append(application)
     return result
