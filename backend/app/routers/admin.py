@@ -2,6 +2,7 @@ from datetime import UTC, datetime
 import json
 import logging
 import os
+import re
 import secrets
 
 from fastapi import APIRouter, Depends, HTTPException, Response, status
@@ -41,6 +42,11 @@ LEGACY_DOCUMENT_STATUSES = {"submitted": "uploaded", "approved": "verified"}
 
 def document_status(value: str) -> str:
     return LEGACY_DOCUMENT_STATUSES.get(value, value or "pending")
+
+
+def is_cognito_subject(value: str) -> bool:
+    """Do not show Cognito's opaque subject UUID as a parent's display name."""
+    return bool(re.fullmatch(r"[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}", value.strip(), re.IGNORECASE))
 
 
 def document_summary(rows: list[dict]) -> tuple[str, dict[str, int]]:
@@ -128,9 +134,15 @@ def admissions(_: dict = AdminUser) -> list[dict]:
                 application_data = {}
             guardians = application_data.get("guardians") if isinstance(application_data, dict) else {}
             guardian = next((details for details in guardians.values() if isinstance(details, dict) and details.get("mobile")), {}) if isinstance(guardians, dict) else {}
+            saved_parent_name = str(application.get("parent_name") or "").strip()
+            guardian_name = str(guardian.get("fullName") or "").strip()
+            parent_name = guardian_name or saved_parent_name
+            if is_cognito_subject(parent_name):
+                parent_name = "Parent details pending"
             application.update({
                 "documents_status": documents_status,
                 "document_summary": summary,
+                "parent_name": parent_name,
                 "parent_mobile": str(guardian.get("mobile") or application_data.get("parentPhone") or ""),
             })
             result.append(application)

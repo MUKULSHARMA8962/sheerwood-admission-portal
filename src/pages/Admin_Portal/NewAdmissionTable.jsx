@@ -26,6 +26,12 @@ function formatDate(value) {
   return Number.isNaN(date.getTime()) ? value : new Intl.DateTimeFormat("en-IN", { day: "2-digit", month: "short", year: "numeric" }).format(date);
 }
 
+function parentDisplayName(value) {
+  const name = String(value || "").trim();
+  const cognitoSubject = /^[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$/i;
+  return !name || cognitoSubject.test(name) ? "Parent details pending" : name;
+}
+
 function Badge({ value }) {
   const normalizedValue = value === "submitted" ? "pending" : value;
   return <span className={`new-admission-badge ${String(normalizedValue || "pending").replaceAll("_", "-")}`}>{label(normalizedValue)}</span>;
@@ -120,7 +126,7 @@ export default function NewAdmissionTable({ onOpenDocuments, setNotice }) {
                 <td><b>{application.application_number}</b></td>
                 <td>{application.student_name || "Application in progress"}</td>
                 <td>{application.desired_class || "—"}</td>
-                <td><b>{application.parent_name || "—"}</b><small>{application.parent_mobile || "No mobile saved"}</small></td>
+                <td className="new-admission-parent-cell"><b>{parentDisplayName(application.parent_name)}</b><small>Mobile: {application.parent_mobile || "Not saved"}</small></td>
                 <td>{summary.uploaded || 0}/{summary.required || 5} uploaded<br /><small>{summary.verified || 0}/{summary.required || 5} verified</small></td>
                 <td><Badge value={application.documents_status} /></td>
                 <td><Badge value={application.status} /></td>
