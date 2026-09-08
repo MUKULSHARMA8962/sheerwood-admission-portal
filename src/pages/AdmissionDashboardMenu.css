@@ -53,9 +53,16 @@
 .new-admission-dashboard-anchor { display: block; height: 1px; scroll-margin-top: 70px; }
 .admission-stage-cards { scroll-margin-top: 72px; }
 
+.new-admission-dashboard-header .account-menu { gap: 8px; }
+.new-admission-dashboard-header .account-session { color: #60776a; font-size: 10px; }
+.new-admission-dashboard-header .account-avatar { width: 34px; min-height: 34px; height: 34px; padding: 0; border: 0; color: #fff; background: #08783f; }
+.new-admission-dashboard-header .account-dropdown button { width: 100%; min-height: 0; margin-top: 5px; padding: 8px; border: 0; color: #fff; background: #08783f; }
+.new-admission-dashboard-header .account-dropdown button:hover { background: #054b2d; }
+
 @media (max-width: 700px) {
   .new-admission-dashboard-menu { padding: 0 12px; }
   .new-admission-dashboard-menu > div { gap: 1px; }
   .new-admission-dashboard-menu a { padding: 8px; font-size: 10px; }
   .new-admission-dashboard-menu button { display: none; }
+  .new-admission-dashboard-header .account-session { display: none; }
 }
