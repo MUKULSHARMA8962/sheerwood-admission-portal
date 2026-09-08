@@ -1,0 +1,44 @@
+.new-admission-live-note {
+  display: inline-flex !important;
+  align-items: center;
+  gap: 6px;
+  margin-top: 12px !important;
+  color: #34734d !important;
+  font-size: 11px !important;
+  font-weight: 800;
+}
+
+.new-admission-live-note i {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #1b9a52;
+  box-shadow: 0 0 0 4px #1b9a5222;
+}
+
+.new-admission-status-metrics {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+  padding: 0 0 22px;
+}
+
+.new-admission-status-metrics span {
+  display: grid;
+  gap: 4px;
+  padding: 11px;
+  border: 1px solid #e0ebe3;
+  border-radius: 10px;
+  background: #fbfefc;
+}
+
+.new-admission-status-metrics b { color: #173d2d; font-size: 16px; }
+.new-admission-status-metrics small { color: #718078; font-size: 10px; font-weight: 700; }
+.new-admission-status-metrics span:nth-child(1) b { color: #155f93; }
+.new-admission-status-metrics span:nth-child(2) b { color: #176b3b; }
+.new-admission-status-metrics span:nth-child(3) b { color: #a46d0b; }
+.new-admission-status-metrics span:nth-child(4) b { color: #a52d26; }
+
+@media (max-width: 700px) {
+  .new-admission-status-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}

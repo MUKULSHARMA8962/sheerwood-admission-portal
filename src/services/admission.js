@@ -98,6 +98,37 @@ export function updateAdmissionDocument(documentId, status, reason = "", file, s
   return updatedDocuments;
 }
 
+const databaseDocumentStatusLabels = {
+  uploaded: "Uploaded",
+  under_verification: "Under Verification",
+  verified: "Verified",
+  reupload_required: "Re-upload Required",
+  rejected: "Rejected",
+};
+
+// The browser cache only makes the upload screen feel immediate. The database
+// remains the source of truth so a parent sees the same document state after
+// signing in from another browser or device.
+export function syncAdmissionDocumentsFromDatabase(records = []) {
+  const recordsByKey = new Map(records.map((record) => [record.document_key, record]));
+  const documents = defaultDocuments.map((document) => {
+    const record = recordsByKey.get(document.id);
+    if (!record) return { ...document };
+
+    return {
+      ...document,
+      status: databaseDocumentStatusLabels[record.status] || readableStatus(record.status),
+      file: record.file_name || "",
+      reason: record.reason || "",
+      storageId: record.id,
+      sizeBytes: record.size_bytes,
+      contentType: record.content_type,
+    };
+  });
+  localStorage.setItem(DOCUMENTS_KEY, JSON.stringify(documents));
+  return documents;
+}
+
 export function getAdmissionData() {
   try {
     return JSON.parse(sessionStorage.getItem(APPLICATION_DATA_KEY) || "{}");
@@ -131,6 +162,31 @@ export async function uploadAdmissionDocument(accessToken, documentKey, file) {
   const result = await response.json().catch(() => ({}));
   if (!response.ok) throw new Error(result.detail || "Document could not be uploaded.");
   return result;
+}
+
+export async function getAdmissionDocumentRecords(accessToken) {
+  if (!accessToken) return [];
+
+  async function requestDocuments(applicationNumber) {
+    const response = await fetch(`${API_BASE_URL}/applications/${encodeURIComponent(applicationNumber)}/documents`, {
+      cache: "no-store",
+      headers: { Authorization: `Bearer ${accessToken}` },
+    });
+    if (response.status === 404) return null;
+    const result = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(result.detail || "Saved documents could not be loaded.");
+    return Array.isArray(result) ? result : [];
+  }
+
+  let records = await requestDocuments(getNewAdmissionId());
+  if (records) return records;
+
+  // A new browser can have a generated local ID. Resolve the parent's latest
+  // record before deciding that no documents exist.
+  const currentStatus = await getCurrentAdmissionStatus(accessToken);
+  if (!currentStatus?.application?.application_number) return [];
+  records = await requestDocuments(currentStatus.application.application_number);
+  return records || [];
 }
 
 async function requestAdmissionStatus(accessToken, path) {

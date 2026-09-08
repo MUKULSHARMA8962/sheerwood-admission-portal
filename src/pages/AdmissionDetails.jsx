@@ -62,15 +62,16 @@ function statusClassName(status) {
 }
 
 function statusIcon(status) {
-  if (status === "approved") return "✓";
-  if (status === "reupload_required") return "!";
+  if (["approved", "verified"].includes(status)) return "✓";
+  if (["reupload_required", "rejected"].includes(status)) return "!";
   return "◷";
 }
 
-function LiveApplicationStatus({ liveStatus, isLoading, error, onRefresh }) {
+function LiveApplicationStatus({ liveStatus, isLoading, error, onRefresh, onOpenDocuments, onOpenDashboard }) {
   const documents = liveStatus?.documents || [];
-  const summary = liveStatus?.document_summary || { uploaded: 0, approved: 0, pending: 0, reupload_required: 0 };
+  const summary = liveStatus?.document_summary || { required: 5, uploaded: 0, verified: 0, under_verification: 0, reupload_required: 0 };
   const applicationStatus = liveStatus?.application?.status;
+  const documentsActionLabel = summary.uploaded ? "Manage documents" : "Upload documents";
 
   return <section className="admission-form-block admission-live-status" aria-labelledby="live-status-heading">
     <header className="admission-form-block-header">
@@ -79,6 +80,7 @@ function LiveApplicationStatus({ liveStatus, isLoading, error, onRefresh }) {
         <h2 id="live-status-heading">Document verification &amp; admission approval</h2>
       </div>
       <div className="live-status-header-actions">
+        <span className="live-status-connection"><i /> LIVE</span>
         <span className={`live-application-status is-${statusClassName(applicationStatus)}`}>
           {liveStatus ? getApplicationStatusLabel(applicationStatus) : "Waiting for first save"}
         </span>
@@ -93,8 +95,8 @@ function LiveApplicationStatus({ liveStatus, isLoading, error, onRefresh }) {
       <p className="live-status-description">Status is read directly from your saved application. It refreshes automatically every 15 seconds.</p>
       <div className="live-status-summary" aria-label="Document verification summary">
         <span><b>{summary.uploaded}</b><small>Uploaded</small></span>
-        <span><b>{summary.approved}</b><small>Verified</small></span>
-        <span><b>{summary.pending}</b><small>Under review</small></span>
+        <span><b>{summary.verified}</b><small>Verified</small></span>
+        <span><b>{summary.under_verification}</b><small>Under review</small></span>
         <span><b>{summary.reupload_required}</b><small>Action needed</small></span>
       </div>
 
@@ -105,7 +107,11 @@ function LiveApplicationStatus({ liveStatus, isLoading, error, onRefresh }) {
           <span className="live-document-status">{getDocumentStatusLabel(document.status)}</span>
           {document.reason && <p><b>Admin note:</b> {document.reason}</p>}
         </article>)}
-      </div> : <p className="live-status-empty">No documents are saved in the database yet. Upload them in the Documents step to send them for verification.</p>}
+      </div> : <p className="live-status-empty">No documents are saved in the database yet. Upload them now to send them for verification.</p>}
+      <div className="live-status-actions">
+        <button type="button" className="live-status-upload" onClick={onOpenDocuments}>{documentsActionLabel} <span>→</span></button>
+        <button type="button" className="live-status-dashboard" onClick={onOpenDashboard}>New Admission Dashboard</button>
+      </div>
     </>}
   </section>;
 }
@@ -180,6 +186,17 @@ export default function AdmissionDetails() {
     }
   }
 
+  async function openDocuments() {
+    try {
+      // Create or refresh the draft first so document uploads always have an
+      // application record in the database to attach to.
+      await saveAdmissionDraft(session?.accessToken, { otpVerification, admissionDetails: form, ...form });
+      navigate("/application/documents");
+    } catch (error) {
+      setMessage(error.message || "Documents could not be opened.");
+    }
+  }
+
   function continueApplication() {
     if (form.class === "Select class") {
       setMessage("Please select the class you are applying for.");
@@ -250,7 +267,7 @@ export default function AdmissionDetails() {
                 <label>Medium<select name="medium" value={form.medium} onChange={update}><option value="English">English</option><option value="Hindi">Hindi</option><option value="Other">Other</option></select></label>
               </div>
             </section>
-            <LiveApplicationStatus liveStatus={liveStatus} isLoading={isLiveStatusLoading} error={liveStatusError} onRefresh={loadLiveStatus} />
+            <LiveApplicationStatus liveStatus={liveStatus} isLoading={isLiveStatusLoading} error={liveStatusError} onRefresh={loadLiveStatus} onOpenDocuments={openDocuments} onOpenDashboard={() => navigate("/new-user-dashboard")} />
             <div className="form-actions"><button type="button" className="save-draft" onClick={saveDraft}>Save Draft</button><button className="next-step" type="submit">Next <span>→</span></button></div>
           </form>
         </div>
