@@ -147,7 +147,14 @@ export SMTP_USE_TLS="true"
 export SMTP_USERNAME="your-smtp-username"
 export SMTP_PASSWORD="your-smtp-app-password"
 export SMTP_FROM_EMAIL="admissions@your-school.edu"
+export ADMISSION_NOTIFICATION_EMAILS="admissions@your-school.edu,principal@your-school.edu"
 ```
+
+When a parent submits an admission application, the portal sends a confirmation
+to the parent's account email and a notification to every portal user with the
+`admin` role. Use `ADMISSION_NOTIFICATION_EMAILS` for additional admissions
+recipients who do not have a portal admin account. Email delivery is best-effort:
+the application saves successfully even if the SMTP provider is temporarily unavailable.
 
 Endpoints:
 

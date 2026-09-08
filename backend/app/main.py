@@ -9,7 +9,7 @@ from typing import Annotated, Any
 
 import httpx
 from dotenv import load_dotenv
-from fastapi import Depends, FastAPI, File, Header, HTTPException, Response, UploadFile, status
+from fastapi import BackgroundTasks, Depends, FastAPI, File, Header, HTTPException, Response, UploadFile, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
@@ -19,6 +19,7 @@ load_dotenv(Path(__file__).resolve().parents[1] / ".env")
 
 from .database import connection, initialize_database
 from .dependencies import CurrentUser, require_roles
+from .notifications import send_admission_submission_notifications
 from .schemas import AdmissionDecisionRequest, CognitoTokenExchangeRequest, CreateApplicationRequest, LoginRequest, RegisterRequest, SaveApplicationDraftRequest
 from .security import hash_password, new_session_token, session_expiry, verify_password
 from .routers import admin, ai, otp, parent, teacher
@@ -354,7 +355,11 @@ def create_application(payload: CreateApplicationRequest, user: Annotated[dict[s
 
 
 @app.put("/api/applications/draft")
-def save_application_draft(payload: SaveApplicationDraftRequest, user: Annotated[dict[str, Any], Depends(require_roles("parent"))]) -> dict[str, Any]:
+def save_application_draft(
+    payload: SaveApplicationDraftRequest,
+    background_tasks: BackgroundTasks,
+    user: Annotated[dict[str, Any], Depends(require_roles("parent"))],
+) -> dict[str, Any]:
     application_data = json.dumps(payload.data, ensure_ascii=True)
     documents_json = json.dumps(payload.documents, ensure_ascii=True)
     admission_details = payload.data.get("admissionDetails")
@@ -397,6 +402,7 @@ def save_application_draft(payload: SaveApplicationDraftRequest, user: Annotated
         current_status = existing["status"] if existing else (existing_new_admission["status"] if existing_new_admission else "")
         incoming_status = "pending" if payload.status == "submitted" else payload.status
         application_status = current_status if current_status in FINAL_APPLICATION_STATUSES else incoming_status
+        notify_submission = payload.status == "submitted" and current_status in {"", "draft", "needs_information"}
         documents_status, _ = document_review_summary(database, payload.application_number)
         if existing:
             database.execute(
@@ -459,6 +465,15 @@ def save_application_draft(payload: SaveApplicationDraftRequest, user: Annotated
             ),
         )
         application = database.execute("SELECT * FROM applications WHERE id = ?", (application_id,)).fetchone()
+    if notify_submission:
+        background_tasks.add_task(
+            send_admission_submission_notifications,
+            parent_email=user["email"],
+            parent_name=user["full_name"],
+            student_name=student_name,
+            application_number=payload.application_number,
+            desired_class=desired_class,
+        )
     return dict(application)
 
 
