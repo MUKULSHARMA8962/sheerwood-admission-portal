@@ -63,6 +63,17 @@ export async function downloadAdminDocument(accessToken, documentId, fallbackFil
   return { blob: await response.blob(), fileName: fileNameMatch?.[1] || fallbackFileName };
 }
 
+export async function deleteAdminDocument(accessToken, documentId) {
+  const response = await fetch(`${API_ROUTES.adminDocuments}/${encodeURIComponent(documentId)}`, {
+    method: "DELETE",
+    headers: { Authorization: `Bearer ${accessToken}` },
+  });
+  if (!response.ok) {
+    const data = await response.json().catch(() => ({}));
+    throw new Error(data.detail || "Document could not be deleted.");
+  }
+}
+
 export async function getAdminAdmissions(accessToken) {
   const response = await fetch(API_ROUTES.adminAdmissions, { headers: { Authorization: `Bearer ${accessToken}` } });
   const data = await response.json().catch(() => ({}));

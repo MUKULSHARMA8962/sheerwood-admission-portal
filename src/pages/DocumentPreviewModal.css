@@ -71,7 +71,7 @@
   background: #fff;
 }
 
-.admission-document-modal footer > div { display: flex; gap: 8px; }
+.admission-document-modal footer > div { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; }
 .admission-document-modal footer button { min-height: 36px; padding: 0 12px; border-radius: 7px; font-size: 11px; font-weight: 800; cursor: pointer; }
 .admission-document-modal footer button:disabled { cursor: wait; opacity: .65; }
 .admission-document-download,
@@ -80,6 +80,10 @@
 .admission-document-replace:hover:not(:disabled) { background: #eff9f1; }
 .admission-document-delete { border: 1px solid #e9bdb9; color: #a52d26; background: #fff7f6; }
 .admission-document-delete:hover:not(:disabled) { background: #fee9e6; }
+.admission-document-verify { border: 1px solid #08783f; color: #fff; background: #08783f; }
+.admission-document-verify:hover:not(:disabled) { background: #054b2d; }
+.admission-document-review { border: 1px solid #b8d9ee; color: #145d94; background: #eef7fe; }
+.admission-document-review:hover:not(:disabled) { background: #dceffd; }
 
 .new-admission-document-list > header > small {
   color: #718078;

@@ -239,6 +239,45 @@ def review_document(document_id: int, payload: DocumentReviewRequest, user: dict
     return serialize_document(updated)
 
 
+@router.delete("/documents/{document_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_document(document_id: int, _: dict = AdminUser) -> Response:
+    """Remove an incorrect upload while an application is still under review."""
+    with connection() as database:
+        existing = database.execute(
+            "SELECT application_number FROM admission_documents WHERE id = ?",
+            (document_id,),
+        ).fetchone()
+        if not existing:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Document not found.")
+        application = database.execute(
+            "SELECT status FROM applications WHERE application_number = ?",
+            (existing["application_number"],),
+        ).fetchone()
+        if application and application["status"] in {"approved", "rejected"}:
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Documents cannot be deleted after a final admission decision.")
+
+        database.execute("DELETE FROM admission_documents WHERE id = ?", (document_id,))
+        all_documents = database.execute(
+            "SELECT document_key, status FROM admission_documents WHERE application_number = ?",
+            (existing["application_number"],),
+        ).fetchall()
+        document_status, _ = document_summary(all_documents)
+        updated_at = datetime.now(UTC).isoformat()
+        database.execute(
+            """UPDATE applications
+            SET documents_status = ?, verification_status = ?, reupload_reason = ''
+            WHERE application_number = ?""",
+            (document_status, document_status, existing["application_number"]),
+        )
+        database.execute(
+            """UPDATE new_admissions
+            SET documents_status = ?, verification_status = ?, reupload_reason = '', updated_at = ?
+            WHERE application_number = ?""",
+            (document_status, document_status, updated_at, existing["application_number"]),
+        )
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
 @router.get("/documents/{document_id}/download")
 def download_document(document_id: int, _: dict = AdminUser) -> Response:
     with connection() as database:
