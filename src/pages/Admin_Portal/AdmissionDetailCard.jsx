@@ -10,7 +10,15 @@ function formatDate(value) {
 
 export default function AdmissionDetailCard({ application, onClose, onApprove, onReject, saving, documentBusyId, onOpenDocument, onReviewDocument, onDeleteDocument }) {
   if (!application) return null;
+  const requiredDocuments = application.document_summary?.required || 5;
+  const verifiedDocuments = application.document_summary?.verified || 0;
+  const pendingDocuments = Math.max(requiredDocuments - verifiedDocuments, 0);
   const canApprove = application.documents_status === "documents_verified" && application.status !== "approved";
+  const approvalHint = application.status === "approved"
+    ? "This admission is already approved."
+    : canApprove
+      ? "All required documents are verified. You can approve this admission."
+      : `Approve Admission unlocks after all required documents are verified (${verifiedDocuments}/${requiredDocuments} verified, ${pendingDocuments} remaining).`;
 
   return <div className="admin-admission-detail-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}>
     <section className="admin-admission-detail-card" role="dialog" aria-modal="true" aria-labelledby="admin-admission-detail-title">
@@ -34,7 +42,7 @@ export default function AdmissionDetailCard({ application, onClose, onApprove, o
         })}</div> : <p className="admin-admission-detail-no-documents">No documents are uploaded yet.</p>}</section>
         <AdmissionStageCards application={application} documents={application.documents || []} />
       </div>
-      <footer><button type="button" className="admin-admission-detail-approve" onClick={onApprove} disabled={!canApprove || saving}>{saving ? "Saving…" : "Approve Admission"}</button><button type="button" className="admin-admission-detail-reject" onClick={onReject} disabled={saving}>Reject Application</button><button type="button" className="admin-admission-detail-close" onClick={onClose}>Close details</button></footer>
+      <footer><p className={canApprove ? "admin-admission-detail-approval-hint ready" : "admin-admission-detail-approval-hint"}>{approvalHint}</p><div><button type="button" className="admin-admission-detail-approve" onClick={onApprove} disabled={!canApprove || saving}>{saving ? "Saving…" : "Approve Admission"}</button><button type="button" className="admin-admission-detail-reject" onClick={onReject} disabled={saving}>Reject Application</button><button type="button" className="admin-admission-detail-close" onClick={onClose}>Close details</button></div></footer>
     </section>
   </div>;
 }

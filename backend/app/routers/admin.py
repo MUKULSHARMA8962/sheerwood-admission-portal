@@ -124,7 +124,7 @@ def admissions(_: dict = AdminUser) -> list[dict]:
         for row in rows:
             application = dict(row)
             documents = database.execute(
-                """SELECT id, document_key, file_name, content_type, size_bytes, status, reason,
+                """SELECT id, application_number, document_key, file_name, content_type, size_bytes, status, reason,
                           created_at, updated_at
                    FROM admission_documents WHERE application_number = ?""",
                 (application["application_number"],),
