@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { getAdminAdmissions, getAdminAttendance, getAdminClasses, getAdminStudents, getAdminTeachers } from "../../services/api";
+import { getAdminAdmissionFunnel, getAdminAdmissions, getAdminAttendance, getAdminClasses, getAdminStudents, getAdminTeachers } from "../../services/api";
 import { useCognitoAuth } from "../../auth/useCognitoAuth";
 import "./AdminDashboard.css";
 
@@ -57,6 +57,20 @@ function DashboardCard({ icon, title, description, metrics, action, onClick }) {
   </article>;
 }
 
+function AdmissionFunnelTracker({ funnel, onClick }) {
+  const oldestSubmissionLabel = funnel.oldest_submission_days === 1 ? "1 day" : `${funnel.oldest_submission_days || 0} days`;
+  return <section className="admin-admission-funnel">
+    <header><div><p>LIVE ADMISSION TRACKER</p><h2>Follow-up funnel</h2><small>Track each parent from login through application submission.</small></div><span><i /> Live</span></header>
+    <div>
+      <Metric label="Submitted / in review" value={funnel.submitted} note={`Oldest submission: ${oldestSubmissionLabel}`} />
+      <Metric label="Pending documents" value={funnel.pending_documents} note="Missing one or more required uploads" />
+      <Metric label="Pending registration fee" value={funnel.pending_registration_fee} note="Documents complete; fee not recorded" />
+      <Metric label="Login only" value={funnel.login_only} note="Parent account with no application" />
+    </div>
+    <button type="button" onClick={onClick}>Open admission dashboard <span>→</span></button>
+  </section>;
+}
+
 function AnalyticsCard({ eyebrow, title, children }) {
   return <article className="admin-dashboard-chart-card"><header><p>{eyebrow}</p><h3>{title}</h3></header>{children}</article>;
 }
@@ -107,7 +121,7 @@ function titleFor(view) {
 
 export default function AdminDashboard({ onNavigate, view = "overview" }) {
   const { session } = useCognitoAuth();
-  const [data, setData] = useState({ admissions: [], teachers: [], students: [], classes: [], attendance: {} });
+  const [data, setData] = useState({ admissions: [], funnel: {}, teachers: [], students: [], classes: [], attendance: {} });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
@@ -116,14 +130,15 @@ export default function AdminDashboard({ onNavigate, view = "overview" }) {
     setLoading(true);
     setError("");
     try {
-      const [admissions, teachers, students, classes, attendance] = await Promise.all([
+      const [admissions, funnel, teachers, students, classes, attendance] = await Promise.all([
         getAdminAdmissions(session.accessToken),
+        getAdminAdmissionFunnel(session.accessToken),
         getAdminTeachers(session.accessToken),
         getAdminStudents(session.accessToken),
         getAdminClasses(session.accessToken),
         getAdminAttendance(session.accessToken),
       ]);
-      setData({ admissions: list(admissions), teachers: list(teachers), students: list(students), classes: list(classes), attendance: attendance && typeof attendance === "object" ? attendance : {} });
+      setData({ admissions: list(admissions), funnel: funnel && typeof funnel === "object" ? funnel : {}, teachers: list(teachers), students: list(students), classes: list(classes), attendance: attendance && typeof attendance === "object" ? attendance : {} });
     } catch (reason) {
       setError(reason.message || "Dashboard data could not be loaded.");
     } finally {
@@ -135,6 +150,7 @@ export default function AdminDashboard({ onNavigate, view = "overview" }) {
 
   const analytics = useMemo(() => {
     const admissions = data.admissions;
+    const funnel = data.funnel || {};
     const teachers = data.teachers;
     const students = data.students;
     const classes = data.classes;
@@ -166,7 +182,13 @@ export default function AdminDashboard({ onNavigate, view = "overview" }) {
     const recentApplications = [...admissions].sort((a, b) => new Date(b.submitted_on || 0) - new Date(a.submitted_on || 0)).slice(0, 4);
     const recentlyVerified = admissions.flatMap((application) => list(application.documents).filter((document) => normalizedStatus(document.status) === "verified").map((document) => ({ application, document }))).slice(0, 2);
     return {
-      admissions, teachers, students, classes, attendance,
+      admissions, funnel: {
+        submitted: number(funnel.submitted),
+        oldest_submission_days: number(funnel.oldest_submission_days),
+        pending_documents: number(funnel.pending_documents),
+        pending_registration_fee: number(funnel.pending_registration_fee),
+        login_only: number(funnel.login_only),
+      }, teachers, students, classes, attendance,
       totalApplications: admissions.length,
       pendingApplications: submitted.length,
       underVerification: documentStatuses.under_verification || 0,
@@ -250,6 +272,7 @@ export default function AdminDashboard({ onNavigate, view = "overview" }) {
       <section className="admin-dashboard-focus-card"><span>{focusedConfig.icon}</span><div><p>{focusedConfig.title.toUpperCase()}</p><h3>{focusedConfig.title}</h3><small>{focusedConfig.text}</small></div><div>{focusedConfig.metrics.map((metric) => <Metric key={metric.label} {...metric} />)}</div></section>
       {focusedConfig.charts}
     </> : <>
+      <AdmissionFunnelTracker funnel={analytics.funnel} onClick={() => onNavigate("admissions")} />
       <section className="admin-dashboard-module-grid">
         <DashboardCard icon="📝" title="New Admissions" description="Application, document and approval progress" metrics={[{ label: "Total Applications", value: analytics.totalApplications }, { label: "Pending", value: analytics.pendingApplications }, { label: "Under Verification", value: analytics.underVerification }, { label: "Documents Verified", value: analytics.documentsVerified }, { label: "Approved", value: analytics.approved }, { label: "Rejected", value: analytics.rejected }]} action="View New Admission Dashboard" onClick={() => onNavigate("admissions")} />
         <DashboardCard icon="👨‍🏫" title="Teachers" description="Staff availability and academic allocation" metrics={[{ label: "Total Teachers", value: analytics.teachers.length }, { label: "Active Teachers", value: analytics.activeTeachers }, { label: "On Leave", value: analytics.onLeave }, { label: "Classes Assigned", value: analytics.classAssignments }, { label: "Subjects Assigned", value: analytics.subjectAssignments }]} action="View Teacher Dashboard" onClick={() => onNavigate("teachers")} />

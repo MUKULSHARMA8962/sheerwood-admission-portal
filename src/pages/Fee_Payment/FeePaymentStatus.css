@@ -1,0 +1,20 @@
+.fee-error {
+  padding: 10px 34px;
+  margin: 0;
+  color: #a24848;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.fee-actions button:disabled {
+  cursor: wait;
+  opacity: .7;
+}
+
+.fee-actions button:last-child:hover:not(:disabled) {
+  background: var(--fee-deep);
+}
+
+@media (max-width: 600px) {
+  .fee-error { padding-inline: 19px; }
+}

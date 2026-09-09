@@ -13,6 +13,7 @@ const statusLabels = {
   verified: "Verified",
   documents_verified: "Documents Verified",
   approved: "Approved",
+  approve_with_exception: "Approved with exception",
   needs_information: "Needs Information",
   reupload_required: "Re-upload Required",
   rejected: "Rejected",
@@ -35,9 +36,10 @@ function parentDisplayName(value) {
   return !name || cognitoSubject.test(name) ? "Parent details pending" : name;
 }
 
-function Badge({ value }) {
+function Badge({ value, exceptionalApproval = false }) {
   const normalizedValue = value === "submitted" ? "pending" : value;
-  return <span className={`new-admission-badge ${String(normalizedValue || "pending").replaceAll("_", "-")}`}>{label(normalizedValue)}</span>;
+  const displayValue = exceptionalApproval && normalizedValue === "approved" ? "approve_with_exception" : normalizedValue;
+  return <span className={`new-admission-badge ${String(normalizedValue || "pending").replaceAll("_", "-")}`}>{label(displayValue)}</span>;
 }
 
 export default function NewAdmissionTable({ setNotice }) {
@@ -104,6 +106,24 @@ export default function NewAdmissionTable({ setNotice }) {
     const sectionAllocation = window.prompt("Section allocation (for example, A)", application.section_allocation || "");
     if (sectionAllocation === null || !sectionAllocation.trim()) return;
     void updateAdmission(application, "approved", { classSection: classSection.trim(), sectionAllocation: sectionAllocation.trim() });
+  }
+
+  function approveWithException(application) {
+    const classSection = window.prompt("Class allocation", application.class_section || application.desired_class || "");
+    if (classSection === null || !classSection.trim()) return;
+    const sectionAllocation = window.prompt("Section allocation (for example, A)", application.section_allocation || "");
+    if (sectionAllocation === null || !sectionAllocation.trim()) return;
+    const adminRemark = window.prompt("Reason for exceptional approval (required)", application.approval_exception_reason || "");
+    if (adminRemark === null) return;
+    if (!adminRemark.trim()) {
+      setError("A reason is required to approve an admission with exception.");
+      return;
+    }
+    void updateAdmission(application, "approve_with_exception", {
+      classSection: classSection.trim(),
+      sectionAllocation: sectionAllocation.trim(),
+      adminRemark: adminRemark.trim(),
+    });
   }
 
   async function refreshSelectedApplication(applicationNumber) {
@@ -192,7 +212,7 @@ export default function NewAdmissionTable({ setNotice }) {
                 <td className="new-admission-parent-cell"><b>{parentDisplayName(application.parent_name)}</b><small>Mobile: {application.parent_mobile || "Not saved"}</small></td>
                 <td>{summary.uploaded || 0}/{summary.required || 5} uploaded<br /><small>{summary.verified || 0}/{summary.required || 5} verified</small></td>
                 <td><Badge value={application.documents_status} /></td>
-                <td><Badge value={application.status} /></td>
+                <td><Badge value={application.status} exceptionalApproval={Number(application.approval_exception) === 1} /></td>
                 <td>{formatDate(application.submitted_on)}</td>
                 <td><button type="button" className="new-admission-view" onClick={() => setSelectedApplication(application)}>View details</button></td>
               </tr>;
@@ -200,7 +220,7 @@ export default function NewAdmissionTable({ setNotice }) {
         </tbody>
       </table>
     </div>
-    <AdmissionDetailCard application={selectedApplication} onClose={() => setSelectedApplication(null)} onApprove={() => approve(selectedApplication)} onReject={() => updateAdmission(selectedApplication, "rejected")} saving={savingId === selectedApplication?.id} documentBusyId={documentBusyId} onOpenDocument={(document) => void openDocumentPreview(document)} onReviewDocument={(document, decision) => void reviewDocument(document, decision)} onDeleteDocument={(document) => void deleteDocument(document)} />
+    <AdmissionDetailCard application={selectedApplication} onClose={() => setSelectedApplication(null)} onApprove={() => approve(selectedApplication)} onApproveWithException={() => approveWithException(selectedApplication)} onReject={() => updateAdmission(selectedApplication, "rejected")} saving={savingId === selectedApplication?.id} documentBusyId={documentBusyId} onOpenDocument={(document) => void openDocumentPreview(document)} onReviewDocument={(document, decision) => void reviewDocument(document, decision)} onDeleteDocument={(document) => void deleteDocument(document)} />
     <DocumentPreviewModal preview={documentPreview} deleting={documentBusyId === documentPreview?.document?.id} onClose={() => setDocumentPreview(null)} onDownload={downloadPreview} onDelete={() => void deleteDocument(documentPreview?.document)} actions={[
       { label: "Mark under review", className: "admission-document-review", onClick: () => void reviewDocument(documentPreview?.document, "under_verification"), disabled: documentBusyId !== null },
       { label: "Verify", className: "admission-document-verify", onClick: () => void reviewDocument(documentPreview?.document, "verified"), disabled: documentBusyId !== null },

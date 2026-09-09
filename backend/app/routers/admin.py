@@ -1,4 +1,4 @@
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
 import json
 import logging
 import os
@@ -153,6 +153,59 @@ def admissions(_: dict = AdminUser) -> list[dict]:
             })
             result.append(application)
     return result
+
+
+@router.get("/admission-funnel")
+def admission_funnel(_: dict = AdminUser) -> dict:
+    """Return the live parent-to-submission funnel for the admin dashboard."""
+    with connection() as database:
+        applications = database.execute(
+            """SELECT a.application_number, a.parent_id, a.status, a.registration_fee_status,
+                      a.submitted_on, COALESCE(n.created_at, a.submitted_on) AS created_at
+               FROM applications a
+               LEFT JOIN new_admissions n ON n.application_number = a.application_number"""
+        ).fetchall()
+        document_rows = database.execute(
+            """SELECT application_number, COUNT(DISTINCT document_key) AS uploaded
+               FROM admission_documents
+               WHERE document_key IN (?, ?, ?, ?, ?)
+               GROUP BY application_number""",
+            tuple(REQUIRED_DOCUMENT_KEYS),
+        ).fetchall()
+        parent_rows = database.execute(
+            "SELECT id FROM users WHERE role IN ('parent', 'admission')"
+        ).fetchall()
+
+    documents_by_application = {row["application_number"]: int(row["uploaded"] or 0) for row in document_rows}
+    parent_ids_with_applications = {row["parent_id"] for row in applications if row["parent_id"] is not None}
+    active_applications = [row for row in applications if row["status"] not in {"approved", "rejected"}]
+    submitted_applications = [row for row in active_applications if row["status"] != "draft"]
+    pending_documents = [
+        row for row in active_applications
+        if documents_by_application.get(row["application_number"], 0) < len(REQUIRED_DOCUMENT_KEYS)
+    ]
+    pending_registration_fee = [
+        row for row in active_applications
+        if documents_by_application.get(row["application_number"], 0) >= len(REQUIRED_DOCUMENT_KEYS)
+        and row["registration_fee_status"] != "paid"
+    ]
+
+    def submission_age_days(row) -> int:
+        try:
+            submitted_date = date.fromisoformat(str(row["submitted_on"] or row["created_at"] or "")[:10])
+        except ValueError:
+            return 0
+        return max(0, (datetime.now(UTC).date() - submitted_date).days)
+
+    submission_ages = [submission_age_days(row) for row in submitted_applications]
+    return {
+        "submitted": len(submitted_applications),
+        "oldest_submission_days": max(submission_ages, default=0),
+        "pending_documents": len(pending_documents),
+        "pending_registration_fee": len(pending_registration_fee),
+        "login_only": sum(row["id"] not in parent_ids_with_applications for row in parent_rows),
+        "updated_at": datetime.now(UTC).isoformat(),
+    }
 
 
 @router.get("/students")

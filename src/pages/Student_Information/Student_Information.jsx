@@ -17,14 +17,25 @@ function getAcademicYearStart() {
   return new Date(new Date().getFullYear() + 1, 3, 1);
 }
 
+const ageEligibilityByClass = {
+  "Class 3": { minimumMonths: 84, label: "7 years" },
+  "Class 4": { minimumMonths: 102, label: "8½ years" },
+  "Class 5": { minimumMonths: 114, label: "9½ years" },
+  "Class 6": { minimumMonths: 126, label: "10½ years" },
+  "Class 7": { minimumMonths: 138, label: "11½ years" },
+  "Class 9": { minimumMonths: 150, label: "12½ years" },
+  "Class 11": { minimumMonths: 174, label: "14½ years" },
+};
+
 function getBirthDateGuideline(applyingClass) {
-  const classNumber = Number(applyingClass?.replace("Class ", ""));
-  if (!Number.isInteger(classNumber) || classNumber < 3 || classNumber > 11) return null;
+  const eligibility = ageEligibilityByClass[applyingClass];
+  if (!eligibility) return null;
 
   return {
-    minMonths: classNumber * 12 + 54,
-    maxMonths: classNumber * 12 + 60,
-    ageRange: `${classNumber + 4.5}–${classNumber + 5} years`,
+    // Admissions allows one or two months of flexibility below the stated
+    // minimum age, so validate against the more generous two-month margin.
+    minMonths: eligibility.minimumMonths - 2,
+    ageRange: `${eligibility.label} or above (up to 2 months below is also considered)`,
   };
 }
 
@@ -40,27 +51,27 @@ function formatDate(date) {
 }
 
 const initialForm = {
-  firstName: "Aadhya",
-  middleName: "Kumar",
-  lastName: "Sharma",
-  birthDate: "2020-01-10",
+  firstName: "",
+  middleName: "",
+  lastName: "",
+  birthDate: "",
   placeOfBirth: "",
-  gender: "Female",
-  bloodGroup: "B+",
+  gender: "",
+  bloodGroup: "",
   motherTongue: "",
-  nationality: "Indian",
+  nationality: "",
   nationalityOther: "",
   nationalityCountryId: "",
-  religion: "Hindu",
+  religion: "",
   religionOther: "",
-  category: "General",
-  sld: "No",
-  adhd: "No",
-  singleParent: "No",
+  category: "",
+  sld: "",
+  adhd: "",
+  singleParent: "",
   responsibleParent: "",
   howHeard: "",
   howHeardOther: "",
-  aadhaar: "1254 5678 9012",
+  aadhaar: "",
 };
 
 export default function StudentInformation() {
@@ -72,6 +83,8 @@ export default function StudentInformation() {
   const [photo, setPhoto] = useState("");
   const [message, setMessage] = useState("");
   const [birthDateError, setBirthDateError] = useState("");
+  const [savingDraft, setSavingDraft] = useState(false);
+  const hasEditedRef = useRef(false);
   const applyingClass = location.state?.applyingClass || sessionStorage.getItem("sheerwood-applying-class") || "";
   const birthDateGuideline = getBirthDateGuideline(applyingClass);
   const academicYearStart = getAcademicYearStart();
@@ -82,8 +95,8 @@ export default function StudentInformation() {
     if (!birthDateGuideline) return "Please select Class Applying For first, then return to validate the Date of Birth.";
 
     const ageInMonths = ageInMonthsOnDate(value, academicYearStart);
-    if (ageInMonths < birthDateGuideline.minMonths || ageInMonths > birthDateGuideline.maxMonths) {
-      return `This Date of Birth is not acceptable for ${applyingClass}.`;
+    if (ageInMonths < birthDateGuideline.minMonths) {
+      return `The student does not meet the minimum age guideline for ${applyingClass}.`;
     }
     return "";
   }
@@ -92,8 +105,20 @@ export default function StudentInformation() {
     if (photo) URL.revokeObjectURL(photo);
   }, [photo]);
 
+  useEffect(() => {
+    if (!hasEditedRef.current || !session?.accessToken) return undefined;
+    const saveTimer = window.setTimeout(() => {
+      setSavingDraft(true);
+      saveAdmissionDraft(session.accessToken, { student: form })
+        .catch((error) => setMessage(error.message || "Student details could not be saved."))
+        .finally(() => setSavingDraft(false));
+    }, 700);
+    return () => window.clearTimeout(saveTimer);
+  }, [form, session?.accessToken]);
+
   function update(event) {
     const { name, value } = event.target;
+    hasEditedRef.current = true;
     setForm((current) => ({ ...current, [name]: value }));
     if (name === "birthDate") setBirthDateError(validateBirthDate(value));
   }
@@ -134,7 +159,14 @@ export default function StudentInformation() {
       ["firstName", "First Name"],
       ["lastName", "Last Name"],
       ["placeOfBirth", "Place of Birth"],
+      ["gender", "Gender"],
+      ["bloodGroup", "Blood Group"],
       ["motherTongue", "Mother Tongue"],
+      ["nationality", "Nationality"],
+      ["category", "Category"],
+      ["sld", "Specific Learning Disability (SLD)"],
+      ["adhd", "Attention Deficit Hyperactive Disorder (ADHD)"],
+      ["singleParent", "Single Parent"],
       ["howHeard", "How did you come to know about our School?"],
     ];
     const missingField = requiredFields.find(([field]) => !form[field].trim());
@@ -174,13 +206,13 @@ export default function StudentInformation() {
   return (
     <main className="student-page">
       <header className="student-header">
-        <Link className="student-brand" to="/dashboard"><span>S</span><div><strong>Sheerwood</strong><small>International School</small></div></Link>
+        <Link className="student-brand" to="/new-user-dashboard"><span>S</span><div><strong>Sheerwood</strong><small>International School</small></div></Link>
         <AccountMenu />
       </header>
 
       <section className="student-shell">
         <div className="student-main">
-          <div className="student-title"><div><p className="student-kicker">NEW APPLICATION</p><h1>Student Information</h1><p>Tell us about the student applying for admission.</p></div><button onClick={() => navigate("/dashboard")}>← Back to dashboard</button></div>
+          <div className="student-title"><div><p className="student-kicker">NEW APPLICATION</p><h1>Student Information</h1><p>Tell us about the student applying for admission.</p><small>{savingDraft ? "Saving your changes…" : "Changes save automatically."}</small></div><button onClick={() => navigate("/new-user-dashboard")}>← Back to dashboard</button></div>
 
           <ol className="student-steps" aria-label="Application progress">
             {steps.map((step, index) => <li className={index === 2 ? "current" : index < 2 ? "complete" : ""} key={step}><span>{index < 2 ? "✓" : index + 1}</span><b>{step}</b></li>)}
@@ -196,17 +228,17 @@ export default function StudentInformation() {
               <label>Last Name <em>*</em><input name="lastName" value={form.lastName} onChange={update} required /></label>
               <label className={`birth-date-field${birthDateError ? " has-error" : ""}`}>Date of Birth <em>*</em><input name="birthDate" type="date" value={form.birthDate} onChange={update} onBlur={(event) => setBirthDateError(validateBirthDate(event.target.value))} max={getLocalDate()} required /><small className="birth-date-guideline">{birthDateGuideline ? `For ${applyingClass}: ${birthDateGuideline.ageRange} as on ${formatDate(academicYearStart)}.` : "Select Class Applying For to view the age guideline."}</small>{birthDateError && <small className="birth-date-error" role="alert">{birthDateError}</small>}</label>
               <label>Place of Birth <em>*</em><input name="placeOfBirth" value={form.placeOfBirth} onChange={update} placeholder="Enter place of birth" required /></label>
-              <label>Gender <em>*</em><select name="gender" value={form.gender} onChange={update}><option>Female</option><option>Male</option></select></label>
-              <label>Blood Group <em>*</em><select name="bloodGroup" value={form.bloodGroup} onChange={update} required><option>A+</option><option>A-</option><option>B+</option><option>B-</option><option>AB+</option><option>AB-</option><option>O+</option><option>O-</option></select></label>
+              <label>Gender <em>*</em><select name="gender" value={form.gender} onChange={update} required><option value="" disabled>Select gender</option><option>Female</option><option>Male</option></select></label>
+              <label>Blood Group <em>*</em><select name="bloodGroup" value={form.bloodGroup} onChange={update} required><option value="" disabled>Select blood group</option><option>A+</option><option>A-</option><option>B+</option><option>B-</option><option>AB+</option><option>AB-</option><option>O+</option><option>O-</option></select></label>
               <label>Mother Tongue <em>*</em><input name="motherTongue" value={form.motherTongue} onChange={update} placeholder="Enter mother tongue" required /></label>
-              <label>Nationality <em>*</em><select name="nationality" value={form.nationality} onChange={update}><option>Indian</option><option>Other</option></select></label>
+              <label>Nationality <em>*</em><select name="nationality" value={form.nationality} onChange={update} required><option value="" disabled>Select nationality</option><option>Indian</option><option>Other</option></select></label>
               {form.nationality === "Other" && <><label>Specify Nationality <em>*</em><input name="nationalityOther" value={form.nationalityOther} onChange={update} placeholder="Enter nationality" required /></label><label>Country ID / Passport Number <em>*</em><input name="nationalityCountryId" value={form.nationalityCountryId} onChange={update} placeholder="Enter country ID or passport number" required /></label></>}
-              <label>Religion<select name="religion" value={form.religion} onChange={update}><option>Hindu</option><option>Muslim</option><option>Christian</option><option>Sikh</option><option>Other</option></select></label>
+              <label>Religion<select name="religion" value={form.religion} onChange={update}><option value="">Select religion</option><option>Hindu</option><option>Muslim</option><option>Christian</option><option>Sikh</option><option>Other</option></select></label>
               {form.religion === "Other" && <label>Specify Religion <em>*</em><input name="religionOther" value={form.religionOther} onChange={update} placeholder="Enter religion" required /></label>}
-              <label>Category <em>*</em><select name="category" value={form.category} onChange={update}><option>General</option><option>SC</option><option>ST</option><option>OBC</option><option>Others</option></select></label>
-              <label>Specific Learning Disability (SLD) <em>*</em><select name="sld" value={form.sld} onChange={update}><option>No</option><option>Yes</option></select></label>
-              <label>Attention Deficit Hyperactive Disorder (ADHD) <em>*</em><select name="adhd" value={form.adhd} onChange={update}><option>No</option><option>Yes</option></select></label>
-              <label>Single Parent <em>*</em><select name="singleParent" value={form.singleParent} onChange={update}><option>No</option><option>Yes</option></select></label>
+              <label>Category <em>*</em><select name="category" value={form.category} onChange={update} required><option value="" disabled>Select category</option><option>General</option><option>SC</option><option>ST</option><option>OBC</option><option>Others</option></select></label>
+              <label>Specific Learning Disability (SLD) <em>*</em><select name="sld" value={form.sld} onChange={update} required><option value="" disabled>Select option</option><option>No</option><option>Yes</option></select></label>
+              <label>Attention Deficit Hyperactive Disorder (ADHD) <em>*</em><select name="adhd" value={form.adhd} onChange={update} required><option value="" disabled>Select option</option><option>No</option><option>Yes</option></select></label>
+              <label>Single Parent <em>*</em><select name="singleParent" value={form.singleParent} onChange={update} required><option value="" disabled>Select option</option><option>No</option><option>Yes</option></select></label>
               {form.singleParent === "Yes" && <label>Responsible Parent <em>*</em><select name="responsibleParent" value={form.responsibleParent} onChange={update} required><option value="" disabled>Select parent</option><option>Father</option><option>Mother</option></select></label>}
               <label>Aadhaar Number <em>*</em><input name="aadhaar" value={form.aadhaar} onChange={update} inputMode="numeric" pattern="[0-9 ]{12,14}" placeholder="1234 5678 9012" required /></label>
               <label>How did you come to know about our School? <em>*</em><select name="howHeard" value={form.howHeard} onChange={update} required><option value="" disabled>Select an option</option><option>Sibling Studying</option><option>Social Media</option><option>Media</option><option>Parents</option><option>Alumni</option><option>Google</option><option>Others</option></select></label>
@@ -221,7 +253,7 @@ export default function StudentInformation() {
 
         <aside className="student-help">
           <section className="student-assistant"><div><span>✦</span><p><b>Sheerwood Assistant</b><small><i /> Online</small></p></div><button onClick={() => navigate("/ai-assistant")}>Ask a question →</button></section>
-          <section className="student-help-card"><h2>Quick Help</h2><button onClick={() => setMessage("Please keep the student's Aadhaar Card, Birth Certificate issued by the Nagar Nigam/Municipal Department, and most recent mark sheet ready. The original Transfer Certificate is submitted after admission is confirmed.")}>What documents are required?</button><button onClick={() => setMessage("For Class 3, the child should be between 7.5 and 8 years old as of the academic year start date.")}>What is the age criteria for Class 3?</button><button onClick={() => setMessage("The entrance test is online, with English and Mathematics papers. Each paper is one hour.")}>How is the entrance test conducted?</button><button onClick={() => setMessage("Admissions close as and when seats are filled. Please contact the admissions team to confirm current availability.")}>When do admissions close?</button><input placeholder="Type your question..." aria-label="Ask a question" /></section>
+          <section className="student-help-card"><h2>Quick Help</h2><button onClick={() => setMessage("Please keep the student's Aadhaar Card, Birth Certificate issued by the Nagar Nigam/Municipal Department, and most recent mark sheet ready. The original Transfer Certificate is submitted after admission is confirmed.")}>What documents are required?</button><button onClick={() => setMessage("For Class 3, the child should be 7 years or above as of the academic year start date. One to two months below the stated age is also considered.")}>What is the age criteria for Class 3?</button><button onClick={() => setMessage("The entrance test is online, with English and Mathematics papers. Each paper is one hour.")}>How is the entrance test conducted?</button><button onClick={() => setMessage("Admissions close as and when seats are filled. Please contact the admissions team to confirm current availability.")}>When do admissions close?</button><input placeholder="Type your question..." aria-label="Ask a question" /></section>
         </aside>
       </section>
     </main>

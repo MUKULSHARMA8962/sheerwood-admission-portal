@@ -30,6 +30,7 @@ def main():
         from app.security import hash_password
 
         application_number = "TEST-ADM-2027-000001"
+        exception_application_number = "TEST-ADM-2027-000002"
         document_keys = ("report-card", "aadhaar-card", "birth-certificate", "passport", "national-id-card")
         document_metadata = [{"id": key, "name": key.replace("-", " ").title(), "status": "Not Uploaded", "file": ""} for key in document_keys]
         application_data = {
@@ -55,9 +56,35 @@ def main():
             parent_headers = {"Authorization": f"Bearer {parent_login['access_token']}"}
             admin_headers = {"Authorization": f"Bearer {admin_login['access_token']}"}
 
+            login_only_funnel = expect(client.get("/api/admin/admission-funnel", headers=admin_headers), 200)
+            assert login_only_funnel["login_only"] == 1
+
+            expect(client.put("/api/applications/draft", headers=parent_headers, json={"application_number": exception_application_number, "data": application_data, "documents": document_metadata, "status": "submitted"}), 200)
+            applications = expect(client.get("/api/admin/admissions", headers=admin_headers), 200)
+            exception_application = next(item for item in applications if item["application_number"] == exception_application_number)
+            expect(client.patch(f"/api/applications/{exception_application['id']}/decision", headers=admin_headers, json={"decision": "approved", "class_section": "Class 5", "section_allocation": "A"}), 409)
+            expect(client.patch(f"/api/applications/{exception_application['id']}/decision", headers=admin_headers, json={"decision": "approve_with_exception", "class_section": "Class 5", "section_allocation": "A", "admin_remark": ""}), 422)
+            expect(client.patch(f"/api/applications/{exception_application['id']}/decision", headers=admin_headers, json={"decision": "approve_with_exception", "class_section": "Class 5", "section_allocation": "A", "admin_remark": "Documents to be collected during orientation."}), 200)
+            exception_approved = expect(client.get("/api/admin/admissions", headers=admin_headers), 200)
+            exception_approved = next(item for item in exception_approved if item["application_number"] == exception_application_number)
+            assert exception_approved["status"] == "approved"
+            assert exception_approved["approval_exception"] == 1
+            assert exception_approved["approval_exception_reason"] == "Documents to be collected during orientation."
+
             expect(client.put("/api/applications/draft", headers=parent_headers, json={"application_number": application_number, "data": application_data, "documents": document_metadata, "status": "submitted"}), 200)
             for key in document_keys:
                 expect(client.post(f"/api/applications/{application_number}/documents/{key}", headers=parent_headers, files={"file": (f"{key}.pdf", b"%PDF-1.4\nworkflow test document\n", "application/pdf")}), 201)
+
+            fee_pending_funnel = expect(client.get("/api/admin/admission-funnel", headers=admin_headers), 200)
+            assert fee_pending_funnel["submitted"] == 1
+            assert fee_pending_funnel["pending_documents"] == 0
+            assert fee_pending_funnel["pending_registration_fee"] == 1
+            assert fee_pending_funnel["login_only"] == 0
+
+            fee_payment = expect(client.post(f"/api/applications/{application_number}/registration-fee", headers=parent_headers, json={"method": "UPI"}), 200)
+            assert fee_payment["registration_fee_status"] == "paid"
+            paid_funnel = expect(client.get("/api/admin/admission-funnel", headers=admin_headers), 200)
+            assert paid_funnel["pending_registration_fee"] == 0
 
             applications = expect(client.get("/api/admin/admissions", headers=admin_headers), 200)
             application = next(item for item in applications if item["application_number"] == application_number)

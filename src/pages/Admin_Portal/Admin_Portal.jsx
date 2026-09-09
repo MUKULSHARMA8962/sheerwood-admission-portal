@@ -165,6 +165,7 @@ function DocumentQueue({ setNotice }) {
 export default function AdminPortal() {
   const { screen = "dashboard" } = useParams();
   const navigate = useNavigate();
+  const { signOut } = useCognitoAuth();
   const [notice, setNotice] = useState("");
   const currentScreen = screens.some(([, , value]) => value === screen) ? screen : "dashboard";
   const content = currentScreen === "documents"
@@ -184,5 +185,5 @@ export default function AdminPortal() {
   };
   const [eyebrow, heading, description] = headings[currentScreen] || headings.admissions;
 
-  return <main className="admin-page"><Sidebar screen={currentScreen} /><section className="admin-content"><header className="admin-feature-heading"><div><p>{eyebrow}</p><h1>{heading}</h1><small>{description}</small></div></header>{notice && <div className="admin-notice admin-global-notice" role="status">{notice}<button onClick={() => setNotice("")} aria-label="Dismiss notice">×</button></div>}{content}</section></main>;
+  return <main className="admin-page"><Sidebar screen={currentScreen} /><section className="admin-content"><header className="admin-feature-heading"><div><p>{eyebrow}</p><h1>{heading}</h1><small>{description}</small></div><button type="button" className="admin-header-logout" onClick={() => void signOut()}>↪ Logout</button></header>{notice && <div className="admin-notice admin-global-notice" role="status">{notice}<button onClick={() => setNotice("")} aria-label="Dismiss notice">×</button></div>}{content}</section></main>;
 }

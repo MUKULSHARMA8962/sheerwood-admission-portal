@@ -5,6 +5,8 @@
 .admin-feature-heading p,.admin-feature-card header p,.admin-feature-card>p { margin: 0 0 7px; color: var(--admin-green); font-size: 10px; font-weight: 800; letter-spacing: 1.5px; }
 .admin-feature-heading h1 { margin: 0; color: var(--admin-ink); font: 600 clamp(29px, 3.1vw, 39px) Georgia; }
 .admin-feature-heading small { display: block; margin-top: 8px; color: var(--admin-muted); font-size: 13px; }
+.admin-header-logout { padding: 10px 13px; border: 1px solid #b6dcc1; border-radius: 7px; color: var(--admin-green); background: #fff; font-size: 10px; font-weight: 800; white-space: nowrap; cursor: pointer; }
+.admin-header-logout:hover { color: #fff; background: var(--admin-green); }
 .admin-feature-button { display: inline-block; padding: 11px 15px; border: 0; border-radius: 7px; color: #fff; background: var(--admin-green); box-shadow: 0 8px 16px #08783f2b; font-size: 10px; font-weight: 800; white-space: nowrap; cursor: pointer; }
 .admin-feature-button:hover { background: var(--admin-deep); }.admin-feature-button.outline { border: 1px solid #b6dcc1; color: var(--admin-green); background: #fff; box-shadow: none; }
 .admin-global-notice { margin: 0 0 18px; }

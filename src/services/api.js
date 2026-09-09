@@ -81,6 +81,10 @@ export async function getAdminAdmissions(accessToken) {
   return data;
 }
 
+export function getAdminAdmissionFunnel(accessToken) {
+  return getAdminData(API_ROUTES.adminAdmissionFunnel, accessToken, "Admission tracking could not be loaded.");
+}
+
 async function getAdminData(url, accessToken, errorMessage) {
   const response = await fetch(url, { headers: { Authorization: `Bearer ${accessToken}` } });
   const data = await response.json().catch(() => ({}));

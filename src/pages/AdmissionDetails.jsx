@@ -1,13 +1,11 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import {
   getAdmissionData,
-  getAdmissionDocumentLabel,
-  getAdmissionStatus,
-  getApplicationStatusLabel,
-  getDocumentStatusLabel,
-  getNewAdmissionId,
+  getCurrentAdmissionStatus,
+  getStoredAdmissionId,
   saveAdmissionDraft,
+  syncAdmissionDataFromDatabase,
 } from "../services/admission";
 import { useCognitoAuth } from "../auth/useCognitoAuth";
 import AccountMenu from "../components/AccountMenu";
@@ -34,12 +32,12 @@ function getNextAcademicSession() {
 }
 
 const nextAcademicSession = getNextAcademicSession();
-// Admissions begin at Class 5. Class 4 is only available as a student's
-// current class when they are applying for Class 5.
-const admissionClassOptions = ["Class 5", "Class 6", "Class 7", "Class 8", "Class 9", "Class 10", "Class 11"];
-const currentClassOptions = ["Class 4", ...admissionClassOptions];
+// Offer only the classes confirmed by the admissions team. Current-class
+// choices remain available for the grade a student is presently studying in.
+const admissionClassOptions = ["Class 3", "Class 4", "Class 5", "Class 6", "Class 7", "Class 9", "Class 11"];
+const currentClassOptions = ["Class 2", "Class 3", "Class 4", "Class 5", "Class 6", "Class 7", "Class 8", "Class 9", "Class 10"];
 const classOrder = currentClassOptions;
-const classRank = Object.fromEntries(classOrder.map((className, index) => [className, index + 4]));
+const classRank = Object.fromEntries(classOrder.map((className, index) => [className, index + 2]));
 
 const currentClassChoices = (selectedClass) =>
   currentClassOptions.filter((className) => selectedClass === "Select class" || classRank[className] <= classRank[selectedClass]);
@@ -57,113 +55,67 @@ const initialForm = {
   medium: "English",
 };
 
-function statusClassName(status) {
-  return String(status || "unknown").replaceAll("_", "-");
-}
-
-function statusIcon(status) {
-  if (["approved", "verified"].includes(status)) return "✓";
-  if (["reupload_required", "rejected"].includes(status)) return "!";
-  return "◷";
-}
-
-function LiveApplicationStatus({ liveStatus, isLoading, error, onRefresh, onOpenDocuments, onOpenDashboard }) {
-  const documents = liveStatus?.documents || [];
-  const summary = liveStatus?.document_summary || { required: 5, uploaded: 0, verified: 0, under_verification: 0, reupload_required: 0 };
-  const applicationStatus = liveStatus?.application?.status;
-  const documentsActionLabel = summary.uploaded ? "Manage documents" : "Upload documents";
-
-  return <section className="admission-form-block admission-live-status" aria-labelledby="live-status-heading">
-    <header className="admission-form-block-header">
-      <div>
-        <p>LIVE APPLICATION STATUS</p>
-        <h2 id="live-status-heading">Document verification &amp; admission approval</h2>
-      </div>
-      <div className="live-status-header-actions">
-        <span className="live-status-connection"><i /> LIVE</span>
-        <span className={`live-application-status is-${statusClassName(applicationStatus)}`}>
-          {liveStatus ? getApplicationStatusLabel(applicationStatus) : "Waiting for first save"}
-        </span>
-        <button type="button" onClick={onRefresh} disabled={isLoading}>{isLoading ? "Refreshing…" : "Refresh"}</button>
-      </div>
-    </header>
-
-    {error && <p className="live-status-error" role="status">{error} We will try again automatically.</p>}
-    {!liveStatus && !error && <p className="live-status-empty">{isLoading ? "Checking the latest application status…" : "Save your draft once to see real-time document and admission updates here."}</p>}
-
-    {liveStatus && <>
-      <p className="live-status-description">Status is read directly from your saved application. It refreshes automatically every 15 seconds.</p>
-      <div className="live-status-summary" aria-label="Document verification summary">
-        <span><b>{summary.uploaded}</b><small>Uploaded</small></span>
-        <span><b>{summary.verified}</b><small>Verified</small></span>
-        <span><b>{summary.under_verification}</b><small>Under review</small></span>
-        <span><b>{summary.reupload_required}</b><small>Action needed</small></span>
-      </div>
-
-      {documents.length > 0 ? <div className="live-document-list" role="list" aria-label="Uploaded document statuses">
-        {documents.map((document) => <article className={`is-${statusClassName(document.status)}`} key={document.id} role="listitem">
-          <i aria-hidden="true">{statusIcon(document.status)}</i>
-          <div className="live-document-name"><b>{getAdmissionDocumentLabel(document.document_key)}</b><small title={document.file_name}>{document.file_name}</small></div>
-          <span className="live-document-status">{getDocumentStatusLabel(document.status)}</span>
-          {document.reason && <p><b>Admin note:</b> {document.reason}</p>}
-        </article>)}
-      </div> : <p className="live-status-empty">No documents are saved in the database yet. Upload them now to send them for verification.</p>}
-      <div className="live-status-actions">
-        <button type="button" className="live-status-upload" onClick={onOpenDocuments}>{documentsActionLabel} <span>→</span></button>
-        <button type="button" className="live-status-dashboard" onClick={onOpenDashboard}>New Admission Dashboard</button>
-      </div>
-    </>}
-  </section>;
-}
-
 export default function AdmissionDetails() {
   const navigate = useNavigate();
   const { session, user } = useCognitoAuth();
   const [form, setForm] = useState(() => {
     const savedForm = { ...initialForm, ...getAdmissionData().admissionDetails };
-    // A saved Class 4 application is no longer valid after removing Class 4
-    // from the admission dropdown.
+    // Do not retain a saved selection for a class that is not currently open
+    // for admission.
     return admissionClassOptions.includes(savedForm.class)
       ? savedForm
       : { ...savedForm, class: "Select class", stream: "Select stream" };
   });
   const [message, setMessage] = useState("");
-  const applicationId = getNewAdmissionId();
-  const otpVerification = getAdmissionData().otpVerification || {
+  const [savingDraft, setSavingDraft] = useState(false);
+  const applicationId = getStoredAdmissionId();
+  const hydratedApplicationRef = useRef("");
+  const hasEditedRef = useRef(false);
+  const otpVerification = useRef(getAdmissionData().otpVerification || {
     contact: user?.email || "",
     status: "verified",
     verifiedAt: new Date().toISOString(),
-  };
-  const [liveStatus, setLiveStatus] = useState(null);
-  const [isLiveStatusLoading, setIsLiveStatusLoading] = useState(true);
-  const [liveStatusError, setLiveStatusError] = useState("");
-
-  const loadLiveStatus = useCallback(async () => {
+  }).current;
+  const syncSavedApplication = useCallback(async () => {
     if (!session?.accessToken) {
-      setIsLiveStatusLoading(false);
       return;
     }
 
-    setIsLiveStatusLoading(true);
     try {
-      const nextStatus = await getAdmissionStatus(session.accessToken, applicationId);
-      setLiveStatus(nextStatus);
-      setLiveStatusError("");
-    } catch (error) {
-      setLiveStatusError(error.message || "Live status is temporarily unavailable.");
-    } finally {
-      setIsLiveStatusLoading(false);
+      const nextStatus = await getCurrentAdmissionStatus(session.accessToken);
+      const savedApplication = nextStatus?.application;
+      const savedData = savedApplication?.form_data;
+      if (savedApplication?.application_number && savedData && hydratedApplicationRef.current !== savedApplication.application_number) {
+        syncAdmissionDataFromDatabase(savedData);
+        const savedAdmissionDetails = savedData.admissionDetails && typeof savedData.admissionDetails === "object" ? savedData.admissionDetails : {};
+        setForm((current) => ({ ...current, ...initialForm, ...savedAdmissionDetails }));
+        hydratedApplicationRef.current = savedApplication.application_number;
+      }
+    } catch {
+      // The form remains usable with locally saved values if the application
+      // cannot be restored at this point.
     }
-  }, [applicationId, session?.accessToken]);
+  }, [session?.accessToken]);
 
   useEffect(() => {
-    void loadLiveStatus();
-    const refreshTimer = window.setInterval(loadLiveStatus, 15_000);
-    return () => window.clearInterval(refreshTimer);
-  }, [loadLiveStatus]);
+    void syncSavedApplication();
+  }, [syncSavedApplication]);
+
+  useEffect(() => {
+    if (!hasEditedRef.current || !session?.accessToken) return undefined;
+    const saveTimer = window.setTimeout(() => {
+      setSavingDraft(true);
+      saveAdmissionDraft(session.accessToken, { otpVerification, admissionDetails: form, ...form })
+        .then(() => void syncSavedApplication())
+        .catch((error) => setMessage(error.message || "Admission details could not be saved."))
+        .finally(() => setSavingDraft(false));
+    }, 700);
+    return () => window.clearTimeout(saveTimer);
+  }, [form, otpVerification, session?.accessToken, syncSavedApplication]);
 
   function update(event) {
     const { name, value } = event.target;
+    hasEditedRef.current = true;
     setForm((current) => {
       const next = { ...current, [name]: value };
 
@@ -180,20 +132,9 @@ export default function AdmissionDetails() {
     try {
       await saveAdmissionDraft(session?.accessToken, { otpVerification, admissionDetails: form, ...form });
       setMessage("Your admission details have been saved as a draft.");
-      void loadLiveStatus();
+      void syncSavedApplication();
     } catch (error) {
       setMessage(error.message);
-    }
-  }
-
-  async function openDocuments() {
-    try {
-      // Create or refresh the draft first so document uploads always have an
-      // application record in the database to attach to.
-      await saveAdmissionDraft(session?.accessToken, { otpVerification, admissionDetails: form, ...form });
-      navigate("/application/documents");
-    } catch (error) {
-      setMessage(error.message || "Documents could not be opened.");
     }
   }
 
@@ -216,7 +157,7 @@ export default function AdmissionDetails() {
     }
     saveAdmissionDraft(session?.accessToken, { otpVerification, admissionDetails: form, ...form })
       .then(() => {
-        void loadLiveStatus();
+        void syncSavedApplication();
         sessionStorage.setItem("sheerwood-applying-class", form.class);
         navigate("/student-information", { state: { applyingClass: form.class, stream: form.stream } });
       })
@@ -232,7 +173,7 @@ export default function AdmissionDetails() {
 
       <section className="admission-shell">
         <div className="admission-main">
-          <div className="admission-title"><div><p className="admission-kicker">STEP 2 OF 7 · NEW APPLICATION</p><h1>Admission Details</h1><p>Tell us about the class and school background for this application.</p></div></div>
+          <div className="admission-title"><div><p className="admission-kicker">STEP 2 OF 7 · NEW APPLICATION</p><h1>Admission Details</h1><p>Tell us about the class and school background for this application.</p><small>{savingDraft ? "Saving your changes…" : "Changes save automatically."}</small></div></div>
 
           <ol className="application-steps" aria-label="Application progress">
             {steps.map(([number, label, status]) => (
@@ -252,7 +193,7 @@ export default function AdmissionDetails() {
                 <label>Class Applying For <em>*</em><select name="class" value={form.class} onChange={update} required><option value="Select class" disabled>Select class</option>{admissionClassOptions.map((className) => <option key={className} value={className}>{className}</option>)}</select></label>
                 {form.class === "Class 11" && <label>Stream <em>*</em><select name="stream" value={form.stream} onChange={update} required><option value="Select stream" disabled>Select stream</option><option value="PCMB">PCMB</option><option value="PCM">PCM</option><option value="PCB">PCB</option><option value="Commerce with Mathematics">Commerce with Mathematics</option><option value="Commerce without Mathematics">Commerce without Mathematics</option><option value="Humanities">Humanities</option></select></label>}
                 <label>Application Date<input name="date" type="date" value={form.date} readOnly /></label>
-                <label>Application ID<input value={applicationId} readOnly /></label>
+                <label>Application ID<input value={applicationId || "Assigned after first save"} readOnly /></label>
                 <label>PEN Number <small>(Personal Education Number)</small><input name="penNumber" value={form.penNumber} onChange={update} placeholder="Enter PEN number" /></label>
               </div>
             </section>
@@ -267,14 +208,13 @@ export default function AdmissionDetails() {
                 <label>Medium<select name="medium" value={form.medium} onChange={update}><option value="English">English</option><option value="Hindi">Hindi</option><option value="Other">Other</option></select></label>
               </div>
             </section>
-            <LiveApplicationStatus liveStatus={liveStatus} isLoading={isLiveStatusLoading} error={liveStatusError} onRefresh={loadLiveStatus} onOpenDocuments={openDocuments} onOpenDashboard={() => navigate("/new-user-dashboard")} />
             <div className="form-actions"><button type="button" className="save-draft" onClick={saveDraft}>Save Draft</button><button className="next-step" type="submit">Next <span>→</span></button></div>
           </form>
         </div>
 
         <aside className="admission-help">
           <section className="help-assistant"><div><span>✦</span><p><b>Sheerwood Assistant</b><small><i /> Online</small></p></div><button onClick={() => navigate("/ai-assistant")}>Ask a question →</button></section>
-          <section className="help-card"><h2>Quick Help</h2><button onClick={() => setMessage("Please keep the student's Aadhaar Card, Birth Certificate issued by the Nagar Nigam/Municipal Department, and most recent mark sheet ready. The original Transfer Certificate is submitted after admission is confirmed.")}>What documents are required?</button><button onClick={() => setMessage("For Class 3, the child should be between 7.5 and 8 years old as of the academic year start date.")}>What is the age criteria for Class 3?</button><button onClick={() => setMessage("The entrance test is online, with English and Mathematics papers. Each paper is one hour.")}>How is the entrance test conducted?</button><button onClick={() => setMessage("Admissions close as and when seats are filled. Please contact the admissions team to confirm current availability.")}>When do admissions close?</button></section>
+          <section className="help-card"><h2>Quick Help</h2><button onClick={() => setMessage("Please keep the student's Aadhaar Card, Birth Certificate issued by the Nagar Nigam/Municipal Department, and most recent mark sheet ready. The original Transfer Certificate is submitted after admission is confirmed.")}>What documents are required?</button><button onClick={() => setMessage("For Class 3, the child should be 7 years or above as of the academic year start date. One to two months below the stated age is also considered.")}>What is the age criteria for Class 3?</button><button onClick={() => setMessage("The entrance test is online, with English and Mathematics papers. Each paper is one hour.")}>How is the entrance test conducted?</button><button onClick={() => setMessage("Admissions close as and when seats are filled. Please contact the admissions team to confirm current availability.")}>When do admissions close?</button></section>
         </aside>
       </section>
     </main>

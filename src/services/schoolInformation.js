@@ -2,7 +2,7 @@ export const schoolInformationContext = `
 Official information for Sheerwood International School:
 
 Admissions and eligibility
-- Class 3 age range is 7.5 to 8 years as of the academic year start date.
+- Age eligibility as of the academic-year start date: Class 3 — 7 years or above; Class 4 — 8.5 years or above; Class 5 — 9.5 years or above; Class 6 — 10.5 years or above; Class 7 — 11.5 years or above; Class 9 — 12.5 years or above; Class 11 — 14.5 years or above. A child who is one or two months below the stated age is also considered.
 - Admissions are not offered for Classes 10 and 12. For Grades 9 and 11, eligibility is based on entrance-test and interview performance; the Class 11 stream is also considered.
 - The entrance test is online, with English and Mathematics papers. Each paper is one hour.
 - The interaction panel decides the student and parent interaction outcome.
@@ -43,8 +43,8 @@ const frequentlyAskedQuestions = [
     answer: "Admissions are not offered for Classes 10 and 12. For Grades 9 and 11, admission eligibility is based on entrance-test and interview performance. For Class 11, the selected stream is also considered.",
   },
   {
-    terms: ["class 3", "grade 3", "7.5", "8 years", "age cutoff", "age criteria", "age limit"],
-    answer: "For Class 3, the child should be between 7.5 and 8 years old as of the academic year start date.",
+    terms: ["class 3", "class 4", "class 5", "class 6", "class 7", "class 9", "class 11", "grade 3", "grade 4", "grade 5", "grade 6", "grade 7", "grade 9", "grade 11", "age cutoff", "age criteria", "age limit"],
+    answer: "As of the academic-year start date, the minimum ages are: Class 3 — 7 years; Class 4 — 8.5 years; Class 5 — 9.5 years; Class 6 — 10.5 years; Class 7 — 11.5 years; Class 9 — 12.5 years; and Class 11 — 14.5 years. A child who is one or two months below the stated age is also considered.",
   },
   {
     terms: ["entrance test", "entrance exam", "test pattern", "sample paper", "online test", "mathematics paper"],

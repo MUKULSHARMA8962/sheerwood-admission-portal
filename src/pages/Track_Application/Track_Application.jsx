@@ -1,10 +1,30 @@
+import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import "./Track_Application.css";
-import "../TrackDocuments.css";
-
-const progress = [["✓", "Submitted", "26 May 2027", "complete"], ["✓", "Under Review", "28 May 2027", "complete"], ["✓", "Document Verification", "30 May 2027", "complete"], ["4", "Admission Decision", "Pending", "pending"]];
 
 export default function TrackApplication() {
   const navigate = useNavigate();
-  return <main className="track-page"><header className="track-header"><Link className="track-brand" to="/dashboard"><span>S</span><div><strong>Sheerwood</strong><small>International School</small></div></Link><button onClick={() => navigate("/dashboard")}>← Dashboard</button></header><section className="track-shell"><div className="track-heading"><p>APPLICATION STATUS</p><h1>Track Application</h1><small>Follow each stage of your child’s admission application.</small></div><article className="track-number"><div><span>Application Number</span><strong>AIS/2027-28/000124</strong></div><small>Submitted on: 26 May 2027</small></article><ol className="track-progress">{progress.map(([icon, name, date, className]) => <li className={className} key={name}><span>{icon}</span><b>{name}</b><small>{date}</small></li>)}</ol><section className="track-document-check"><header><div><p>DOCUMENT CHECK</p><h2>4 documents approved</h2><small>One document is still needed before final approval.</small></div><button onClick={() => navigate("/application/documents")}>Upload pending document →</button></header><div><article><i>✓</i><span><b>Birth Certificate</b><small>Approved</small></span></article><article><i>✓</i><span><b>Aadhaar Card</b><small>Approved</small></span></article><article><i>✓</i><span><b>Passport Photograph</b><small>Approved</small></span></article><article><i>⇧</i><span><b>Transfer Certificate</b><small>Upload required</small></span></article></div></section><div className="track-info"><section><span>Current Status</span><strong>Document Verification</strong><p>Upload the transfer certificate; then our admissions team can review the application for approval.</p></section><button onClick={() => navigate("/ai-assistant")}>Need Help?<b>Chat with our AI Assistant →</b></button></div></section></main>;
+  const [applicationNumber, setApplicationNumber] = useState("");
+  const [submittedNumber, setSubmittedNumber] = useState("");
+  const [message, setMessage] = useState("");
+
+  function continueTracking(event) {
+    event.preventDefault();
+    const number = applicationNumber.trim().toUpperCase();
+    if (number.length < 5) {
+      setMessage("Please enter your application number.");
+      return;
+    }
+    setMessage("");
+    setSubmittedNumber(number);
+  }
+
+  return <main className="track-page">
+    <header className="track-header"><Link className="track-brand" to="/"><span>S</span><div><strong>Sheerwood</strong><small>International School</small></div></Link><button onClick={() => navigate("/login")}>Sign in</button></header>
+    <section className="track-shell">
+      <div className="track-heading"><p>APPLICATION STATUS</p><h1>Track Application</h1><small>Enter the application number from your admission form.</small></div>
+      <form className="track-form" onSubmit={continueTracking} noValidate><label htmlFor="application-number">Application Number</label><div><input id="application-number" value={applicationNumber} onChange={(event) => { setApplicationNumber(event.target.value); setSubmittedNumber(""); setMessage(""); }} placeholder="AIS/2027-28/000124" autoCapitalize="characters" autoComplete="off" autoFocus /><button type="submit">Continue →</button></div>{message && <p role="alert">{message}</p>}</form>
+      {submittedNumber && <section className="track-result" aria-live="polite"><p>APPLICATION NUMBER</p><strong>{submittedNumber}</strong><h2>Sign in to see your application</h2><small>Sign in with the same parent account to view the live status, documents, and approval updates for this application.</small><button onClick={() => navigate("/login?flow=admission&returnTo=/new-user-dashboard")}>Sign in securely →</button></section>}
+    </section>
+  </main>;
 }

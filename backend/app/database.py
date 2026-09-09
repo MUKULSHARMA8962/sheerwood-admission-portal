@@ -151,9 +151,13 @@ def initialize_database() -> None:
                 verified_by TEXT,
                 approval_date TEXT,
                 approved_by TEXT,
+                approval_exception INTEGER NOT NULL DEFAULT 0,
+                approval_exception_reason TEXT NOT NULL DEFAULT '',
                 parent_id INTEGER,
                 application_data TEXT NOT NULL DEFAULT '{}',
                 documents_json TEXT NOT NULL DEFAULT '[]',
+                registration_fee_status TEXT NOT NULL DEFAULT 'pending',
+                registration_fee_paid_at TEXT,
                 FOREIGN KEY(parent_id) REFERENCES users(id) ON DELETE SET NULL
             );
 
@@ -179,9 +183,13 @@ def initialize_database() -> None:
                 verified_by TEXT,
                 approval_date TEXT,
                 approved_by TEXT,
+                approval_exception INTEGER NOT NULL DEFAULT 0,
+                approval_exception_reason TEXT NOT NULL DEFAULT '',
                 section_allocation TEXT,
                 application_data TEXT NOT NULL DEFAULT '{}',
                 documents_json TEXT NOT NULL DEFAULT '[]',
+                registration_fee_status TEXT NOT NULL DEFAULT 'pending',
+                registration_fee_paid_at TEXT,
                 submitted_on TEXT,
                 created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
                 updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -314,6 +322,10 @@ def initialize_database() -> None:
             ("verified_by", "TEXT"),
             ("approval_date", "TEXT"),
             ("approved_by", "TEXT"),
+            ("approval_exception", "INTEGER NOT NULL DEFAULT 0"),
+            ("approval_exception_reason", "TEXT NOT NULL DEFAULT ''"),
+            ("registration_fee_status", "TEXT NOT NULL DEFAULT 'pending'"),
+            ("registration_fee_paid_at", "TEXT"),
         ):
             if column not in application_columns:
                 database.execute(f"ALTER TABLE applications ADD COLUMN {column} {definition}")
@@ -326,7 +338,11 @@ def initialize_database() -> None:
             ("verified_by", "TEXT"),
             ("approval_date", "TEXT"),
             ("approved_by", "TEXT"),
+            ("approval_exception", "INTEGER NOT NULL DEFAULT 0"),
+            ("approval_exception_reason", "TEXT NOT NULL DEFAULT ''"),
             ("section_allocation", "TEXT"),
+            ("registration_fee_status", "TEXT NOT NULL DEFAULT 'pending'"),
+            ("registration_fee_paid_at", "TEXT"),
         ):
             if column not in admission_columns:
                 database.execute(f"ALTER TABLE new_admissions ADD COLUMN {column} {definition}")
@@ -389,9 +405,13 @@ def initialize_postgres_database() -> None:
             verified_by TEXT,
             approval_date TEXT,
             approved_by TEXT,
+            approval_exception INTEGER NOT NULL DEFAULT 0,
+            approval_exception_reason TEXT NOT NULL DEFAULT '',
             parent_id BIGINT REFERENCES users(id) ON DELETE SET NULL,
             application_data TEXT NOT NULL DEFAULT '{}',
-            documents_json TEXT NOT NULL DEFAULT '[]'
+            documents_json TEXT NOT NULL DEFAULT '[]',
+            registration_fee_status TEXT NOT NULL DEFAULT 'pending',
+            registration_fee_paid_at TEXT
         )
         """,
         """
@@ -417,9 +437,13 @@ def initialize_postgres_database() -> None:
             verified_by TEXT,
             approval_date TEXT,
             approved_by TEXT,
+            approval_exception INTEGER NOT NULL DEFAULT 0,
+            approval_exception_reason TEXT NOT NULL DEFAULT '',
             section_allocation TEXT,
             application_data TEXT NOT NULL DEFAULT '{}',
             documents_json TEXT NOT NULL DEFAULT '[]',
+            registration_fee_status TEXT NOT NULL DEFAULT 'pending',
+            registration_fee_paid_at TEXT,
             submitted_on TEXT,
             created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP::text,
             updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP::text
@@ -521,6 +545,10 @@ def initialize_postgres_database() -> None:
         "ALTER TABLE applications ADD COLUMN IF NOT EXISTS verified_by TEXT",
         "ALTER TABLE applications ADD COLUMN IF NOT EXISTS approval_date TEXT",
         "ALTER TABLE applications ADD COLUMN IF NOT EXISTS approved_by TEXT",
+        "ALTER TABLE applications ADD COLUMN IF NOT EXISTS approval_exception INTEGER NOT NULL DEFAULT 0",
+        "ALTER TABLE applications ADD COLUMN IF NOT EXISTS approval_exception_reason TEXT NOT NULL DEFAULT ''",
+        "ALTER TABLE applications ADD COLUMN IF NOT EXISTS registration_fee_status TEXT NOT NULL DEFAULT 'pending'",
+        "ALTER TABLE applications ADD COLUMN IF NOT EXISTS registration_fee_paid_at TEXT",
         "ALTER TABLE new_admissions ADD COLUMN IF NOT EXISTS verification_status TEXT NOT NULL DEFAULT 'pending'",
         "ALTER TABLE new_admissions ADD COLUMN IF NOT EXISTS admin_remark TEXT NOT NULL DEFAULT ''",
         "ALTER TABLE new_admissions ADD COLUMN IF NOT EXISTS reupload_reason TEXT NOT NULL DEFAULT ''",
@@ -528,7 +556,11 @@ def initialize_postgres_database() -> None:
         "ALTER TABLE new_admissions ADD COLUMN IF NOT EXISTS verified_by TEXT",
         "ALTER TABLE new_admissions ADD COLUMN IF NOT EXISTS approval_date TEXT",
         "ALTER TABLE new_admissions ADD COLUMN IF NOT EXISTS approved_by TEXT",
+        "ALTER TABLE new_admissions ADD COLUMN IF NOT EXISTS approval_exception INTEGER NOT NULL DEFAULT 0",
+        "ALTER TABLE new_admissions ADD COLUMN IF NOT EXISTS approval_exception_reason TEXT NOT NULL DEFAULT ''",
         "ALTER TABLE new_admissions ADD COLUMN IF NOT EXISTS section_allocation TEXT",
+        "ALTER TABLE new_admissions ADD COLUMN IF NOT EXISTS registration_fee_status TEXT NOT NULL DEFAULT 'pending'",
+        "ALTER TABLE new_admissions ADD COLUMN IF NOT EXISTS registration_fee_paid_at TEXT",
         "ALTER TABLE students ADD COLUMN IF NOT EXISTS admission_id BIGINT REFERENCES new_admissions(id) ON DELETE SET NULL",
         "ALTER TABLE students ADD COLUMN IF NOT EXISTS roll_number TEXT",
         "ALTER TABLE students ADD COLUMN IF NOT EXISTS email TEXT",

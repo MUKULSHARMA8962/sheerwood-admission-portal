@@ -7,9 +7,10 @@ import { useCognitoAuth } from "../../auth/useCognitoAuth";
 
 const steps = ["OTP Verified", "Admission Details", "Student Details", "Parent Details", "Documents", "Verification", "Approval"];
 
+const emptyGuardian = { fullName: "", occupation: "", mobile: "", email: "", aadhaar: "" };
 const families = {
-  Father: { fullName: "Rajesh Sharma", occupation: "TCS", mobile: "9876543210", email: "rajesh.sharma@example.com", aadhaar: "" },
-  Mother: { fullName: "Priya Sharma", occupation: "Sheerwood Public School", mobile: "9876543211", email: "priya.sharma@example.com", aadhaar: "" },
+  Father: { ...emptyGuardian },
+  Mother: { ...emptyGuardian },
 };
 
 const fieldLabels = [["fullName", "Full Name"], ["occupation", "Occupation"], ["mobile", "Mobile Number"], ["email", "Email Address"], ["aadhaar", "Aadhaar Number"]];
@@ -21,17 +22,31 @@ export default function ParentGuardian() {
   const [family, setFamily] = useState(() => ({ ...families, ...getAdmissionData().guardians }));
   const [photos, setPhotos] = useState({ Father: "", Mother: "" });
   const [message, setMessage] = useState("");
+  const [savingDraft, setSavingDraft] = useState(false);
   const fatherUploadRef = useRef(null);
   const motherUploadRef = useRef(null);
   const photoUrlsRef = useRef(new Set());
+  const hasEditedRef = useRef(false);
   const parentTypes = location.state?.singleParent === "Yes" ? [location.state.responsibleParent] : ["Father", "Mother"];
 
   useEffect(() => () => {
     photoUrlsRef.current.forEach((url) => URL.revokeObjectURL(url));
   }, []);
 
+  useEffect(() => {
+    if (!hasEditedRef.current || !session?.accessToken) return undefined;
+    const saveTimer = window.setTimeout(() => {
+      setSavingDraft(true);
+      saveAdmissionDraft(session.accessToken, { guardians: family })
+        .catch((error) => setMessage(error.message || "Parent details could not be saved."))
+        .finally(() => setSavingDraft(false));
+    }, 700);
+    return () => window.clearTimeout(saveTimer);
+  }, [family, session?.accessToken]);
+
   function update(event, parentType) {
     const { name, value } = event.target;
+    hasEditedRef.current = true;
     setFamily((details) => ({ ...details, [parentType]: { ...details[parentType], [name]: value } }));
   }
 
@@ -114,13 +129,13 @@ export default function ParentGuardian() {
   return (
     <main className="guardian-page">
       <header className="guardian-header">
-        <Link className="guardian-brand" to="/dashboard"><span>S</span><div><strong>Sheerwood</strong><small>International School</small></div></Link>
+        <Link className="guardian-brand" to="/new-user-dashboard"><span>S</span><div><strong>Sheerwood</strong><small>International School</small></div></Link>
         <AccountMenu />
       </header>
 
       <section className="guardian-shell">
         <div className="guardian-main">
-          <div className="guardian-title"><div><p className="guardian-kicker">NEW APPLICATION</p><h1>Parent Information</h1><p>Please provide the parent contact details for the student.</p></div><button onClick={() => navigate("/dashboard")}>← Back to dashboard</button></div>
+          <div className="guardian-title"><div><p className="guardian-kicker">NEW APPLICATION</p><h1>Parent Information</h1><p>Please provide the parent contact details for the student.</p><small>{savingDraft ? "Saving your changes…" : "Changes save automatically."}</small></div><button onClick={() => navigate("/new-user-dashboard")}>← Back to dashboard</button></div>
 
           <ol className="guardian-steps" aria-label="Application progress">
             {steps.map((step, index) => <li className={index === 3 ? "current" : index < 3 ? "complete" : ""} key={step}><span>{index < 3 ? "✓" : index + 1}</span><b>{step}</b></li>)}

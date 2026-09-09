@@ -62,6 +62,12 @@ export function getNewAdmissionId() {
   return applicationId;
 }
 
+// Reading an application must never create one.  A new number is assigned only
+// when a parent starts saving an admission draft.
+export function getStoredAdmissionId() {
+  return String(localStorage.getItem(APPLICATION_ID_KEY) || "").trim();
+}
+
 export function setNewAdmissionId(applicationNumber) {
   const normalizedApplicationNumber = String(applicationNumber || "").trim();
   if (!normalizedApplicationNumber) return "";
@@ -137,6 +143,12 @@ export function getAdmissionData() {
   }
 }
 
+export function syncAdmissionDataFromDatabase(data = {}) {
+  const savedData = data && typeof data === "object" ? data : {};
+  sessionStorage.setItem(APPLICATION_DATA_KEY, JSON.stringify(savedData));
+  return savedData;
+}
+
 export async function saveAdmissionDraft(accessToken, data, status = "draft") {
   const mergedData = { ...getAdmissionData(), ...data };
   sessionStorage.setItem(APPLICATION_DATA_KEY, JSON.stringify(mergedData));
@@ -147,6 +159,18 @@ export async function saveAdmissionDraft(accessToken, data, status = "draft") {
   });
   const result = await response.json().catch(() => ({}));
   if (!response.ok) throw new Error(result.detail || "Application could not be saved.");
+  return result;
+}
+
+export async function recordRegistrationFeePayment(accessToken, applicationNumber, method) {
+  if (!accessToken || !applicationNumber) throw new Error("Please save the application before paying the registration fee.");
+  const response = await fetch(`${API_BASE_URL}/applications/${encodeURIComponent(applicationNumber)}/registration-fee`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Authorization: `Bearer ${accessToken}` },
+    body: JSON.stringify({ method }),
+  });
+  const result = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(result.detail || "Registration fee could not be recorded.");
   return result;
 }
 
@@ -178,14 +202,17 @@ export async function getAdmissionDocumentRecords(accessToken) {
     return Array.isArray(result) ? result : [];
   }
 
-  let records = await requestDocuments(getNewAdmissionId());
-  if (records) return records;
+  const storedApplicationNumber = getStoredAdmissionId();
+  if (storedApplicationNumber) {
+    const records = await requestDocuments(storedApplicationNumber);
+    if (records) return records;
+  }
 
   // A new browser can have a generated local ID. Resolve the parent's latest
   // record before deciding that no documents exist.
   const currentStatus = await getCurrentAdmissionStatus(accessToken);
   if (!currentStatus?.application?.application_number) return [];
-  records = await requestDocuments(currentStatus.application.application_number);
+  const records = await requestDocuments(currentStatus.application.application_number);
   return records || [];
 }
 
@@ -243,8 +270,9 @@ export async function getCurrentAdmissionStatus(accessToken) {
   return result;
 }
 
-export async function getAdmissionStatus(accessToken, applicationNumber = getNewAdmissionId()) {
-  if (!accessToken || !applicationNumber) return null;
+export async function getAdmissionStatus(accessToken, applicationNumber = getStoredAdmissionId()) {
+  if (!accessToken) return null;
+  if (!applicationNumber) return getCurrentAdmissionStatus(accessToken);
 
   const result = await requestAdmissionStatus(accessToken, `/applications/${encodeURIComponent(applicationNumber)}/status`);
   if (result) {

@@ -8,17 +8,24 @@ function formatDate(value) {
   return Number.isNaN(date.getTime()) ? String(value) : new Intl.DateTimeFormat("en-IN", { day: "2-digit", month: "short", year: "numeric" }).format(date);
 }
 
-export default function AdmissionDetailCard({ application, onClose, onApprove, onReject, saving, documentBusyId, onOpenDocument, onReviewDocument, onDeleteDocument }) {
+export default function AdmissionDetailCard({ application, onClose, onApprove, onApproveWithException, onReject, saving, documentBusyId, onOpenDocument, onReviewDocument, onDeleteDocument }) {
   if (!application) return null;
   const requiredDocuments = application.document_summary?.required || 5;
   const verifiedDocuments = application.document_summary?.verified || 0;
   const pendingDocuments = Math.max(requiredDocuments - verifiedDocuments, 0);
-  const canApprove = application.documents_status === "documents_verified" && application.status !== "approved";
-  const approvalHint = application.status === "approved"
-    ? "This admission is already approved."
+  const isFinal = ["approved", "rejected"].includes(application.status);
+  const isExceptionalApproval = Number(application.approval_exception) === 1;
+  const canApprove = application.documents_status === "documents_verified" && !isFinal;
+  const canApproveWithException = !isFinal && !canApprove;
+  const approvalHint = isExceptionalApproval
+    ? `Approved with exception. Reason: ${application.approval_exception_reason || application.admin_remark || "Not recorded"}.`
+    : application.status === "approved"
+      ? "This admission is already approved."
+      : application.status === "rejected"
+        ? "This admission has been rejected."
     : canApprove
       ? "All required documents are verified. You can approve this admission."
-      : `Approve Admission unlocks after all required documents are verified (${verifiedDocuments}/${requiredDocuments} verified, ${pendingDocuments} remaining).`;
+      : `Approve Admission unlocks after all required documents are verified (${verifiedDocuments}/${requiredDocuments} verified, ${pendingDocuments} remaining). An exception requires a recorded reason.`;
 
   return <div className="admin-admission-detail-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}>
     <section className="admin-admission-detail-card" role="dialog" aria-modal="true" aria-labelledby="admin-admission-detail-title">
@@ -31,7 +38,7 @@ export default function AdmissionDetailCard({ application, onClose, onApprove, o
         <div><small>Parent</small><b>{application.parent_name || "Parent details pending"}</b><span>{application.parent_mobile || "Mobile not saved"}</span></div>
         <div><small>Documents</small><b>{application.document_summary?.uploaded || 0}/{application.document_summary?.required || 5} uploaded</b><span>{application.document_summary?.verified || 0}/{application.document_summary?.required || 5} verified</span></div>
         <div><small>Verification</small><b>{getApplicationStatusLabel(application.documents_status)}</b><span>{application.verification_date ? formatDate(application.verification_date) : "Awaiting review"}</span></div>
-        <div><small>Application date</small><b>{formatDate(application.submitted_on)}</b><span>{application.admin_remark || "No admin remark"}</span></div>
+        <div><small>{isExceptionalApproval ? "Exception reason" : "Application date"}</small><b>{isExceptionalApproval ? "Approved with exception" : formatDate(application.submitted_on)}</b><span>{isExceptionalApproval ? application.approval_exception_reason || application.admin_remark || "Not recorded" : application.admin_remark || "No admin remark"}</span></div>
       </section>
 
       <div className="admin-admission-detail-body">
@@ -42,7 +49,7 @@ export default function AdmissionDetailCard({ application, onClose, onApprove, o
         })}</div> : <p className="admin-admission-detail-no-documents">No documents are uploaded yet.</p>}</section>
         <AdmissionStageCards application={application} documents={application.documents || []} />
       </div>
-      <footer><p className={canApprove ? "admin-admission-detail-approval-hint ready" : "admin-admission-detail-approval-hint"}>{approvalHint}</p><div><button type="button" className="admin-admission-detail-approve" onClick={onApprove} disabled={!canApprove || saving}>{saving ? "Saving…" : "Approve Admission"}</button><button type="button" className="admin-admission-detail-reject" onClick={onReject} disabled={saving}>Reject Application</button><button type="button" className="admin-admission-detail-close" onClick={onClose}>Close details</button></div></footer>
+      <footer><p className={canApprove || isExceptionalApproval ? "admin-admission-detail-approval-hint ready" : "admin-admission-detail-approval-hint"}>{approvalHint}</p><div><button type="button" className="admin-admission-detail-approve" onClick={onApprove} disabled={!canApprove || saving}>{saving ? "Saving…" : "Approve Admission"}</button>{canApproveWithException && <button type="button" className="admin-admission-detail-exception" onClick={onApproveWithException} disabled={saving}>{saving ? "Saving…" : "Approve with exception"}</button>}<button type="button" className="admin-admission-detail-reject" onClick={onReject} disabled={isFinal || saving}>Reject Application</button><button type="button" className="admin-admission-detail-close" onClick={onClose}>Close details</button></div></footer>
     </section>
   </div>;
 }

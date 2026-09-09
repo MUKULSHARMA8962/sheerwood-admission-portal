@@ -24,7 +24,7 @@ class CognitoTokenExchangeRequest(BaseModel):
 
 
 class AdmissionDecisionRequest(BaseModel):
-    decision: Literal["approved", "rejected", "needs_information", "remark"]
+    decision: Literal["approved", "approve_with_exception", "rejected", "needs_information", "remark"]
     class_section: str | None = Field(default=None, max_length=30)
     section_allocation: str | None = Field(default=None, max_length=30)
     admin_remark: str = Field(default="", max_length=1000)
@@ -45,6 +45,10 @@ class SaveApplicationDraftRequest(BaseModel):
     data: dict[str, Any] = Field(default_factory=dict)
     documents: list[dict[str, Any]] = Field(default_factory=list)
     status: Literal["draft", "submitted"] = "draft"
+
+
+class RegistrationFeePaymentRequest(BaseModel):
+    method: str = Field(min_length=2, max_length=80)
 
 
 class CreateUserRequest(BaseModel):

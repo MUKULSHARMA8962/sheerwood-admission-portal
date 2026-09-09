@@ -20,7 +20,7 @@ load_dotenv(Path(__file__).resolve().parents[1] / ".env")
 from .database import connection, initialize_database
 from .dependencies import CurrentUser, require_roles
 from .notifications import send_admission_submission_notifications
-from .schemas import AdmissionDecisionRequest, CognitoTokenExchangeRequest, CreateApplicationRequest, LoginRequest, RegisterRequest, SaveApplicationDraftRequest
+from .schemas import AdmissionDecisionRequest, CognitoTokenExchangeRequest, CreateApplicationRequest, LoginRequest, RegisterRequest, RegistrationFeePaymentRequest, SaveApplicationDraftRequest
 from .security import hash_password, new_session_token, session_expiry, verify_password
 from .routers import admin, ai, otp, parent, teacher
 
@@ -148,7 +148,7 @@ def safe_upload_filename(filename: str | None, content_type: str) -> str:
 
 def owned_application(database: Any, application_number: str, parent_id: int) -> Any:
     application = database.execute(
-        "SELECT id, status FROM applications WHERE application_number = ? AND parent_id = ?",
+        "SELECT id, status, registration_fee_status, registration_fee_paid_at FROM applications WHERE application_number = ? AND parent_id = ?",
         (application_number, parent_id),
     ).fetchone()
     if not application:
@@ -162,6 +162,7 @@ def parent_admission_status_payload(database: Any, application_number: str, pare
         """SELECT application_number, student_name, parent_name, desired_class, status,
                   documents_status, verification_status, admin_remark, reupload_reason,
                   verification_date, verified_by, approval_date, approved_by,
+                  registration_fee_status, registration_fee_paid_at,
                   submitted_on, class_section, section_allocation, application_data
            FROM applications WHERE application_number = ? AND parent_id = ?""",
         (application_number, parent_id),
@@ -354,6 +355,61 @@ def create_application(payload: CreateApplicationRequest, user: Annotated[dict[s
     return dict(application)
 
 
+@app.post("/api/applications/{application_number}/registration-fee")
+def record_registration_fee_payment(
+    application_number: str,
+    payload: RegistrationFeePaymentRequest,
+    background_tasks: BackgroundTasks,
+    user: Annotated[dict[str, Any], Depends(require_roles("parent"))],
+) -> dict[str, Any]:
+    """Record the completed registration-fee step for the portal payment flow."""
+    paid_at = datetime.now(UTC).isoformat()
+    with connection() as database:
+        application = owned_application(database, application_number, user["id"])
+        if application["status"] in FINAL_APPLICATION_STATUSES:
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="This admission already has a final decision.")
+        if application["registration_fee_status"] == "paid":
+            return {
+                "application_number": application_number,
+                "registration_fee_status": "paid",
+                "registration_fee_paid_at": application["registration_fee_paid_at"],
+                "method": payload.method,
+            }
+        _, document_counts = document_review_summary(database, application_number)
+        if document_counts["uploaded"] < document_counts["required"]:
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Upload all required documents before paying the registration fee.")
+
+        database.execute(
+            """UPDATE applications
+            SET registration_fee_status = 'paid', registration_fee_paid_at = ?,
+                status = CASE WHEN status = 'draft' THEN 'pending' ELSE status END
+            WHERE application_number = ? AND parent_id = ?""",
+            (paid_at, application_number, user["id"]),
+        )
+        database.execute(
+            """UPDATE new_admissions
+            SET registration_fee_status = 'paid', registration_fee_paid_at = ?,
+                status = CASE WHEN status = 'draft' THEN 'pending' ELSE status END,
+                updated_at = ?
+            WHERE application_number = ? AND parent_id = ?""",
+            (paid_at, paid_at, application_number, user["id"]),
+        )
+        saved_application = database.execute(
+            "SELECT student_name, desired_class FROM applications WHERE application_number = ? AND parent_id = ?",
+            (application_number, user["id"]),
+        ).fetchone()
+
+    background_tasks.add_task(
+        send_admission_submission_notifications,
+        parent_email=user["email"],
+        parent_name=user["full_name"],
+        student_name=saved_application["student_name"],
+        application_number=application_number,
+        desired_class=saved_application["desired_class"],
+    )
+    return {"application_number": application_number, "registration_fee_status": "paid", "registration_fee_paid_at": paid_at, "method": payload.method}
+
+
 @app.put("/api/applications/draft")
 def save_application_draft(
     payload: SaveApplicationDraftRequest,
@@ -379,7 +435,7 @@ def save_application_draft(
     saved_on = datetime.now(UTC).date().isoformat()
     with connection() as database:
         existing = database.execute(
-            "SELECT id, status, documents_status FROM applications WHERE application_number = ? AND parent_id = ?",
+            "SELECT id, status, documents_status, registration_fee_status FROM applications WHERE application_number = ? AND parent_id = ?",
             (payload.application_number, user["id"]),
         ).fetchone()
         if not existing:
@@ -390,7 +446,7 @@ def save_application_draft(
             if conflicting_application:
                 raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="This application number belongs to another parent.")
         existing_new_admission = database.execute(
-            "SELECT parent_id, status, documents_status FROM new_admissions WHERE application_number = ?",
+            "SELECT parent_id, status, documents_status, registration_fee_status FROM new_admissions WHERE application_number = ?",
             (payload.application_number,),
         ).fetchone()
         if existing_new_admission and existing_new_admission["parent_id"] != user["id"]:
@@ -401,7 +457,8 @@ def save_application_draft(
         # uploads in admission_documents, never from browser-only preview data.
         current_status = existing["status"] if existing else (existing_new_admission["status"] if existing_new_admission else "")
         incoming_status = "pending" if payload.status == "submitted" else payload.status
-        application_status = current_status if current_status in FINAL_APPLICATION_STATUSES else incoming_status
+        fee_is_paid = (existing and existing["registration_fee_status"] == "paid") or (existing_new_admission and existing_new_admission["registration_fee_status"] == "paid")
+        application_status = current_status if current_status in FINAL_APPLICATION_STATUSES or fee_is_paid else incoming_status
         notify_submission = payload.status == "submitted" and current_status in {"", "draft", "needs_information"}
         documents_status, _ = document_review_summary(database, payload.application_number)
         if existing:
@@ -683,30 +740,39 @@ def decide_application(application_id: int, payload: AdmissionDecisionRequest, u
         if not application:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Application not found.")
         documents_status, _ = document_review_summary(database, application["application_number"])
+        is_exceptional_approval = payload.decision == "approve_with_exception"
+        if application["status"] in FINAL_APPLICATION_STATUSES:
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="This admission already has a final decision.")
         if payload.decision == "approved" and documents_status != "documents_verified":
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
                 detail="Approve Admission is available only after all required documents are verified.",
             )
-        next_status = application["status"] if payload.decision == "remark" else payload.decision
+        if is_exceptional_approval and documents_status == "documents_verified":
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Use Approve Admission when all required documents are verified.")
+        exception_reason = payload.admin_remark.strip()
+        if is_exceptional_approval and not exception_reason:
+            raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="A reason is required to approve with exception.")
+        next_status = application["status"] if payload.decision == "remark" else "approved" if is_exceptional_approval else payload.decision
         updated_at = datetime.now(UTC).isoformat()
-        approval_date = updated_at if payload.decision == "approved" else application["approval_date"]
-        approved_by = user["full_name"] if payload.decision == "approved" else application["approved_by"]
-        admin_remark = payload.admin_remark.strip() or application["admin_remark"]
+        approval_date = updated_at if payload.decision in {"approved", "approve_with_exception"} else application["approval_date"]
+        approved_by = user["full_name"] if payload.decision in {"approved", "approve_with_exception"} else application["approved_by"]
+        admin_remark = application["admin_remark"] if is_exceptional_approval else payload.admin_remark.strip() or application["admin_remark"]
         database.execute(
             """UPDATE applications
             SET status = ?, documents_status = ?, class_section = COALESCE(?, class_section),
                 section_allocation = COALESCE(?, section_allocation), admin_remark = ?,
-                approval_date = ?, approved_by = ?
+                approval_date = ?, approved_by = ?, approval_exception = ?, approval_exception_reason = ?
             WHERE id = ?""",
-            (next_status, documents_status, payload.class_section, payload.section_allocation, admin_remark, approval_date, approved_by, application_id),
+            (next_status, documents_status, payload.class_section, payload.section_allocation, admin_remark, approval_date, approved_by, int(is_exceptional_approval), exception_reason if is_exceptional_approval else "", application_id),
         )
         database.execute(
             """UPDATE new_admissions
             SET status = ?, documents_status = ?, section_allocation = COALESCE(?, section_allocation),
-                admin_remark = ?, approval_date = ?, approved_by = ?, updated_at = ?
+                admin_remark = ?, approval_date = ?, approved_by = ?, approval_exception = ?,
+                approval_exception_reason = ?, updated_at = ?
             WHERE application_number = ?""",
-            (next_status, documents_status, payload.section_allocation, admin_remark, approval_date, approved_by, updated_at, application["application_number"]),
+            (next_status, documents_status, payload.section_allocation, admin_remark, approval_date, approved_by, int(is_exceptional_approval), exception_reason if is_exceptional_approval else "", updated_at, application["application_number"]),
         )
         updated = database.execute("SELECT * FROM applications WHERE id = ?", (application_id,)).fetchone()
     return dict(updated)

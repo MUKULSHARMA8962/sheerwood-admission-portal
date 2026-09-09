@@ -42,7 +42,8 @@ export default function Login() {
           {error && <p className="auth-configuration-message" role="alert">{error}</p>}
           <section className="demo-access"><div><span>SECURE COGNITO SIGN-IN</span><small>Roles are assigned from your Cognito account after sign-in.</small></div></section>
           <button className="signin" type="submit" disabled={!isConfigured}>Continue with Cognito →</button>
-          {!admissionFlow && <><div className="or"><span>or</span></div><button className="track" type="button" onClick={() => navigate("/track-application")}>Track application without login</button><small className="new">New parent? <Link to="/register">Create an account in Cognito</Link><br />Already applied? Use your school account above.</small></>}
+          {!admissionFlow && <><div className="or"><span>or</span></div><button className="track" type="button" onClick={() => navigate("/track-application")}>Track application without login</button></>}
+          {!admissionFlow && <small className="new">New parent? <Link to="/register">Create an account in Cognito</Link><br />Already applied? Use your school account above.</small>}
         </form>
       </section>
     </main>
