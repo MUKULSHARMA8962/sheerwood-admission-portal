@@ -395,10 +395,18 @@ def record_registration_fee_payment(
             (paid_at, paid_at, application_number, user["id"]),
         )
         saved_application = database.execute(
-            "SELECT student_name, desired_class FROM applications WHERE application_number = ? AND parent_id = ?",
+            "SELECT student_name, desired_class, application_data, documents_json FROM applications WHERE application_number = ? AND parent_id = ?",
             (application_number, user["id"]),
         ).fetchone()
 
+    try:
+        saved_application_data = json.loads(saved_application["application_data"] or "{}")
+    except (TypeError, json.JSONDecodeError):
+        saved_application_data = {}
+    try:
+        saved_documents = json.loads(saved_application["documents_json"] or "[]")
+    except (TypeError, json.JSONDecodeError):
+        saved_documents = []
     background_tasks.add_task(
         send_admission_submission_notifications,
         parent_email=user["email"],
@@ -406,6 +414,8 @@ def record_registration_fee_payment(
         student_name=saved_application["student_name"],
         application_number=application_number,
         desired_class=saved_application["desired_class"],
+        application_data=saved_application_data if isinstance(saved_application_data, dict) else {},
+        documents=saved_documents if isinstance(saved_documents, list) else [],
     )
     return {"application_number": application_number, "registration_fee_status": "paid", "registration_fee_paid_at": paid_at, "method": payload.method}
 
@@ -530,6 +540,8 @@ def save_application_draft(
             student_name=student_name,
             application_number=payload.application_number,
             desired_class=desired_class,
+            application_data=payload.data,
+            documents=payload.documents,
         )
     return dict(application)
 

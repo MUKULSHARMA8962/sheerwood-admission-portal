@@ -6,14 +6,12 @@ import hashlib
 import hmac
 import os
 import secrets
-import smtplib
-import ssl
 from datetime import UTC, datetime, timedelta
-from email.message import EmailMessage
 
 import boto3
 
 from .database import connection
+from .email_service import send_email
 
 OTP_EXPIRY_SECONDS = max(60, int(os.getenv("OTP_EXPIRY_SECONDS", "300")))
 OTP_RESEND_SECONDS = max(30, int(os.getenv("OTP_RESEND_SECONDS", "60")))
@@ -80,35 +78,13 @@ def send_otp(phone_number: str, otp: str) -> None:
 
 
 def send_email_otp(email: str, otp: str) -> None:
-    """Deliver an OTP over SMTP without logging the email address or code."""
-    host = os.getenv("SMTP_HOST")
-    sender = os.getenv("SMTP_FROM_EMAIL")
-    if not host or not sender:
-        raise OTPConfigurationError("SMTP_HOST and SMTP_FROM_EMAIL must be configured on the server.")
-
-    message = EmailMessage()
-    message["Subject"] = "Your Sheerwood verification code"
-    message["From"] = sender
-    message["To"] = email
-    message.set_content(
-        f"Your Sheerwood verification code is {otp}. It is valid for 5 minutes. Do not share this code."
-    )
-
+    """Deliver an OTP through AWS SES without logging the email address or code."""
     try:
-        port = int(os.getenv("SMTP_PORT", "587"))
-        username = os.getenv("SMTP_USERNAME")
-        password = os.getenv("SMTP_PASSWORD")
-        use_tls = os.getenv("SMTP_USE_TLS", "true").lower() in {"1", "true", "yes"}
-        with smtplib.SMTP(host, port, timeout=10) as smtp:
-            if use_tls:
-                smtp.starttls(context=ssl.create_default_context())
-            if username:
-                if not password:
-                    raise OTPConfigurationError("SMTP_PASSWORD must be configured when SMTP_USERNAME is set.")
-                smtp.login(username, password)
-            smtp.send_message(message)
-    except OTPConfigurationError:
-        raise
+        send_email(
+            recipient=email,
+            subject="Your Sheerwood verification code",
+            body=f"Your Sheerwood verification code is {otp}. It is valid for 5 minutes. Do not share this code.",
+        )
     except Exception as error:
         raise OTPDeliveryError("Unable to send the email OTP right now. Please try again shortly.") from error
 
