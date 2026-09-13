@@ -92,15 +92,14 @@ def main():
                 "parent_email": "parent.workflow@test.example",
                 "child_name": "Test Student",
                 "child_dob": "2017-04-10",
-                "otp": "123456",
             }), 201)
             assert consent["status"] == "active"
-            assert consent["otp_verified"] is True
+            assert consent["otp_verified"] is False
             with connection() as database:
                 consent_event = database.execute("SELECT consent_id, status, otp_verified, consent_text_version FROM consent_events WHERE application_number = ?", (application_number,)).fetchone()
             assert consent_event["consent_id"] == consent["consent_id"]
             assert consent_event["status"] == "active"
-            assert consent_event["otp_verified"] == 1
+            assert consent_event["otp_verified"] == 0
             assert consent_event["consent_text_version"] == "v1.0"
 
             fee_payment = expect(client.post(f"/api/applications/{application_number}/registration-fee", headers=parent_headers, json={"method": "UPI"}), 200)

@@ -1,5 +1,4 @@
 import { useEffect, useState } from "react";
-import { requestMobileOtp } from "../services/api";
 import "./ParentalConsentModal.css";
 
 const consentAcknowledgements = [
@@ -29,10 +28,6 @@ export default function ParentalConsentModal({ applicationData, isConfirming, on
   const schoolWebsite = window.location.origin;
   const [details, setDetails] = useState(() => initialConsentDetails(applicationData));
   const [acknowledgements, setAcknowledgements] = useState(() => consentAcknowledgements.map(() => false));
-  const [otp, setOtp] = useState("");
-  const [hasRequestedOtp, setHasRequestedOtp] = useState(false);
-  const [otpMessage, setOtpMessage] = useState("");
-  const [isSendingOtp, setIsSendingOtp] = useState(false);
   const [error, setError] = useState("");
 
   useEffect(() => {
@@ -49,14 +44,11 @@ export default function ParentalConsentModal({ applicationData, isConfirming, on
     && details.parentMobile.trim()
     && details.parentEmail.trim()
     && details.childName.trim()
-    && details.childDob
-    && hasRequestedOtp
-    && /^\d{6}$/.test(otp);
+    && details.childDob;
 
   function updateDetail(event) {
     const { name, value } = event.target;
     setDetails((current) => ({ ...current, [name]: value }));
-    if (name === "parentMobile") setHasRequestedOtp(false);
     setError("");
   }
 
@@ -65,29 +57,10 @@ export default function ParentalConsentModal({ applicationData, isConfirming, on
     setError("");
   }
 
-  async function sendOtp() {
-    if (!details.parentMobile.trim()) {
-      setError("Enter the parent or guardian mobile number before requesting an OTP.");
-      return;
-    }
-    setError("");
-    setOtpMessage("");
-    setIsSendingOtp(true);
-    try {
-      const result = await requestMobileOtp(details.parentMobile);
-      setHasRequestedOtp(true);
-      setOtpMessage(`OTP sent. It expires in ${Math.round((result.expires_in || 300) / 60)} minutes.`);
-    } catch (reason) {
-      setError(reason.message || "OTP could not be sent. Please try again.");
-    } finally {
-      setIsSendingOtp(false);
-    }
-  }
-
   async function submit(event) {
     event.preventDefault();
     if (!isComplete) {
-      setError("Complete the parent, child, OTP and acknowledgement fields to confirm consent.");
+      setError("Complete the parent, child and acknowledgement fields to confirm consent.");
       return;
     }
     setError("");
@@ -99,7 +72,6 @@ export default function ParentalConsentModal({ applicationData, isConfirming, on
         parent_email: details.parentEmail,
         child_name: details.childName,
         child_dob: details.childDob,
-        otp,
       });
     } catch (reason) {
       setError(reason.message || "Consent could not be confirmed. Please check the OTP and try again.");
@@ -147,7 +119,7 @@ export default function ParentalConsentModal({ applicationData, isConfirming, on
           </section>
 
           <section className="consent-capture" aria-labelledby="consent-capture-title">
-            <header><p>VERIFIED DIGITAL CONSENT</p><h2 id="consent-capture-title">Confirm your consent</h2><small>An OTP is sent to the mobile number below. Consent is recorded only after it is verified.</small></header>
+            <header><p>DIGITAL CONSENT</p><h2 id="consent-capture-title">Confirm your consent</h2><small>Your Cognito-authenticated account and the confirmation below are recorded with this consent.</small></header>
             <div className="consent-checks">
               {consentAcknowledgements.map((label, index) => <label key={label}><input type="checkbox" checked={acknowledgements[index]} onChange={() => toggleAcknowledgement(index)} /><span>{label}</span></label>)}
             </div>
@@ -159,8 +131,6 @@ export default function ParentalConsentModal({ applicationData, isConfirming, on
               <label>Child's full name <em>*</em><input name="childName" value={details.childName} onChange={updateDetail} /></label>
               <label>Child's date of birth <em>*</em><input name="childDob" type="date" value={details.childDob} onChange={updateDetail} /></label>
             </div>
-            <div className="consent-otp-row"><button type="button" onClick={() => void sendOtp()} disabled={isSendingOtp || isConfirming}>{isSendingOtp ? "Sending OTP…" : "Send OTP"}</button><label>OTP verification <input value={otp} onChange={(event) => { setOtp(event.target.value.replace(/\D/g, "").slice(0, 6)); setError(""); }} inputMode="numeric" autoComplete="one-time-code" placeholder="6-digit OTP" /></label></div>
-            {otpMessage && <p className="consent-status success" role="status">{otpMessage}</p>}
             {error && <p className="consent-status error" role="alert">{error}</p>}
           </section>
         </div>

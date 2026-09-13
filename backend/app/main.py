@@ -458,7 +458,7 @@ def record_parental_consent(
     request: Request,
     user: Annotated[dict[str, Any], Depends(require_roles("parent"))],
 ) -> dict[str, Any]:
-    """Verify guardian consent by OTP and add an immutable consent-ledger event."""
+    """Add a Cognito-authenticated guardian consent event to the immutable ledger."""
     with connection() as database:
         application = owned_application(database, application_number, user["id"])
         if application["status"] in FINAL_APPLICATION_STATUSES:
@@ -466,14 +466,8 @@ def record_parental_consent(
 
     try:
         parent_mobile = otp_phone_number(payload.parent_mobile)
-        otp_is_valid = verify_otp(parent_mobile, payload.otp)
     except ValueError as error:
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(error)) from error
-    except OTPConfigurationError as error:
-        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="OTP service is not configured yet.") from error
-
-    if not otp_is_valid:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="OTP is invalid, expired or has already been used.")
 
     consent_id = str(uuid4())
     recorded_at = datetime.now(UTC).isoformat()
@@ -495,7 +489,7 @@ def record_parental_consent(
                 payload.child_name.strip(),
                 payload.child_dob,
                 payload.relationship_to_child.strip(),
-                True,
+                False,
                 recorded_at,
                 PARENTAL_CONSENT_VERSION,
                 recorded_at,
@@ -506,7 +500,7 @@ def record_parental_consent(
     return {
         "consent_id": consent_id,
         "status": "active",
-        "otp_verified": True,
+        "otp_verified": False,
         "consent_text_version": PARENTAL_CONSENT_VERSION,
         "consent_given_timestamp": recorded_at,
     }

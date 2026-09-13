@@ -58,7 +58,6 @@ class ParentalConsentRequest(BaseModel):
     parent_email: str = Field(min_length=5, max_length=254)
     child_name: str = Field(min_length=2, max_length=120)
     child_dob: str = Field(pattern=r"^\d{4}-\d{2}-\d{2}$")
-    otp: str = Field(pattern=r"^\d{6}$")
 
 
 class ParentalConsentWithdrawalRequest(BaseModel):
