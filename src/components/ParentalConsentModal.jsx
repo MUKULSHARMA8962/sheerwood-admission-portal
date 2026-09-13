@@ -109,13 +109,13 @@ export default function ParentalConsentModal({ applicationData, isConfirming, on
             <h2>5. Your rights</h2>
             <p>As the parent or guardian providing consent, you have the right to:</p>
             <ul><li>Access the personal data we hold about your child</li><li>Request correction of inaccurate data</li><li>Withdraw your consent at any time</li><li>Request deletion of your child's data, subject to legal retention requirements such as academic record-keeping rules</li></ul>
-            <p>To exercise these rights, contact the admissions office at <a href="mailto:admissions@sheerwood.edu.in">admissions@sheerwood.edu.in</a>.</p>
+            <p>To exercise these rights, contact the admissions office at <a href="mailto:admissions@sherwood.edu.in">admissions@sherwood.edu.in</a>.</p>
 
             <h2>6. Consequences of withdrawing consent</h2>
             <p>If you withdraw consent, your child may lose access to the school portal and related LMS services because their continued provision depends on this data being processed.</p>
 
             <h2>7. Grievance redressal</h2>
-            <p>If you have concerns about how your child's data is handled, contact the Grievance Officer through the admissions office at <a href="mailto:admissions@sheerwood.edu.in">admissions@sheerwood.edu.in</a>, Sheerwood Campus, Greenfield Road, Bengaluru – 560001, India.</p>
+            <p>If you have concerns about how your child's data is handled, contact the Grievance Officer through the admissions office at <a href="mailto:admissions@sherwood.edu.in">admissions@sherwood.edu.in</a>, Sherwood College, Nainital.</p>
           </section>
 
           <section className="consent-capture" aria-labelledby="consent-capture-title">

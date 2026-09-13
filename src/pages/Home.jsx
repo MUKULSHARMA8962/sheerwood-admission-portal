@@ -244,7 +244,7 @@ export default function Home() {
       </section>
 
       <footer id="contact" className="school-footer">
-        <section className="footer-overview"><div className="footer-brand"><span className="footer-crest">S</span><span><strong>Sheerwood</strong><small>International School</small></span></div><p>Nurturing knowledge, character and possibility for every learner.</p><address>◎ Sheerwood Campus, Greenfield Road<br />Bengaluru – 560001, India<br /><br />▯ +91 98765 43210<br />✉ admissions@sheerwood.edu.in</address></section>
+        <section className="footer-overview"><div className="footer-brand"><span className="footer-crest">S</span><span><strong>Sheerwood</strong><small>International School</small></span></div><p>Nurturing knowledge, character and possibility for every learner.</p><address>◎ Sherwood College, Nainital<br /><br />▯ +91 98765 43210<br />✉ admissions@sherwood.edu.in</address></section>
         <section><h3>Admissions</h3><a href="#admission">Admission Process</a><Link to="/admission-details">Online Application</Link><a href="#admission">Important Dates</a><Link to="/track-application">Track Application</Link></section>
         <section><h3>Academics</h3><a href="#about">Our Learning Approach</a><a href="#campus">Campus Life</a><a href="#campus">Clubs &amp; Societies</a><a href="#campus">Events &amp; Activities</a></section>
         <section><h3>Facilities</h3><a href="#campus">Infrastructure</a><a href="#campus">Sports &amp; Activities</a><a href="#contact">Contact Us</a><Link to="/ai-assistant">Ask Sheerwood AI</Link></section>

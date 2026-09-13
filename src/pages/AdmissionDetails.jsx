@@ -36,11 +36,17 @@ const nextAcademicSession = getNextAcademicSession();
 // choices remain available for the grade a student is presently studying in.
 const admissionClassOptions = ["Class 3", "Class 4", "Class 5", "Class 6", "Class 7", "Class 8", "Class 9", "Class 11"];
 const currentClassOptions = ["Class 2", "Class 3", "Class 4", "Class 5", "Class 6", "Class 7", "Class 8", "Class 9", "Class 10"];
-const classOrder = currentClassOptions;
+// Class 11 applicants may currently be studying any of Classes 2–10. Keep
+// Class 11 in the ranking even though it is not a current-class choice.
+const classOrder = [...currentClassOptions, "Class 11"];
 const classRank = Object.fromEntries(classOrder.map((className, index) => [className, index + 2]));
 
-const currentClassChoices = (selectedClass) =>
-  currentClassOptions.filter((className) => selectedClass === "Select class" || classRank[className] <= classRank[selectedClass]);
+const currentClassChoices = (selectedClass) => {
+  // A Class 11 applicant can be studying in any of the listed current classes.
+  // Handle it directly so the dropdown is never empty for Class 11.
+  if (selectedClass === "Class 11") return currentClassOptions;
+  return currentClassOptions.filter((className) => selectedClass === "Select class" || classRank[className] <= classRank[selectedClass]);
+};
 
 const initialForm = {
   session: nextAcademicSession,
@@ -60,11 +66,12 @@ export default function AdmissionDetails() {
   const { session, user } = useCognitoAuth();
   const [form, setForm] = useState(() => {
     const savedForm = { ...initialForm, ...getAdmissionData().admissionDetails };
+    const currentDate = getLocalDate();
     // Do not retain a saved selection for a class that is not currently open
     // for admission.
     return admissionClassOptions.includes(savedForm.class)
-      ? savedForm
-      : { ...savedForm, class: "Select class", stream: "Select stream" };
+      ? { ...savedForm, date: currentDate }
+      : { ...savedForm, date: currentDate, class: "Select class", stream: "Select stream" };
   });
   const [message, setMessage] = useState("");
   const [savingDraft, setSavingDraft] = useState(false);
@@ -88,7 +95,7 @@ export default function AdmissionDetails() {
       if (savedApplication?.application_number && savedData && hydratedApplicationRef.current !== savedApplication.application_number) {
         syncAdmissionDataFromDatabase(savedData);
         const savedAdmissionDetails = savedData.admissionDetails && typeof savedData.admissionDetails === "object" ? savedData.admissionDetails : {};
-        setForm((current) => ({ ...current, ...initialForm, ...savedAdmissionDetails }));
+        setForm((current) => ({ ...current, ...initialForm, ...savedAdmissionDetails, date: getLocalDate() }));
         hydratedApplicationRef.current = savedApplication.application_number;
       }
     } catch {
