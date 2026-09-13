@@ -16,6 +16,7 @@ export const ROUTES = {
   application: (stage) => `/application/${stage}`,
   applicationDocuments: "/application/documents",
   applicationSuccess: "/application-success",
+  consentWithdrawal: "/consent-withdrawal",
   feePayment: "/fee-payment",
   trackApplication: "/track-application",
   aiAssistant: "/ai-assistant",

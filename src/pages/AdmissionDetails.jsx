@@ -34,7 +34,7 @@ function getNextAcademicSession() {
 const nextAcademicSession = getNextAcademicSession();
 // Offer only the classes confirmed by the admissions team. Current-class
 // choices remain available for the grade a student is presently studying in.
-const admissionClassOptions = ["Class 3", "Class 4", "Class 5", "Class 6", "Class 7", "Class 9", "Class 11"];
+const admissionClassOptions = ["Class 3", "Class 4", "Class 5", "Class 6", "Class 7", "Class 8", "Class 9", "Class 11"];
 const currentClassOptions = ["Class 2", "Class 3", "Class 4", "Class 5", "Class 6", "Class 7", "Class 8", "Class 9", "Class 10"];
 const classOrder = currentClassOptions;
 const classRank = Object.fromEntries(classOrder.map((className, index) => [className, index + 2]));

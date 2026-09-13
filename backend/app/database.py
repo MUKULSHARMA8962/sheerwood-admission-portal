@@ -277,6 +277,33 @@ def initialize_database() -> None:
                 expires_at TEXT NOT NULL,
                 attempts INTEGER NOT NULL DEFAULT 0
             );
+
+            CREATE TABLE IF NOT EXISTS consent_events (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                consent_id TEXT NOT NULL UNIQUE,
+                application_number TEXT NOT NULL,
+                parent_id INTEGER NOT NULL,
+                parent_name TEXT NOT NULL,
+                parent_mobile TEXT NOT NULL,
+                parent_email TEXT NOT NULL,
+                child_name TEXT NOT NULL,
+                child_dob TEXT NOT NULL,
+                relationship_to_child TEXT NOT NULL,
+                otp_verified INTEGER NOT NULL CHECK(otp_verified IN (0, 1)),
+                otp_verified_timestamp TEXT NOT NULL,
+                consent_text_version TEXT NOT NULL,
+                consent_given_timestamp TEXT NOT NULL,
+                ip_address TEXT,
+                purposes_consented TEXT NOT NULL,
+                status TEXT NOT NULL CHECK(status IN ('active', 'withdrawn')),
+                related_consent_id TEXT,
+                withdrawn_timestamp TEXT,
+                created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY(parent_id) REFERENCES users(id)
+            );
+
+            CREATE INDEX IF NOT EXISTS consent_events_application_idx
+            ON consent_events(application_number, parent_id, status, consent_given_timestamp);
             """
         )
         existing_columns = {row["name"] for row in database.execute("PRAGMA table_info(users)")}
@@ -329,6 +356,13 @@ def initialize_database() -> None:
         ):
             if column not in application_columns:
                 database.execute(f"ALTER TABLE applications ADD COLUMN {column} {definition}")
+        consent_columns = {row["name"] for row in database.execute("PRAGMA table_info(consent_events)")}
+        for column, definition in (
+            ("related_consent_id", "TEXT"),
+            ("withdrawn_timestamp", "TEXT"),
+        ):
+            if column not in consent_columns:
+                database.execute(f"ALTER TABLE consent_events ADD COLUMN {column} {definition}")
         admission_columns = {row["name"] for row in database.execute("PRAGMA table_info(new_admissions)")}
         for column, definition in (
             ("verification_status", "TEXT NOT NULL DEFAULT 'pending'"),
@@ -533,6 +567,30 @@ def initialize_postgres_database() -> None:
             attempts INTEGER NOT NULL DEFAULT 0
         )
         """,
+        """
+        CREATE TABLE IF NOT EXISTS consent_events (
+            id BIGSERIAL PRIMARY KEY,
+            consent_id TEXT NOT NULL UNIQUE,
+            application_number TEXT NOT NULL,
+            parent_id BIGINT NOT NULL REFERENCES users(id),
+            parent_name TEXT NOT NULL,
+            parent_mobile TEXT NOT NULL,
+            parent_email TEXT NOT NULL,
+            child_name TEXT NOT NULL,
+            child_dob TEXT NOT NULL,
+            relationship_to_child TEXT NOT NULL,
+            otp_verified BOOLEAN NOT NULL,
+            otp_verified_timestamp TEXT NOT NULL,
+            consent_text_version TEXT NOT NULL,
+            consent_given_timestamp TEXT NOT NULL,
+            ip_address TEXT,
+            purposes_consented TEXT NOT NULL,
+            status TEXT NOT NULL CHECK(status IN ('active', 'withdrawn')),
+            related_consent_id TEXT,
+            withdrawn_timestamp TEXT,
+            created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP::text
+        )
+        """,
         "ALTER TABLE users ADD COLUMN IF NOT EXISTS cognito_subject TEXT",
         "CREATE UNIQUE INDEX IF NOT EXISTS users_cognito_subject_idx ON users(cognito_subject) WHERE cognito_subject IS NOT NULL",
         "ALTER TABLE applications ADD COLUMN IF NOT EXISTS application_data TEXT NOT NULL DEFAULT '{}'",
@@ -549,6 +607,8 @@ def initialize_postgres_database() -> None:
         "ALTER TABLE applications ADD COLUMN IF NOT EXISTS approval_exception_reason TEXT NOT NULL DEFAULT ''",
         "ALTER TABLE applications ADD COLUMN IF NOT EXISTS registration_fee_status TEXT NOT NULL DEFAULT 'pending'",
         "ALTER TABLE applications ADD COLUMN IF NOT EXISTS registration_fee_paid_at TEXT",
+        "ALTER TABLE consent_events ADD COLUMN IF NOT EXISTS related_consent_id TEXT",
+        "ALTER TABLE consent_events ADD COLUMN IF NOT EXISTS withdrawn_timestamp TEXT",
         "ALTER TABLE new_admissions ADD COLUMN IF NOT EXISTS verification_status TEXT NOT NULL DEFAULT 'pending'",
         "ALTER TABLE new_admissions ADD COLUMN IF NOT EXISTS admin_remark TEXT NOT NULL DEFAULT ''",
         "ALTER TABLE new_admissions ADD COLUMN IF NOT EXISTS reupload_reason TEXT NOT NULL DEFAULT ''",
@@ -567,6 +627,7 @@ def initialize_postgres_database() -> None:
         "ALTER TABLE students ADD COLUMN IF NOT EXISTS enrollment_status TEXT NOT NULL DEFAULT 'active'",
         "ALTER TABLE students ADD COLUMN IF NOT EXISTS created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP::text",
         "ALTER TABLE students ADD COLUMN IF NOT EXISTS updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP::text",
+        "CREATE INDEX IF NOT EXISTS consent_events_application_idx ON consent_events(application_number, parent_id, status, consent_given_timestamp)",
         "CREATE INDEX IF NOT EXISTS new_admissions_parent_status_idx ON new_admissions(parent_id, status)",
         "CREATE INDEX IF NOT EXISTS admission_documents_parent_idx ON admission_documents(parent_id, application_number)",
         "CREATE INDEX IF NOT EXISTS students_class_section_idx ON students(class_section)",

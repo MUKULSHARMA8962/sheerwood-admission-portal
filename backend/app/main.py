@@ -6,10 +6,11 @@ import json
 from pathlib import Path
 import re
 from typing import Annotated, Any
+from uuid import uuid4
 
 import httpx
 from dotenv import load_dotenv
-from fastapi import BackgroundTasks, Depends, FastAPI, File, Header, HTTPException, Response, UploadFile, status
+from fastapi import BackgroundTasks, Depends, FastAPI, File, Header, HTTPException, Request, Response, UploadFile, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
@@ -20,7 +21,8 @@ load_dotenv(Path(__file__).resolve().parents[1] / ".env")
 from .database import connection, initialize_database
 from .dependencies import CurrentUser, require_roles
 from .notifications import send_admission_submission_notifications
-from .schemas import AdmissionDecisionRequest, CognitoTokenExchangeRequest, CreateApplicationRequest, LoginRequest, RegisterRequest, RegistrationFeePaymentRequest, SaveApplicationDraftRequest
+from .otp import OTPConfigurationError, normalize_phone_number, verify_otp
+from .schemas import AdmissionDecisionRequest, CognitoTokenExchangeRequest, CreateApplicationRequest, LoginRequest, ParentalConsentRequest, ParentalConsentWithdrawalRequest, RegisterRequest, RegistrationFeePaymentRequest, SaveApplicationDraftRequest
 from .security import hash_password, new_session_token, session_expiry, verify_password
 from .routers import admin, ai, otp, parent, teacher
 
@@ -45,10 +47,36 @@ REQUIRED_ADMISSION_DOCUMENT_KEYS = {
     "national-id-card",
 }
 LEGACY_DOCUMENT_STATUSES = {"submitted": "uploaded", "approved": "verified"}
+PARENTAL_CONSENT_VERSION = "v1.0"
+PARENTAL_CONSENT_PURPOSES = [
+    "LMS access",
+    "Attendance tracking",
+    "Academic progress tracking",
+    "Parent or guardian communication",
+]
 
 
 def normalized_document_status(value: str) -> str:
     return LEGACY_DOCUMENT_STATUSES.get(value, value or "pending")
+
+
+def otp_phone_number(value: str) -> str:
+    """Match the portal's phone-number format before validating an SMS OTP."""
+    digits = "".join(character for character in value if character.isdigit())
+    if value.strip().startswith("+"):
+        return normalize_phone_number(f"+{digits}")
+    return normalize_phone_number(f"+91{digits}" if len(digits) == 10 else f"+{digits}")
+
+
+def active_parental_consent(database: Any, application_number: str, parent_id: int) -> Any:
+    """Return an active consent only when the latest ledger event is active."""
+    latest_event = database.execute(
+        """SELECT * FROM consent_events
+        WHERE application_number = ? AND parent_id = ?
+        ORDER BY id DESC LIMIT 1""",
+        (application_number, parent_id),
+    ).fetchone()
+    return latest_event if latest_event and latest_event["status"] == "active" else None
 
 
 def document_review_summary_for_rows(documents: list[Any]) -> tuple[str, dict[str, int]]:
@@ -368,6 +396,9 @@ def record_registration_fee_payment(
         application = owned_application(database, application_number, user["id"])
         if application["status"] in FINAL_APPLICATION_STATUSES:
             raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="This admission already has a final decision.")
+        active_consent = active_parental_consent(database, application_number, user["id"])
+        if not active_consent:
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Parent or guardian consent must be confirmed before payment.")
         if application["registration_fee_status"] == "paid":
             return {
                 "application_number": application_number,
@@ -418,6 +449,132 @@ def record_registration_fee_payment(
         documents=saved_documents if isinstance(saved_documents, list) else [],
     )
     return {"application_number": application_number, "registration_fee_status": "paid", "registration_fee_paid_at": paid_at, "method": payload.method}
+
+
+@app.post("/api/applications/{application_number}/parental-consent", status_code=status.HTTP_201_CREATED)
+def record_parental_consent(
+    application_number: str,
+    payload: ParentalConsentRequest,
+    request: Request,
+    user: Annotated[dict[str, Any], Depends(require_roles("parent"))],
+) -> dict[str, Any]:
+    """Verify guardian consent by OTP and add an immutable consent-ledger event."""
+    with connection() as database:
+        application = owned_application(database, application_number, user["id"])
+        if application["status"] in FINAL_APPLICATION_STATUSES:
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Consent cannot be changed after a final admission decision.")
+
+    try:
+        parent_mobile = otp_phone_number(payload.parent_mobile)
+        otp_is_valid = verify_otp(parent_mobile, payload.otp)
+    except ValueError as error:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(error)) from error
+    except OTPConfigurationError as error:
+        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="OTP service is not configured yet.") from error
+
+    if not otp_is_valid:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="OTP is invalid, expired or has already been used.")
+
+    consent_id = str(uuid4())
+    recorded_at = datetime.now(UTC).isoformat()
+    client_ip = request.client.host if request.client else None
+    with connection() as database:
+        database.execute(
+            """INSERT INTO consent_events
+            (consent_id, application_number, parent_id, parent_name, parent_mobile, parent_email,
+             child_name, child_dob, relationship_to_child, otp_verified, otp_verified_timestamp,
+             consent_text_version, consent_given_timestamp, ip_address, purposes_consented, status)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'active')""",
+            (
+                consent_id,
+                application_number,
+                user["id"],
+                payload.parent_name.strip(),
+                parent_mobile,
+                payload.parent_email.strip().lower(),
+                payload.child_name.strip(),
+                payload.child_dob,
+                payload.relationship_to_child.strip(),
+                True,
+                recorded_at,
+                PARENTAL_CONSENT_VERSION,
+                recorded_at,
+                client_ip,
+                json.dumps(PARENTAL_CONSENT_PURPOSES),
+            ),
+        )
+    return {
+        "consent_id": consent_id,
+        "status": "active",
+        "otp_verified": True,
+        "consent_text_version": PARENTAL_CONSENT_VERSION,
+        "consent_given_timestamp": recorded_at,
+    }
+
+
+@app.post("/api/applications/{application_number}/parental-consent/withdraw", status_code=status.HTTP_201_CREATED)
+def withdraw_parental_consent(
+    application_number: str,
+    payload: ParentalConsentWithdrawalRequest,
+    request: Request,
+    user: Annotated[dict[str, Any], Depends(require_roles("parent"))],
+) -> dict[str, Any]:
+    """Append an OTP-verified withdrawal event without modifying the original consent."""
+    with connection() as database:
+        owned_application(database, application_number, user["id"])
+        active_consent = active_parental_consent(database, application_number, user["id"])
+    if not active_consent:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="No active parental consent was found for this application.")
+
+    try:
+        parent_mobile = otp_phone_number(payload.parent_mobile)
+    except ValueError as error:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(error)) from error
+    if parent_mobile != active_consent["parent_mobile"]:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Use the mobile number registered with the original consent.")
+    try:
+        otp_is_valid = verify_otp(parent_mobile, payload.otp)
+    except OTPConfigurationError as error:
+        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="OTP service is not configured yet.") from error
+    if not otp_is_valid:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="OTP is invalid, expired or has already been used.")
+
+    withdrawal_id = str(uuid4())
+    withdrawn_at = datetime.now(UTC).isoformat()
+    client_ip = request.client.host if request.client else None
+    with connection() as database:
+        # Recheck under the write transaction so a consent cannot be withdrawn twice.
+        active_consent = active_parental_consent(database, application_number, user["id"])
+        if not active_consent:
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="This consent has already been withdrawn or replaced.")
+        database.execute(
+            """INSERT INTO consent_events
+            (consent_id, application_number, parent_id, parent_name, parent_mobile, parent_email,
+             child_name, child_dob, relationship_to_child, otp_verified, otp_verified_timestamp,
+             consent_text_version, consent_given_timestamp, ip_address, purposes_consented, status,
+             related_consent_id, withdrawn_timestamp)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'withdrawn', ?, ?)""",
+            (
+                withdrawal_id,
+                application_number,
+                user["id"],
+                active_consent["parent_name"],
+                parent_mobile,
+                active_consent["parent_email"],
+                active_consent["child_name"],
+                active_consent["child_dob"],
+                active_consent["relationship_to_child"],
+                True,
+                withdrawn_at,
+                active_consent["consent_text_version"],
+                active_consent["consent_given_timestamp"],
+                client_ip,
+                active_consent["purposes_consented"],
+                active_consent["consent_id"],
+                withdrawn_at,
+            ),
+        )
+    return {"consent_id": withdrawal_id, "status": "withdrawn", "withdrawn_timestamp": withdrawn_at}
 
 
 @app.put("/api/applications/draft")

@@ -25,9 +25,12 @@ def main():
         })
 
         from fastapi.testclient import TestClient
+        from app import main as main_module
         from app.database import connection
         from app.main import app
         from app.security import hash_password
+
+        main_module.verify_otp = lambda _phone_number, _otp: True
 
         application_number = "TEST-ADM-2027-000001"
         exception_application_number = "TEST-ADM-2027-000002"
@@ -80,6 +83,25 @@ def main():
             assert fee_pending_funnel["pending_documents"] == 0
             assert fee_pending_funnel["pending_registration_fee"] == 1
             assert fee_pending_funnel["login_only"] == 0
+
+            expect(client.post(f"/api/applications/{application_number}/registration-fee", headers=parent_headers, json={"method": "UPI"}), 409)
+            consent = expect(client.post(f"/api/applications/{application_number}/parental-consent", headers=parent_headers, json={
+                "parent_name": "Test Father",
+                "relationship_to_child": "Father",
+                "parent_mobile": "9876543210",
+                "parent_email": "parent.workflow@test.example",
+                "child_name": "Test Student",
+                "child_dob": "2017-04-10",
+                "otp": "123456",
+            }), 201)
+            assert consent["status"] == "active"
+            assert consent["otp_verified"] is True
+            with connection() as database:
+                consent_event = database.execute("SELECT consent_id, status, otp_verified, consent_text_version FROM consent_events WHERE application_number = ?", (application_number,)).fetchone()
+            assert consent_event["consent_id"] == consent["consent_id"]
+            assert consent_event["status"] == "active"
+            assert consent_event["otp_verified"] == 1
+            assert consent_event["consent_text_version"] == "v1.0"
 
             fee_payment = expect(client.post(f"/api/applications/{application_number}/registration-fee", headers=parent_headers, json={"method": "UPI"}), 200)
             assert fee_payment["registration_fee_status"] == "paid"

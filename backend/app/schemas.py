@@ -51,6 +51,21 @@ class RegistrationFeePaymentRequest(BaseModel):
     method: str = Field(min_length=2, max_length=80)
 
 
+class ParentalConsentRequest(BaseModel):
+    parent_name: str = Field(min_length=2, max_length=120)
+    relationship_to_child: str = Field(min_length=2, max_length=80)
+    parent_mobile: str = Field(min_length=8, max_length=20)
+    parent_email: str = Field(min_length=5, max_length=254)
+    child_name: str = Field(min_length=2, max_length=120)
+    child_dob: str = Field(pattern=r"^\d{4}-\d{2}-\d{2}$")
+    otp: str = Field(pattern=r"^\d{6}$")
+
+
+class ParentalConsentWithdrawalRequest(BaseModel):
+    parent_mobile: str = Field(min_length=8, max_length=20)
+    otp: str = Field(pattern=r"^\d{6}$")
+
+
 class CreateUserRequest(BaseModel):
     full_name: str = Field(min_length=1, max_length=120)
     email: str = Field(min_length=5, max_length=254)

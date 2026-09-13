@@ -174,6 +174,30 @@ export async function recordRegistrationFeePayment(accessToken, applicationNumbe
   return result;
 }
 
+export async function recordParentalConsent(accessToken, applicationNumber, consent) {
+  if (!accessToken || !applicationNumber) throw new Error("Please save the application before confirming consent.");
+  const response = await fetch(`${API_BASE_URL}/applications/${encodeURIComponent(applicationNumber)}/parental-consent`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Authorization: `Bearer ${accessToken}` },
+    body: JSON.stringify(consent),
+  });
+  const result = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(result.detail || "Parental consent could not be recorded.");
+  return result;
+}
+
+export async function withdrawParentalConsent(accessToken, applicationNumber, withdrawal) {
+  if (!accessToken || !applicationNumber) throw new Error("No saved application was found for this consent request.");
+  const response = await fetch(`${API_BASE_URL}/applications/${encodeURIComponent(applicationNumber)}/parental-consent/withdraw`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Authorization: `Bearer ${accessToken}` },
+    body: JSON.stringify(withdrawal),
+  });
+  const result = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(result.detail || "Consent withdrawal could not be recorded.");
+  return result;
+}
+
 export async function uploadAdmissionDocument(accessToken, documentKey, file) {
   if (!accessToken) throw new Error("Please sign in again before uploading a document.");
   const formData = new FormData();
