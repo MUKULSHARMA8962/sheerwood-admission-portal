@@ -406,6 +406,7 @@ def record_registration_fee_payment(
                 "registration_fee_paid_at": application["registration_fee_paid_at"],
                 "method": payload.method,
             }
+        notify_submission = application["status"] in {"", "draft", "needs_information"}
         _, document_counts = document_review_summary(database, application_number)
         if document_counts["uploaded"] < document_counts["required"]:
             raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Upload all required documents before paying the registration fee.")
@@ -425,29 +426,31 @@ def record_registration_fee_payment(
             WHERE application_number = ? AND parent_id = ?""",
             (paid_at, paid_at, application_number, user["id"]),
         )
-        saved_application = database.execute(
-            "SELECT student_name, desired_class, application_data, documents_json FROM applications WHERE application_number = ? AND parent_id = ?",
-            (application_number, user["id"]),
-        ).fetchone()
+        if notify_submission:
+            saved_application = database.execute(
+                "SELECT student_name, desired_class, application_data, documents_json FROM applications WHERE application_number = ? AND parent_id = ?",
+                (application_number, user["id"]),
+            ).fetchone()
 
-    try:
-        saved_application_data = json.loads(saved_application["application_data"] or "{}")
-    except (TypeError, json.JSONDecodeError):
-        saved_application_data = {}
-    try:
-        saved_documents = json.loads(saved_application["documents_json"] or "[]")
-    except (TypeError, json.JSONDecodeError):
-        saved_documents = []
-    background_tasks.add_task(
-        send_admission_submission_notifications,
-        parent_email=user["email"],
-        parent_name=user["full_name"],
-        student_name=saved_application["student_name"],
-        application_number=application_number,
-        desired_class=saved_application["desired_class"],
-        application_data=saved_application_data if isinstance(saved_application_data, dict) else {},
-        documents=saved_documents if isinstance(saved_documents, list) else [],
-    )
+    if notify_submission:
+        try:
+            saved_application_data = json.loads(saved_application["application_data"] or "{}")
+        except (TypeError, json.JSONDecodeError):
+            saved_application_data = {}
+        try:
+            saved_documents = json.loads(saved_application["documents_json"] or "[]")
+        except (TypeError, json.JSONDecodeError):
+            saved_documents = []
+        background_tasks.add_task(
+            send_admission_submission_notifications,
+            parent_email=user["email"],
+            parent_name=user["full_name"],
+            student_name=saved_application["student_name"],
+            application_number=application_number,
+            desired_class=saved_application["desired_class"],
+            application_data=saved_application_data if isinstance(saved_application_data, dict) else {},
+            documents=saved_documents if isinstance(saved_documents, list) else [],
+        )
     return {"application_number": application_number, "registration_fee_status": "paid", "registration_fee_paid_at": paid_at, "method": payload.method}
 
 

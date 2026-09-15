@@ -8,7 +8,7 @@ import re
 from typing import Any
 
 from .database import connection
-from .email_service import send_email
+from .email_service import configured_sender, send_email
 
 logger = logging.getLogger(__name__)
 
@@ -131,8 +131,8 @@ def _admin_recipients() -> set[str]:
 
 def _send_messages(messages: list[tuple[str, str, str]]) -> None:
     """Send individual messages so administrator addresses are never exposed."""
-    if not _valid_email(os.getenv("SES_FROM_EMAIL", "admissions@sheerwoodadmission.com")):
-        logger.warning("Admission email notifications skipped because SES_FROM_EMAIL is not configured.")
+    if not _valid_email(configured_sender()):
+        logger.warning("Admission email notifications skipped because no sender email is configured.")
         return
 
     try:
@@ -140,7 +140,7 @@ def _send_messages(messages: list[tuple[str, str, str]]) -> None:
             send_email(recipient=recipient, subject=subject, body=body)
     except Exception:
         # A notification must never make a successfully saved application fail.
-        logger.exception("Admission email notification could not be delivered through SES.")
+        logger.exception("Admission email notification could not be delivered.")
 
 
 def send_admission_submission_notifications(
