@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef } from "react";
 import { useAuth } from "react-oidc-context";
 import { deriveRole } from "./cognito";
 import { CognitoAuthContext } from "./CognitoAuthContext";
+import { setAdmissionStorageOwner } from "../services/admission";
 
 const INACTIVITY_TIMEOUT_MS = 60_000;
 const activityEvents = ["pointerdown", "pointermove", "keydown", "touchstart", "wheel", "scroll"];
@@ -24,6 +25,10 @@ export function CognitoAuthProvider({ children }) {
       },
     } : null;
   }, [auth.user]);
+
+  useEffect(() => {
+    setAdmissionStorageOwner(session?.user?.claims?.sub || session?.user?.email);
+  }, [session]);
 
   const signOut = useCallback(async () => {
     await auth.removeUser();

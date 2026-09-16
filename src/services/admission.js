@@ -3,6 +3,17 @@ const DOCUMENTS_KEY = "sheerwood-new-admission-documents";
 const APPLICATION_DATA_KEY = "sheerwood-admission-data";
 const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || "/api").replace(/\/$/, "");
 
+let admissionStorageScope = "anonymous";
+
+function scopedStorageKey(baseKey) {
+  return `${baseKey}:${admissionStorageScope}`;
+}
+
+export function setAdmissionStorageOwner(identifier) {
+  const normalizedIdentifier = String(identifier || "").trim().toLowerCase();
+  admissionStorageScope = normalizedIdentifier ? encodeURIComponent(normalizedIdentifier) : "anonymous";
+}
+
 const admissionDocumentLabels = {
   "report-card": "Report Card",
   "aadhaar-card": "Aadhaar Card",
@@ -54,24 +65,24 @@ export function getApplicationStatusLabel(status) {
 }
 
 export function getNewAdmissionId() {
-  const existingId = localStorage.getItem(APPLICATION_ID_KEY);
+  const existingId = localStorage.getItem(scopedStorageKey(APPLICATION_ID_KEY));
   if (existingId) return existingId;
 
   const applicationId = `SHW-ADM-2027-${Math.floor(100000 + Math.random() * 900000)}`;
-  localStorage.setItem(APPLICATION_ID_KEY, applicationId);
+  localStorage.setItem(scopedStorageKey(APPLICATION_ID_KEY), applicationId);
   return applicationId;
 }
 
 // Reading an application must never create one.  A new number is assigned only
 // when a parent starts saving an admission draft.
 export function getStoredAdmissionId() {
-  return String(localStorage.getItem(APPLICATION_ID_KEY) || "").trim();
+  return String(localStorage.getItem(scopedStorageKey(APPLICATION_ID_KEY)) || "").trim();
 }
 
 export function setNewAdmissionId(applicationNumber) {
   const normalizedApplicationNumber = String(applicationNumber || "").trim();
   if (!normalizedApplicationNumber) return "";
-  localStorage.setItem(APPLICATION_ID_KEY, normalizedApplicationNumber);
+  localStorage.setItem(scopedStorageKey(APPLICATION_ID_KEY), normalizedApplicationNumber);
   return normalizedApplicationNumber;
 }
 
@@ -84,23 +95,24 @@ const defaultDocuments = [
 ];
 
 export function getAdmissionDocuments() {
-  const savedDocuments = localStorage.getItem(DOCUMENTS_KEY);
+  const documentsKey = scopedStorageKey(DOCUMENTS_KEY);
+  const savedDocuments = localStorage.getItem(documentsKey);
   if (savedDocuments) {
     const documents = JSON.parse(savedDocuments).filter((document) => document.id !== "other").map((document) => {
       if (document.status === "Submitted") return { ...document, status: document.file ? "Uploaded" : "Not Uploaded" };
       if (document.status === "Approved") return { ...document, status: document.file ? "Verified" : "Not Uploaded" };
       return { ...document, file: document.file || "" };
     });
-    localStorage.setItem(DOCUMENTS_KEY, JSON.stringify(documents));
+    localStorage.setItem(documentsKey, JSON.stringify(documents));
     return documents;
   }
-  localStorage.setItem(DOCUMENTS_KEY, JSON.stringify(defaultDocuments));
+  localStorage.setItem(documentsKey, JSON.stringify(defaultDocuments));
   return defaultDocuments;
 }
 
 export function updateAdmissionDocument(documentId, status, reason = "", file, storage = {}) {
   const updatedDocuments = getAdmissionDocuments().map((document) => document.id === documentId ? { ...document, status, reason, ...(file ? { file } : {}), ...storage } : document);
-  localStorage.setItem(DOCUMENTS_KEY, JSON.stringify(updatedDocuments));
+  localStorage.setItem(scopedStorageKey(DOCUMENTS_KEY), JSON.stringify(updatedDocuments));
   return updatedDocuments;
 }
 
@@ -131,13 +143,13 @@ export function syncAdmissionDocumentsFromDatabase(records = []) {
       contentType: record.content_type,
     };
   });
-  localStorage.setItem(DOCUMENTS_KEY, JSON.stringify(documents));
+  localStorage.setItem(scopedStorageKey(DOCUMENTS_KEY), JSON.stringify(documents));
   return documents;
 }
 
 export function getAdmissionData() {
   try {
-    return JSON.parse(sessionStorage.getItem(APPLICATION_DATA_KEY) || "{}");
+    return JSON.parse(sessionStorage.getItem(scopedStorageKey(APPLICATION_DATA_KEY)) || "{}");
   } catch {
     return {};
   }
@@ -145,13 +157,13 @@ export function getAdmissionData() {
 
 export function syncAdmissionDataFromDatabase(data = {}) {
   const savedData = data && typeof data === "object" ? data : {};
-  sessionStorage.setItem(APPLICATION_DATA_KEY, JSON.stringify(savedData));
+  sessionStorage.setItem(scopedStorageKey(APPLICATION_DATA_KEY), JSON.stringify(savedData));
   return savedData;
 }
 
 export async function saveAdmissionDraft(accessToken, data, status = "draft") {
   const mergedData = { ...getAdmissionData(), ...data };
-  sessionStorage.setItem(APPLICATION_DATA_KEY, JSON.stringify(mergedData));
+  sessionStorage.setItem(scopedStorageKey(APPLICATION_DATA_KEY), JSON.stringify(mergedData));
   const response = await fetch(`${API_BASE_URL}/applications/draft`, {
     method: "PUT",
     headers: { "Content-Type": "application/json", Authorization: `Bearer ${accessToken}` },
