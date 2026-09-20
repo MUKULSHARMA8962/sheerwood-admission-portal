@@ -13,6 +13,8 @@
 .new-admission-admin-table td { padding: 14px; border-top: 1px solid #eef3ef; vertical-align: top; }
 .new-admission-admin-table td small { display: block; margin-top: 4px; color: #718078; font-size: 11px; }
 .new-admission-parent-cell { min-width: 155px; }
+.new-admission-source-cell { min-width: 145px; }
+.new-admission-source-cell b { display: block; color: #284737; }
 .new-admission-parent-cell b { display: block; color: #284737; }
 .new-admission-file-button { max-width: 175px; overflow: hidden; padding: 0; border: 0; color: #08783f; background: transparent; font-size: 11px; font-weight: 800; text-align: left; text-decoration: underline; text-overflow: ellipsis; white-space: nowrap; cursor: pointer; }
 .new-admission-student-button { padding: 0; border: 0; color: #173d2d; background: transparent; font: inherit; font-weight: 800; text-align: left; cursor: pointer; }

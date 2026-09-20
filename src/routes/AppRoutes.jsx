@@ -29,6 +29,7 @@ export default function AppRoutes() {
     <Routes>
       <Route path={ROUTES.home} element={<DirectCognitoEntry />} />
       <Route path={ROUTES.login} element={<Login />} />
+      <Route path="/apply" element={<Register />} />
       <Route path={ROUTES.register} element={<Register />} />
       <Route path={ROUTES.gallery} element={<Gallery />} />
       <Route path={ROUTES.calendar} element={<SchoolCalendar />} />

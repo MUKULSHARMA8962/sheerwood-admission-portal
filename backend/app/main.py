@@ -22,6 +22,7 @@ from .database import connection, initialize_database
 from .dependencies import CurrentUser, require_roles
 from .notifications import send_admission_submission_notifications
 from .otp import OTPConfigurationError, normalize_phone_number, verify_otp
+from .referrals import resolve_referral
 from .schemas import AdmissionDecisionRequest, CognitoTokenExchangeRequest, CreateApplicationRequest, LoginRequest, ParentalConsentRequest, ParentalConsentWithdrawalRequest, RegisterRequest, RegistrationFeePaymentRequest, SaveApplicationDraftRequest
 from .security import hash_password, new_session_token, session_expiry, verify_password
 from .routers import admin, ai, otp, parent, teacher
@@ -597,9 +598,12 @@ def save_application_draft(
     desired_class = admission_value("class", "Class 4")
     board = admission_value("boardOther") if admission_value("board") == "Other" else admission_value("board")
     saved_on = datetime.now(UTC).date().isoformat()
+    referral = resolve_referral(payload.lead_source, payload.referral_code)
     with connection() as database:
         existing = database.execute(
-            "SELECT id, status, documents_status, registration_fee_status FROM applications WHERE application_number = ? AND parent_id = ?",
+            """SELECT id, status, documents_status, registration_fee_status, lead_source,
+                      vendor_id, campaign_id, referral_code, first_visit, submitted_at
+               FROM applications WHERE application_number = ? AND parent_id = ?""",
             (payload.application_number, user["id"]),
         ).fetchone()
         if not existing:
@@ -610,7 +614,9 @@ def save_application_draft(
             if conflicting_application:
                 raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="This application number belongs to another parent.")
         existing_new_admission = database.execute(
-            "SELECT parent_id, status, documents_status, registration_fee_status FROM new_admissions WHERE application_number = ?",
+            """SELECT parent_id, status, documents_status, registration_fee_status, lead_source,
+                      vendor_id, campaign_id, referral_code, first_visit, submitted_at
+               FROM new_admissions WHERE application_number = ?""",
             (payload.application_number,),
         ).fetchone()
         if existing_new_admission and existing_new_admission["parent_id"] != user["id"]:
@@ -624,30 +630,42 @@ def save_application_draft(
         fee_is_paid = (existing and existing["registration_fee_status"] == "paid") or (existing_new_admission and existing_new_admission["registration_fee_status"] == "paid")
         application_status = current_status if current_status in FINAL_APPLICATION_STATUSES or fee_is_paid else incoming_status
         notify_submission = payload.status == "submitted" and current_status in {"", "draft", "needs_information"}
+        attribution_record = existing or existing_new_admission
+        lead_source = referral.source if referral else str(attribution_record["lead_source"] or "") if attribution_record else ""
+        vendor_id = referral.vendor_id if referral else str(attribution_record["vendor_id"] or "") if attribution_record else ""
+        campaign_id = payload.campaign_id.strip() if referral and payload.campaign_id.strip() else referral.default_campaign_id if referral else str(attribution_record["campaign_id"] or "") if attribution_record else ""
+        referral_code = referral.referral_code if referral else str(attribution_record["referral_code"] or "") if attribution_record else ""
+        first_visit = payload.first_visit.strip() if referral and payload.first_visit.strip() else str(attribution_record["first_visit"] or "") if attribution_record else ""
+        submitted_at = str(attribution_record["submitted_at"] or "") if attribution_record else ""
+        if payload.status == "submitted" and not submitted_at:
+            submitted_at = datetime.now(UTC).isoformat()
         documents_status, _ = document_review_summary(database, payload.application_number)
         if existing:
             database.execute(
                 """UPDATE applications
                 SET student_name = ?, desired_class = ?, status = ?, documents_status = ?,
-                    application_data = ?, documents_json = ?, submitted_on = ?
+                    application_data = ?, documents_json = ?, submitted_on = ?,
+                    lead_source = ?, vendor_id = ?, campaign_id = ?, referral_code = ?,
+                    first_visit = ?, submitted_at = ?
                 WHERE id = ?""",
-                (student_name, desired_class, application_status, documents_status, application_data, documents_json, saved_on, existing["id"]),
+                (student_name, desired_class, application_status, documents_status, application_data, documents_json, saved_on, lead_source, vendor_id, campaign_id, referral_code, first_visit or None, submitted_at or None, existing["id"]),
             )
             application_id = existing["id"]
         else:
             cursor = database.execute(
                 """INSERT INTO applications
-                (application_number, student_name, parent_name, desired_class, status, documents_status, submitted_on, parent_id, application_data, documents_json)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id""",
-                (payload.application_number, student_name, user["full_name"], desired_class, application_status, documents_status, saved_on, user["id"], application_data, documents_json),
+                (application_number, student_name, parent_name, desired_class, status, documents_status, submitted_on, parent_id, application_data, documents_json, lead_source, vendor_id, campaign_id, referral_code, first_visit, submitted_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id""",
+                (payload.application_number, student_name, user["full_name"], desired_class, application_status, documents_status, saved_on, user["id"], application_data, documents_json, lead_source, vendor_id, campaign_id, referral_code, first_visit or None, submitted_at or None),
             )
             application_id = cursor.fetchone()["id"]
         database.execute(
             """INSERT INTO new_admissions
             (application_number, parent_id, academic_session, application_date, class_applying_for,
              pen_number, previous_school, current_class, board, medium, student_name, status,
-             documents_status, application_data, documents_json, submitted_on, updated_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+             documents_status, application_data, documents_json, lead_source, vendor_id, campaign_id,
+             referral_code, first_visit, submitted_at, submitted_on, updated_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT(application_number) DO UPDATE SET
                 parent_id = excluded.parent_id,
                 academic_session = excluded.academic_session,
@@ -663,6 +681,12 @@ def save_application_draft(
                 documents_status = excluded.documents_status,
                 application_data = excluded.application_data,
                 documents_json = excluded.documents_json,
+                lead_source = excluded.lead_source,
+                vendor_id = excluded.vendor_id,
+                campaign_id = excluded.campaign_id,
+                referral_code = excluded.referral_code,
+                first_visit = excluded.first_visit,
+                submitted_at = excluded.submitted_at,
                 submitted_on = excluded.submitted_on,
                 updated_at = excluded.updated_at""",
             (
@@ -681,6 +705,12 @@ def save_application_draft(
                 documents_status,
                 application_data,
                 documents_json,
+                lead_source,
+                vendor_id,
+                campaign_id,
+                referral_code,
+                first_visit or None,
+                submitted_at or None,
                 saved_on,
                 saved_on,
             ),

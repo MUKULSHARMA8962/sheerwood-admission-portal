@@ -45,6 +45,11 @@ class SaveApplicationDraftRequest(BaseModel):
     data: dict[str, Any] = Field(default_factory=dict)
     documents: list[dict[str, Any]] = Field(default_factory=list)
     status: Literal["draft", "submitted"] = "draft"
+    lead_source: str = Field(default="", max_length=80)
+    vendor_id: str = Field(default="", max_length=40)
+    campaign_id: str = Field(default="", max_length=120)
+    referral_code: str = Field(default="", max_length=40)
+    first_visit: str = Field(default="", max_length=40)
 
 
 class RegistrationFeePaymentRequest(BaseModel):

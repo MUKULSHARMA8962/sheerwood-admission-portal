@@ -1,12 +1,38 @@
 const APPLICATION_ID_KEY = "sheerwood-new-admission-id";
 const DOCUMENTS_KEY = "sheerwood-new-admission-documents";
 const APPLICATION_DATA_KEY = "sheerwood-admission-data";
+const REFERRAL_ATTRIBUTION_KEY = "sheerwood-admission-referral";
 const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || "/api").replace(/\/$/, "");
 
 let admissionStorageScope = "anonymous";
 
 function scopedStorageKey(baseKey) {
   return `${baseKey}:${admissionStorageScope}`;
+}
+
+export function captureReferralAttribution(search = window.location.search) {
+  const parameters = new URLSearchParams(search);
+  const source = parameters.get("source")?.trim().toLowerCase();
+  if (!source) return getReferralAttribution();
+
+  const existing = getReferralAttribution();
+  const referral = {
+    lead_source: source,
+    campaign_id: parameters.get("campaign_id")?.trim() || "",
+    referral_code: parameters.get("referral_code")?.trim().toUpperCase() || parameters.get("token")?.trim().toUpperCase() || "",
+    first_visit: existing?.first_visit || new Date().toISOString(),
+  };
+  localStorage.setItem(REFERRAL_ATTRIBUTION_KEY, JSON.stringify(referral));
+  return referral;
+}
+
+export function getReferralAttribution() {
+  try {
+    const value = JSON.parse(localStorage.getItem(REFERRAL_ATTRIBUTION_KEY) || "null");
+    return value && typeof value === "object" ? value : {};
+  } catch {
+    return {};
+  }
 }
 
 export function setAdmissionStorageOwner(identifier) {
@@ -164,10 +190,11 @@ export function syncAdmissionDataFromDatabase(data = {}) {
 export async function saveAdmissionDraft(accessToken, data, status = "draft") {
   const mergedData = { ...getAdmissionData(), ...data };
   sessionStorage.setItem(scopedStorageKey(APPLICATION_DATA_KEY), JSON.stringify(mergedData));
+  const referral = getReferralAttribution();
   const response = await fetch(`${API_BASE_URL}/applications/draft`, {
     method: "PUT",
     headers: { "Content-Type": "application/json", Authorization: `Bearer ${accessToken}` },
-    body: JSON.stringify({ application_number: getNewAdmissionId(), data: mergedData, documents: getAdmissionDocuments(), status }),
+    body: JSON.stringify({ application_number: getNewAdmissionId(), data: mergedData, documents: getAdmissionDocuments(), status, ...referral }),
   });
   const result = await response.json().catch(() => ({}));
   if (!response.ok) throw new Error(result.detail || "Application could not be saved.");

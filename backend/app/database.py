@@ -158,6 +158,12 @@ def initialize_database() -> None:
                 documents_json TEXT NOT NULL DEFAULT '[]',
                 registration_fee_status TEXT NOT NULL DEFAULT 'pending',
                 registration_fee_paid_at TEXT,
+                lead_source TEXT NOT NULL DEFAULT '',
+                vendor_id TEXT NOT NULL DEFAULT '',
+                campaign_id TEXT NOT NULL DEFAULT '',
+                referral_code TEXT NOT NULL DEFAULT '',
+                first_visit TEXT,
+                submitted_at TEXT,
                 FOREIGN KEY(parent_id) REFERENCES users(id) ON DELETE SET NULL
             );
 
@@ -190,6 +196,12 @@ def initialize_database() -> None:
                 documents_json TEXT NOT NULL DEFAULT '[]',
                 registration_fee_status TEXT NOT NULL DEFAULT 'pending',
                 registration_fee_paid_at TEXT,
+                lead_source TEXT NOT NULL DEFAULT '',
+                vendor_id TEXT NOT NULL DEFAULT '',
+                campaign_id TEXT NOT NULL DEFAULT '',
+                referral_code TEXT NOT NULL DEFAULT '',
+                first_visit TEXT,
+                submitted_at TEXT,
                 submitted_on TEXT,
                 created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
                 updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -353,6 +365,12 @@ def initialize_database() -> None:
             ("approval_exception_reason", "TEXT NOT NULL DEFAULT ''"),
             ("registration_fee_status", "TEXT NOT NULL DEFAULT 'pending'"),
             ("registration_fee_paid_at", "TEXT"),
+            ("lead_source", "TEXT NOT NULL DEFAULT ''"),
+            ("vendor_id", "TEXT NOT NULL DEFAULT ''"),
+            ("campaign_id", "TEXT NOT NULL DEFAULT ''"),
+            ("referral_code", "TEXT NOT NULL DEFAULT ''"),
+            ("first_visit", "TEXT"),
+            ("submitted_at", "TEXT"),
         ):
             if column not in application_columns:
                 database.execute(f"ALTER TABLE applications ADD COLUMN {column} {definition}")
@@ -377,6 +395,12 @@ def initialize_database() -> None:
             ("section_allocation", "TEXT"),
             ("registration_fee_status", "TEXT NOT NULL DEFAULT 'pending'"),
             ("registration_fee_paid_at", "TEXT"),
+            ("lead_source", "TEXT NOT NULL DEFAULT ''"),
+            ("vendor_id", "TEXT NOT NULL DEFAULT ''"),
+            ("campaign_id", "TEXT NOT NULL DEFAULT ''"),
+            ("referral_code", "TEXT NOT NULL DEFAULT ''"),
+            ("first_visit", "TEXT"),
+            ("submitted_at", "TEXT"),
         ):
             if column not in admission_columns:
                 database.execute(f"ALTER TABLE new_admissions ADD COLUMN {column} {definition}")
@@ -607,6 +631,12 @@ def initialize_postgres_database() -> None:
         "ALTER TABLE applications ADD COLUMN IF NOT EXISTS approval_exception_reason TEXT NOT NULL DEFAULT ''",
         "ALTER TABLE applications ADD COLUMN IF NOT EXISTS registration_fee_status TEXT NOT NULL DEFAULT 'pending'",
         "ALTER TABLE applications ADD COLUMN IF NOT EXISTS registration_fee_paid_at TEXT",
+        "ALTER TABLE applications ADD COLUMN IF NOT EXISTS lead_source TEXT NOT NULL DEFAULT ''",
+        "ALTER TABLE applications ADD COLUMN IF NOT EXISTS vendor_id TEXT NOT NULL DEFAULT ''",
+        "ALTER TABLE applications ADD COLUMN IF NOT EXISTS campaign_id TEXT NOT NULL DEFAULT ''",
+        "ALTER TABLE applications ADD COLUMN IF NOT EXISTS referral_code TEXT NOT NULL DEFAULT ''",
+        "ALTER TABLE applications ADD COLUMN IF NOT EXISTS first_visit TEXT",
+        "ALTER TABLE applications ADD COLUMN IF NOT EXISTS submitted_at TEXT",
         "ALTER TABLE consent_events ADD COLUMN IF NOT EXISTS related_consent_id TEXT",
         "ALTER TABLE consent_events ADD COLUMN IF NOT EXISTS withdrawn_timestamp TEXT",
         "ALTER TABLE new_admissions ADD COLUMN IF NOT EXISTS verification_status TEXT NOT NULL DEFAULT 'pending'",
@@ -621,6 +651,12 @@ def initialize_postgres_database() -> None:
         "ALTER TABLE new_admissions ADD COLUMN IF NOT EXISTS section_allocation TEXT",
         "ALTER TABLE new_admissions ADD COLUMN IF NOT EXISTS registration_fee_status TEXT NOT NULL DEFAULT 'pending'",
         "ALTER TABLE new_admissions ADD COLUMN IF NOT EXISTS registration_fee_paid_at TEXT",
+        "ALTER TABLE new_admissions ADD COLUMN IF NOT EXISTS lead_source TEXT NOT NULL DEFAULT ''",
+        "ALTER TABLE new_admissions ADD COLUMN IF NOT EXISTS vendor_id TEXT NOT NULL DEFAULT ''",
+        "ALTER TABLE new_admissions ADD COLUMN IF NOT EXISTS campaign_id TEXT NOT NULL DEFAULT ''",
+        "ALTER TABLE new_admissions ADD COLUMN IF NOT EXISTS referral_code TEXT NOT NULL DEFAULT ''",
+        "ALTER TABLE new_admissions ADD COLUMN IF NOT EXISTS first_visit TEXT",
+        "ALTER TABLE new_admissions ADD COLUMN IF NOT EXISTS submitted_at TEXT",
         "ALTER TABLE students ADD COLUMN IF NOT EXISTS admission_id BIGINT REFERENCES new_admissions(id) ON DELETE SET NULL",
         "ALTER TABLE students ADD COLUMN IF NOT EXISTS roll_number TEXT",
         "ALTER TABLE students ADD COLUMN IF NOT EXISTS email TEXT",

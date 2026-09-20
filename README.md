@@ -133,6 +133,23 @@ uvicorn app.main:app --reload --port 8000
 
 Interactive API docs: `http://localhost:8000/docs`.
 
+## Vendor admission links
+
+Vendor attribution is captured automatically from the first landing URL and
+saved with the admission record. Parents do not select a vendor in the form:
+
+```text
+https://sheerwoodadmission.com/apply?source=edustoke
+https://sheerwoodadmission.com/apply?source=ezyschooling
+https://sheerwoodadmission.com/apply?source=global_education
+https://sheerwoodadmission.com/apply?source=edhippo
+```
+
+The backend validates these allowlisted sources and stores the vendor ID,
+campaign ID, first visit, application ID, and submission timestamp. Optional
+validated referral codes are `EDU001`, `EZY001`, `GLO001`, and `HIP001`; use
+them as `referral_code` or `token` query parameters when issuing tracked links.
+
 ---
 
 # React + Vite

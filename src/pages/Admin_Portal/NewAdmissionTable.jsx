@@ -30,6 +30,10 @@ function formatDate(value) {
   return Number.isNaN(date.getTime()) ? value : new Intl.DateTimeFormat("en-IN", { day: "2-digit", month: "short", year: "numeric" }).format(date);
 }
 
+function sourceLabel(value) {
+  return String(value || "Direct / unknown").replaceAll("_", " ").replace(/\b\w/g, (letter) => letter.toUpperCase());
+}
+
 function parentDisplayName(value) {
   const name = String(value || "").trim();
   const cognitoSubject = /^[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$/i;
@@ -77,7 +81,7 @@ export default function NewAdmissionTable({ setNotice }) {
   }, [documentPreview?.fileUrl]);
 
   const visibleApplications = useMemo(() => applications.filter((application) => {
-    const searchable = [application.application_number, application.student_name, application.parent_name, application.parent_mobile, application.desired_class].join(" ").toLowerCase();
+    const searchable = [application.application_number, application.student_name, application.parent_name, application.parent_mobile, application.desired_class, application.lead_source, application.vendor_id, application.campaign_id].join(" ").toLowerCase();
     return searchable.includes(query.trim().toLowerCase());
   }), [applications, query]);
 
@@ -199,21 +203,22 @@ export default function NewAdmissionTable({ setNotice }) {
     {error && <p className="new-admission-table-error" role="alert">{error}</p>}
     <div className="new-admission-table-scroll">
       <table className="new-admission-admin-table">
-        <thead><tr><th>Application ID</th><th>Student Name</th><th>Class</th><th>Parent / Mobile</th><th>Documents</th><th>Verification</th><th>Admission Status</th><th>Application Date</th><th>Action</th></tr></thead>
+        <thead><tr><th>Application ID</th><th>Student Name</th><th>Lead Source</th><th>Class</th><th>Parent / Mobile</th><th>Documents</th><th>Verification</th><th>Admission Status</th><th>Form Submitted</th><th>Action</th></tr></thead>
         <tbody>
-          {loading && <tr><td colSpan="9" className="new-admission-empty">Loading applications…</td></tr>}
-          {!loading && !visibleApplications.length && <tr><td colSpan="9" className="new-admission-empty">No real admission records found.</td></tr>}
+          {loading && <tr><td colSpan="10" className="new-admission-empty">Loading applications…</td></tr>}
+          {!loading && !visibleApplications.length && <tr><td colSpan="10" className="new-admission-empty">No real admission records found.</td></tr>}
           {!loading && visibleApplications.map((application) => {
             const summary = application.document_summary || {};
             return <tr key={application.id}>
                 <td><button type="button" className="new-admission-student-button" onClick={() => setSelectedApplication(application)}>{application.application_number}</button></td>
                 <td><button type="button" className="new-admission-student-button" onClick={() => setSelectedApplication(application)}>{application.student_name || "Application in progress"}</button></td>
+                <td className="new-admission-source-cell"><b>{sourceLabel(application.lead_source)}</b><small>{application.vendor_id || "No vendor ID"}</small></td>
                 <td>{application.desired_class || "—"}</td>
                 <td className="new-admission-parent-cell"><b>{parentDisplayName(application.parent_name)}</b><small>Mobile: {application.parent_mobile || "Not saved"}</small></td>
                 <td>{summary.uploaded || 0}/{summary.required || 5} uploaded<br /><small>{summary.verified || 0}/{summary.required || 5} verified</small></td>
                 <td><Badge value={application.documents_status} /></td>
                 <td><Badge value={application.status} exceptionalApproval={Number(application.approval_exception) === 1} /></td>
-                <td>{formatDate(application.submitted_on)}</td>
+                <td><b>{application.submitted_at ? "Yes" : "No"}</b><small>{application.submitted_at ? formatDate(application.submitted_at) : "Not submitted"}</small></td>
                 <td><button type="button" className="new-admission-view" onClick={() => setSelectedApplication(application)}>View details</button></td>
               </tr>;
           })}
