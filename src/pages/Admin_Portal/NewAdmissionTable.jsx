@@ -55,6 +55,7 @@ export default function NewAdmissionTable({ setNotice }) {
   const { session } = useCognitoAuth();
   const [applications, setApplications] = useState([]);
   const [query, setQuery] = useState("");
+  const [vendorFilter, setVendorFilter] = useState("all");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
   const [savingId, setSavingId] = useState(null);
@@ -87,8 +88,19 @@ export default function NewAdmissionTable({ setNotice }) {
 
   const visibleApplications = useMemo(() => applications.filter((application) => {
     const searchable = [application.application_number, application.student_name, application.parent_name, application.parent_mobile, application.desired_class, application.lead_source, application.vendor_id, application.campaign_id].join(" ").toLowerCase();
-    return searchable.includes(query.trim().toLowerCase());
-  }), [applications, query]);
+    const matchesSearch = searchable.includes(query.trim().toLowerCase());
+    const matchesVendor = vendorFilter === "all" || application.vendor_id === vendorFilter;
+    return matchesSearch && matchesVendor;
+  }), [applications, query, vendorFilter]);
+
+  const vendorOptions = useMemo(() => [
+    ["all", "All vendors"],
+    ["DIRECT", "Direct Website"],
+    ["EDU001", "Edustoke"],
+    ["EZY001", "Ezyschooling"],
+    ["GLO001", "Global Education"],
+    ["HIP001", "Edhippo"],
+  ], []);
 
   async function updateAdmission(application, decision, options = {}) {
     if (!session?.accessToken || savingId) return;
@@ -204,7 +216,12 @@ export default function NewAdmissionTable({ setNotice }) {
       <div><p>NEW ADMISSION</p><h2>Admission applications</h2><span>Verification and approval are saved separately.</span></div>
       <button type="button" onClick={loadApplications} disabled={loading}>↻ Refresh</button>
     </header>
-    <input className="new-admission-search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search application, student, parent or mobile…" aria-label="Search admissions" />
+    <div className="new-admission-filter-row">
+      <input className="new-admission-search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search application, student, parent or mobile…" aria-label="Search admissions" />
+      <select value={vendorFilter} onChange={(event) => setVendorFilter(event.target.value)} aria-label="Filter by vendor">
+        {vendorOptions.map(([value, labelText]) => <option value={value} key={value}>{labelText}</option>)}
+      </select>
+    </div>
     {error && <p className="new-admission-table-error" role="alert">{error}</p>}
     <div className="new-admission-table-scroll">
       <table className="new-admission-admin-table">

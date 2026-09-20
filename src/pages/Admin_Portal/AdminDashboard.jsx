@@ -23,6 +23,11 @@ function shortName(value, fallback = "Not set") {
   return words.length > 1 ? `${words[0]} ${words[1][0]}.` : words[0];
 }
 
+function vendorName(application) {
+  const names = { DIRECT: "Direct Website", EDU001: "Edustoke", EZY001: "Ezyschooling", GLO001: "Global Education", HIP001: "Edhippo" };
+  return names[application.vendor_id] || String(application.lead_source || "Direct Website").replaceAll("_", " ").replace(/\b\w/g, (letter) => letter.toUpperCase());
+}
+
 function dateLabel(value) {
   if (!value) return "Recently";
   const date = new Date(value);
@@ -115,6 +120,13 @@ function DonutChart({ segments, emptyMessage }) {
   return <div className="admin-dashboard-donut-wrap"><div className="admin-dashboard-donut" style={{ background: `conic-gradient(${gradient})` }}><div><strong>{total}</strong><small>Total</small></div></div><ul>{visible.map((segment, index) => <li key={segment.label}><i style={{ background: segment.color || chartColors[index % chartColors.length] }} /><span>{segment.label}</span><b>{segment.value}</b></li>)}</ul></div>;
 }
 
+function VendorOverview({ vendors, onClick }) {
+  return <section className="admin-vendor-overview">
+    <header><div><p>VENDOR PERFORMANCE</p><h2>Admissions by vendor</h2><small>Track leads, submissions and admission outcomes by source.</small></div><button type="button" onClick={onClick}>Open admissions <span>→</span></button></header>
+    {!vendors.length ? <EmptyChart message="No vendor attribution has been recorded yet." /> : <div className="admin-vendor-grid">{vendors.map((vendor) => <article key={vendor.id}><div className="admin-vendor-heading"><span>{vendor.name.slice(0, 1)}</span><div><b>{vendor.name}</b><small>{vendor.id}</small></div></div><div className="admin-vendor-metrics"><div><strong>{vendor.leads}</strong><small>Leads</small></div><div><strong>{vendor.submitted}</strong><small>Submitted</small></div><div><strong>{vendor.pending}</strong><small>Pending</small></div><div><strong>{vendor.approved}</strong><small>Confirmed</small></div></div><div className="admin-vendor-bar"><i style={{ width: `${vendor.leads ? Math.max(4, (vendor.submitted / vendor.leads) * 100) : 0}%` }} /></div></article>)}</div>}
+  </section>;
+}
+
 function titleFor(view) {
   return view === "teachers" ? "Teacher Analytics" : view === "students" ? "Student Analytics" : "Operational Analytics";
 }
@@ -158,6 +170,16 @@ export default function AdminDashboard({ onNavigate, view = "overview" }) {
     const applicationStatuses = grouped(admissions, (application) => normalizedStatus(application.status));
     const documentStatuses = grouped(admissions, (application) => normalizedStatus(application.documents_status));
     const submitted = admissions.filter((application) => ["pending", "needs_information", "reupload_required"].includes(normalizedStatus(application.status)));
+    const vendorMap = admissions.reduce((result, application) => {
+      const id = application.vendor_id || "DIRECT";
+      const current = result[id] || { id, name: vendorName(application), leads: 0, submitted: 0, pending: 0, approved: 0 };
+      current.leads += 1;
+      if (application.submitted_at) current.submitted += 1;
+      if (["pending", "needs_information", "reupload_required"].includes(normalizedStatus(application.status))) current.pending += 1;
+      if (normalizedStatus(application.status) === "approved") current.approved += 1;
+      result[id] = current;
+      return result;
+    }, {});
     const months = Array.from({ length: 6 }, (_, index) => {
       const date = new Date();
       date.setDate(1);
@@ -190,6 +212,7 @@ export default function AdminDashboard({ onNavigate, view = "overview" }) {
         login_only: number(funnel.login_only),
       }, teachers, students, classes, attendance,
       totalApplications: admissions.length,
+      vendors: Object.values(vendorMap).sort((a, b) => b.leads - a.leads),
       pendingApplications: submitted.length,
       underVerification: documentStatuses.under_verification || 0,
       documentsVerified: documentStatuses.documents_verified || 0,
@@ -273,6 +296,7 @@ export default function AdminDashboard({ onNavigate, view = "overview" }) {
       {focusedConfig.charts}
     </> : <>
       <AdmissionFunnelTracker funnel={analytics.funnel} onClick={() => onNavigate("admissions")} />
+      <VendorOverview vendors={analytics.vendors} onClick={() => onNavigate("admissions")} />
       <section className="admin-dashboard-module-grid">
         <DashboardCard icon="📝" title="New Admissions" description="Application, document and approval progress" metrics={[{ label: "Total Applications", value: analytics.totalApplications }, { label: "Pending", value: analytics.pendingApplications }, { label: "Under Verification", value: analytics.underVerification }, { label: "Documents Verified", value: analytics.documentsVerified }, { label: "Approved", value: analytics.approved }, { label: "Rejected", value: analytics.rejected }]} action="View New Admission Dashboard" onClick={() => onNavigate("admissions")} />
         <DashboardCard icon="👨‍🏫" title="Teachers" description="Staff availability and academic allocation" metrics={[{ label: "Total Teachers", value: analytics.teachers.length }, { label: "Active Teachers", value: analytics.activeTeachers }, { label: "On Leave", value: analytics.onLeave }, { label: "Classes Assigned", value: analytics.classAssignments }, { label: "Subjects Assigned", value: analytics.subjectAssignments }]} action="View Teacher Dashboard" onClick={() => onNavigate("teachers")} />
