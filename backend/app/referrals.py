@@ -14,6 +14,7 @@ class Referral:
 
 
 REFERRALS = {
+    "direct": Referral("direct", "DIRECT", "ORGANIC", ""),
     "edustoke": Referral("edustoke", "EDU001", "EDUSTOKE_ADMISSIONS", "EDU001"),
     "ezyschooling": Referral("ezyschooling", "EZY001", "EZYSCHOOLING_ADMISSIONS", "EZY001"),
     "global_education": Referral("global_education", "GLO001", "GLOBAL_EDUCATION_ADMISSIONS", "GLO001"),

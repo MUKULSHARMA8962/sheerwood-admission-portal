@@ -34,6 +34,11 @@ function sourceLabel(value) {
   return String(value || "Direct / unknown").replaceAll("_", " ").replace(/\b\w/g, (letter) => letter.toUpperCase());
 }
 
+function vendorName(application) {
+  const names = { EDU001: "Edustoke", EZY001: "Ezyschooling", GLO001: "Global Education", HIP001: "Edhippo" };
+  return names[application.vendor_id] || sourceLabel(application.lead_source);
+}
+
 function parentDisplayName(value) {
   const name = String(value || "").trim();
   const cognitoSubject = /^[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$/i;
@@ -212,7 +217,7 @@ export default function NewAdmissionTable({ setNotice }) {
             return <tr key={application.id}>
                 <td><button type="button" className="new-admission-student-button" onClick={() => setSelectedApplication(application)}>{application.application_number}</button></td>
                 <td><button type="button" className="new-admission-student-button" onClick={() => setSelectedApplication(application)}>{application.student_name || "Application in progress"}</button></td>
-                <td className="new-admission-source-cell"><b>{sourceLabel(application.lead_source)}</b><small>{application.vendor_id || "No vendor ID"}</small></td>
+                <td className="new-admission-source-cell"><b>{vendorName(application)}</b><small>{application.vendor_id || "No vendor ID"}</small></td>
                 <td>{application.desired_class || "—"}</td>
                 <td className="new-admission-parent-cell"><b>{parentDisplayName(application.parent_name)}</b><small>Mobile: {application.parent_mobile || "Not saved"}</small></td>
                 <td>{summary.uploaded || 0}/{summary.required || 5} uploaded<br /><small>{summary.verified || 0}/{summary.required || 5} verified</small></td>

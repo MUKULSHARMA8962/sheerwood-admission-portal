@@ -8,6 +8,11 @@ function formatDate(value) {
   return Number.isNaN(date.getTime()) ? String(value) : new Intl.DateTimeFormat("en-IN", { day: "2-digit", month: "short", year: "numeric" }).format(date);
 }
 
+function vendorName(application) {
+  const names = { EDU001: "Edustoke", EZY001: "Ezyschooling", GLO001: "Global Education", HIP001: "Edhippo" };
+  return names[application.vendor_id] || String(application.lead_source || "Direct / unknown").replaceAll("_", " ");
+}
+
 export default function AdmissionDetailCard({ application, onClose, onApprove, onApproveWithException, onReject, saving, documentBusyId, onOpenDocument, onReviewDocument, onDeleteDocument }) {
   if (!application) return null;
   const requiredDocuments = application.document_summary?.required || 5;
@@ -36,7 +41,7 @@ export default function AdmissionDetailCard({ application, onClose, onApprove, o
 
       <section className="admin-admission-detail-summary" aria-label="Application summary">
         <div><small>Parent</small><b>{application.parent_name || "Parent details pending"}</b><span>{application.parent_mobile || "Mobile not saved"}</span></div>
-        <div><small>Lead source</small><b>{String(application.lead_source || "Direct / unknown").replaceAll("_", " ")}</b><span>{application.vendor_id || "No vendor ID"} · {application.campaign_id || "No campaign"}</span></div>
+        <div><small>Vendor</small><b>{vendorName(application)}</b><span>{application.vendor_id || "No vendor ID"} · {application.campaign_id || "No campaign"}</span></div>
         <div><small>Documents</small><b>{application.document_summary?.uploaded || 0}/{application.document_summary?.required || 5} uploaded</b><span>{application.document_summary?.verified || 0}/{application.document_summary?.required || 5} verified</span></div>
         <div><small>Verification</small><b>{getApplicationStatusLabel(application.documents_status)}</b><span>{application.verification_date ? formatDate(application.verification_date) : "Awaiting review"}</span></div>
         <div><small>{isExceptionalApproval ? "Exception reason" : "Form submitted"}</small><b>{isExceptionalApproval ? "Approved with exception" : application.submitted_at ? "Yes" : "No"}</b><span>{isExceptionalApproval ? application.approval_exception_reason || application.admin_remark || "Not recorded" : application.submitted_at ? formatDate(application.submitted_at) : "Not submitted"}</span></div>

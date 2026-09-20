@@ -12,13 +12,14 @@ function scopedStorageKey(baseKey) {
 
 export function captureReferralAttribution(search = window.location.search) {
   const parameters = new URLSearchParams(search);
-  const source = parameters.get("source")?.trim().toLowerCase();
-  if (!source) return getReferralAttribution();
-
   const existing = getReferralAttribution();
+  const requestedSource = parameters.get("source")?.trim().toLowerCase();
+  const source = requestedSource || existing.lead_source || "direct";
+  if (!requestedSource && existing.lead_source) return existing;
+
   const referral = {
     lead_source: source,
-    campaign_id: parameters.get("campaign_id")?.trim() || "",
+    campaign_id: parameters.get("campaign_id")?.trim() || (source === "direct" ? "ORGANIC" : ""),
     referral_code: parameters.get("referral_code")?.trim().toUpperCase() || parameters.get("token")?.trim().toUpperCase() || "",
     first_visit: existing?.first_visit || new Date().toISOString(),
   };
