@@ -56,6 +56,17 @@ class RegistrationFeePaymentRequest(BaseModel):
     method: str = Field(min_length=2, max_length=80)
 
 
+class RegistrationFeeSettingsRequest(BaseModel):
+    amount: int = Field(ge=0, le=10_000_000)
+
+
+class SyllabusRequest(BaseModel):
+    subject: str = Field(min_length=1, max_length=120)
+    details: str = Field(min_length=1, max_length=5000)
+    sort_order: int = Field(default=0, ge=0, le=10_000)
+    active: bool = True
+
+
 class ParentalConsentRequest(BaseModel):
     parent_name: str = Field(min_length=2, max_length=120)
     relationship_to_child: str = Field(min_length=2, max_length=80)

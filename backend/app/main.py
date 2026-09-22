@@ -20,7 +20,7 @@ load_dotenv(Path(__file__).resolve().parents[1] / ".env")
 
 from .database import connection, initialize_database
 from .dependencies import CurrentUser, require_roles
-from .notifications import send_admission_submission_notifications
+from .notifications import send_admission_approval_notification, send_admission_submission_notifications
 from .otp import OTPConfigurationError, normalize_phone_number, verify_otp
 from .referrals import resolve_referral
 from .schemas import AdmissionDecisionRequest, CognitoTokenExchangeRequest, CreateApplicationRequest, LoginRequest, ParentalConsentRequest, ParentalConsentWithdrawalRequest, RegisterRequest, RegistrationFeePaymentRequest, SaveApplicationDraftRequest
@@ -930,7 +930,7 @@ def delete_admission_document(
 
 
 @app.patch("/api/applications/{application_id}/decision")
-def decide_application(application_id: int, payload: AdmissionDecisionRequest, user: Annotated[dict[str, Any], Depends(require_roles("admin"))]) -> dict[str, Any]:
+def decide_application(application_id: int, payload: AdmissionDecisionRequest, background_tasks: BackgroundTasks, user: Annotated[dict[str, Any], Depends(require_roles("admin"))]) -> dict[str, Any]:
     with connection() as database:
         application = database.execute("SELECT * FROM applications WHERE id = ?", (application_id,)).fetchone()
         if not application:
@@ -971,6 +971,15 @@ def decide_application(application_id: int, payload: AdmissionDecisionRequest, u
             (next_status, documents_status, payload.section_allocation, admin_remark, approval_date, approved_by, int(is_exceptional_approval), exception_reason if is_exceptional_approval else "", updated_at, application["application_number"]),
         )
         updated = database.execute("SELECT * FROM applications WHERE id = ?", (application_id,)).fetchone()
+        parent = database.execute("SELECT email, full_name FROM users WHERE id = ?", (updated["parent_id"],)).fetchone()
+    if next_status == "approved" and application["status"] != "approved" and parent:
+        background_tasks.add_task(
+            send_admission_approval_notification,
+            parent_email=parent["email"],
+            parent_name=parent["full_name"],
+            student_name=updated["student_name"],
+            application_number=updated["application_number"],
+        )
     return dict(updated)
 
 

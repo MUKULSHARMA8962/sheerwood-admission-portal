@@ -29,5 +29,5 @@ export default function AuthCallback() {
     };
   }, [location.search, navigate, setSession]);
 
-  return <main className="auth-callback-page"><section className="auth-callback-card"><span className="auth-callback-crest">S</span><p>SHEERWOOD INTERNATIONAL SCHOOL</p><h1>{error ? "We could not sign you in" : "Signing you in securely…"}</h1><div className={error ? "auth-callback-status error" : "auth-callback-status"}>{error || "Completing your Cognito sign-in. Please wait."}</div>{error && <button onClick={() => navigate("/login", { replace: true })}>Return to sign in</button>}</section></main>;
+  return <main className="auth-callback-page"><section className="auth-callback-card"><span className="auth-callback-crest">S</span><p>SHEERWOOD COLLEGE</p><h1>{error ? "We could not sign you in" : "Signing you in securely…"}</h1><div className={error ? "auth-callback-status error" : "auth-callback-status"}>{error || "Completing your Cognito sign-in. Please wait."}</div>{error && <button onClick={() => navigate("/login", { replace: true })}>Return to sign in</button>}</section></main>;
 }

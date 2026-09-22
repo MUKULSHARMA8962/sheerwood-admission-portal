@@ -5,6 +5,7 @@ from __future__ import annotations
 import logging
 import os
 import re
+from textwrap import wrap
 from typing import Any
 
 from .database import connection
@@ -129,15 +130,77 @@ def _admin_recipients() -> set[str]:
     return {email for row in rows if (email := _valid_email(row["email"]))} | _additional_admin_emails()
 
 
-def _send_messages(messages: list[tuple[str, str, str]]) -> None:
+def _pdf_escape(value: str) -> str:
+    return value.replace("\\", "\\\\").replace("(", "\\(").replace(")", "\\)")
+
+
+def _application_pdf(*, application_number: str, student_name: str, desired_class: str, form_lines: list[str]) -> bytes:
+    """Create a small dependency-free PDF receipt from the completed form."""
+    lines = [
+        "Sheerwood College",
+        "Admission Application Form",
+        f"Application ID: {application_number}",
+        f"Student: {student_name}",
+        f"Class: {desired_class}",
+        "",
+        *form_lines,
+    ]
+    wrapped_lines = [part for line in lines for part in (wrap(str(line), 92) or [""])]
+    pages = [wrapped_lines[index:index + 48] for index in range(0, len(wrapped_lines), 48)] or [[]]
+    objects: list[bytes] = []
+    page_ids: list[int] = []
+    font_id = 3
+    next_id = 4
+    for page_lines in pages:
+        commands = ["BT", "/F1 10 Tf", "50 760 Td"]
+        for index, line in enumerate(page_lines):
+            if index:
+                commands.append("0 -15 Td")
+            commands.append(f"({_pdf_escape(line)}) Tj")
+        commands.append("ET")
+        stream = "\n".join(commands).encode("latin-1", "replace")
+        content_id = next_id
+        page_id = next_id + 1
+        next_id += 2
+        objects.extend([f"<< /Length {len(stream)} >>\nstream\n".encode() + stream + b"\nendstream", b""])
+        page_ids.append(page_id)
+        objects[-1] = f"<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 {font_id} 0 R >> >> /Contents {content_id} 0 R >>".encode()
+    objects[0:0] = [b"<< /Type /Catalog /Pages 2 0 R >>", f"<< /Type /Pages /Kids [{' '.join(f'{page_id} 0 R' for page_id in page_ids)}] /Count {len(page_ids)} >>".encode(), b"<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>"]
+    pdf = bytearray(b"%PDF-1.4\n")
+    offsets = [0]
+    for object_id, content in enumerate(objects, 1):
+        offsets.append(len(pdf))
+        pdf.extend(f"{object_id} 0 obj\n".encode() + content + b"\nendobj\n")
+    xref_offset = len(pdf)
+    pdf.extend(f"xref\n0 {len(objects) + 1}\n0000000000 65535 f \n".encode())
+    pdf.extend(b"".join(f"{offset:010d} 00000 n \n".encode() for offset in offsets[1:]))
+    pdf.extend(f"trailer\n<< /Size {len(objects) + 1} /Root 1 0 R >>\nstartxref\n{xref_offset}\n%%EOF".encode())
+    return bytes(pdf)
+
+
+def _syllabus_pdf(*, application_number: str, student_name: str, syllabus: list[dict[str, Any]]) -> bytes:
+    lines = [
+        "Sheerwood College",
+        "Entrance Test Syllabus",
+        f"Application ID: {application_number}",
+        f"Student: {student_name}",
+        "",
+        "SYLLABUS",
+    ]
+    for item in syllabus:
+        lines.extend([f"{item['subject']}", f"  {item['details']}", ""])
+    return _application_pdf(application_number=application_number, student_name=student_name, desired_class="Entrance Test", form_lines=lines[5:])
+
+
+def _send_messages(messages: list[tuple[str, str, str, list[tuple[str, bytes, str]]]]) -> None:
     """Send individual messages so administrator addresses are never exposed."""
     if not _valid_email(configured_sender()):
         logger.warning("Admission email notifications skipped because no sender email is configured.")
         return
 
     try:
-        for recipient, subject, body in messages:
-            send_email(recipient=recipient, subject=subject, body=body)
+        for recipient, subject, body, attachments in messages:
+            send_email(recipient=recipient, subject=subject, body=body, attachments=attachments)
     except Exception:
         # A notification must never make a successfully saved application fail.
         logger.exception("Admission email notification could not be delivered.")
@@ -160,7 +223,8 @@ def send_admission_submission_notifications(
     application_display = application_number.strip()
     class_display = desired_class.strip() or "selected class"
     completed_form = _completed_application_form(application_data, documents)
-    messages: list[tuple[str, str, str]] = []
+    pdf_attachment = [(f"{application_display.replace('/', '-')}-application.pdf", _application_pdf(application_number=application_display, student_name=student_display_name, desired_class=class_display, form_lines=completed_form), "application/pdf")]
+    messages: list[tuple[str, str, str, list[tuple[str, bytes, str]]]] = []
 
     if parent_recipient:
         messages.append((
@@ -179,6 +243,7 @@ def send_admission_submission_notifications(
                 "",
                 "Sheerwood International School Admissions",
             ]),
+            pdf_attachment,
         ))
 
     for admin_email in _admin_recipients():
@@ -196,7 +261,35 @@ def send_admission_submission_notifications(
                 *completed_form,
                 "Open the Admin Admissions dashboard to review documents and update the application.",
             ]),
+            pdf_attachment,
         ))
 
     if messages:
         _send_messages(messages)
+
+
+def send_admission_approval_notification(*, parent_email: str, parent_name: str, student_name: str, application_number: str) -> None:
+    """Send the acceptance letter and current entrance-test syllabus."""
+    recipient = _valid_email(parent_email)
+    if not recipient:
+        return
+    with connection() as database:
+        rows = database.execute("SELECT subject, details FROM entrance_syllabus WHERE active = 1 ORDER BY sort_order, id").fetchall()
+    syllabus = [dict(row) for row in rows]
+    syllabus_lines = ["ENTRANCE TEST SYLLABUS", ""]
+    syllabus_lines.extend(f"{item['subject']}: {item['details']}" for item in syllabus)
+    if not syllabus:
+        syllabus_lines.append("The entrance-test syllabus will be shared by the admissions office.")
+    display_name = parent_name.strip() or "Parent"
+    display_student = student_name.strip() or "the applicant"
+    body = "\n".join([
+        f"Dear {display_name},", "",
+        "ADMISSION ACCEPTED", "",
+        f"We are pleased to inform you that {display_student}'s admission application has been accepted by Sheerwood College.",
+        "", f"Application ID: {application_number}", "", *syllabus_lines, "",
+        "Please keep the attached syllabus for the entrance-test preparation.",
+        "For further instructions, sign in to the parent admission portal or contact the admissions office.",
+        "", "Regards,", "Admissions Office", "Sheerwood College",
+    ])
+    attachment = [(f"{application_number.replace('/', '-')}-entrance-syllabus.pdf", _syllabus_pdf(application_number=application_number, student_name=display_student, syllabus=syllabus), "application/pdf")]
+    _send_messages([(recipient, f"Admission accepted — {application_number}", body, attachment)])

@@ -290,6 +290,21 @@ def initialize_database() -> None:
                 attempts INTEGER NOT NULL DEFAULT 0
             );
 
+            CREATE TABLE IF NOT EXISTS school_settings (
+                setting_key TEXT PRIMARY KEY,
+                setting_value TEXT NOT NULL,
+                updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+            );
+
+            CREATE TABLE IF NOT EXISTS entrance_syllabus (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                subject TEXT NOT NULL,
+                details TEXT NOT NULL,
+                sort_order INTEGER NOT NULL DEFAULT 0,
+                active INTEGER NOT NULL DEFAULT 1,
+                updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+            );
+
             CREATE TABLE IF NOT EXISTS consent_events (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 consent_id TEXT NOT NULL UNIQUE,
@@ -592,6 +607,23 @@ def initialize_postgres_database() -> None:
         )
         """,
         """
+        CREATE TABLE IF NOT EXISTS school_settings (
+            setting_key TEXT PRIMARY KEY,
+            setting_value TEXT NOT NULL,
+            updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP::text
+        )
+        """,
+        """
+        CREATE TABLE IF NOT EXISTS entrance_syllabus (
+            id BIGSERIAL PRIMARY KEY,
+            subject TEXT NOT NULL,
+            details TEXT NOT NULL,
+            sort_order INTEGER NOT NULL DEFAULT 0,
+            active BOOLEAN NOT NULL DEFAULT TRUE,
+            updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP::text
+        )
+        """,
+        """
         CREATE TABLE IF NOT EXISTS consent_events (
             id BIGSERIAL PRIMARY KEY,
             consent_id TEXT NOT NULL UNIQUE,
@@ -669,6 +701,8 @@ def initialize_postgres_database() -> None:
         "CREATE INDEX IF NOT EXISTS students_class_section_idx ON students(class_section)",
         "CREATE INDEX IF NOT EXISTS teachers_status_idx ON teachers(employment_status)",
         "CREATE INDEX IF NOT EXISTS admins_status_idx ON admins(employment_status)",
+        "INSERT INTO school_settings (setting_key, setting_value) VALUES ('registration_fee_amount', '1500') ON CONFLICT(setting_key) DO NOTHING",
+        "INSERT INTO school_settings (setting_key, setting_value) VALUES ('registration_fee_amount', '1500') ON CONFLICT(setting_key) DO NOTHING",
     )
     with connection() as database:
         for statement in statements:

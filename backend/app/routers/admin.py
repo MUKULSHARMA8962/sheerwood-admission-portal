@@ -12,7 +12,7 @@ from botocore.exceptions import BotoCoreError, ClientError
 from ..ai import AIConfigurationError, AIProviderRateLimitError, AIProviderUnavailableError, generate_ai_reply
 from ..database import connection
 from ..dependencies import require_roles
-from ..schemas import AIRequest, AnnouncementRequest, CreateUserRequest, DocumentReviewRequest, UserRoleUpdate
+from ..schemas import AIRequest, AnnouncementRequest, CreateUserRequest, DocumentReviewRequest, RegistrationFeeSettingsRequest, SyllabusRequest, UserRoleUpdate
 from ..security import hash_password
 
 router = APIRouter(prefix="/api/admin", tags=["Admin UI"])
@@ -462,7 +462,60 @@ def update_user_role(user_id: str, payload: UserRoleUpdate, _: dict = AdminUser)
 
 @router.get("/settings")
 def settings(_: dict = AdminUser) -> dict:
-    return {"school_name": "Sheerwood International School", "academic_session": "2027–28", "branches": 1, "classes": "2–12", "subjects": 42, "notification_channels": ["app", "email", "sms"]}
+    with connection() as database:
+        fee = database.execute("SELECT setting_value FROM school_settings WHERE setting_key = 'registration_fee_amount'").fetchone()
+    return {"school_name": "Sheerwood College", "academic_session": "2027–28", "branches": 1, "classes": "2–12", "subjects": 42, "registration_fee_amount": int(fee["setting_value"] if fee else 1500), "notification_channels": ["app", "email", "sms"]}
+
+
+@router.patch("/settings/registration-fee")
+def update_registration_fee(payload: RegistrationFeeSettingsRequest, _: dict = AdminUser) -> dict:
+    with connection() as database:
+        database.execute("INSERT INTO school_settings (setting_key, setting_value, updated_at) VALUES ('registration_fee_amount', ?, CURRENT_TIMESTAMP) ON CONFLICT(setting_key) DO UPDATE SET setting_value = excluded.setting_value, updated_at = excluded.updated_at", (str(payload.amount),))
+    return {"registration_fee_amount": payload.amount}
+
+
+@router.get("/syllabus")
+def list_syllabus(_: dict = AdminUser) -> list[dict]:
+    with connection() as database:
+        rows = database.execute("SELECT id, subject, details, sort_order, active, updated_at FROM entrance_syllabus ORDER BY sort_order, id").fetchall()
+    return [dict(row) for row in rows]
+
+
+@router.post("/syllabus", status_code=201)
+def create_syllabus(payload: SyllabusRequest, _: dict = AdminUser) -> dict:
+    with connection() as database:
+        row = database.execute("INSERT INTO entrance_syllabus (subject, details, sort_order, active) VALUES (?, ?, ?, ?) RETURNING id, subject, details, sort_order, active, updated_at", (payload.subject.strip(), payload.details.strip(), payload.sort_order, int(payload.active))).fetchone()
+    return dict(row)
+
+
+@router.patch("/syllabus/{syllabus_id}")
+def update_syllabus(syllabus_id: int, payload: SyllabusRequest, _: dict = AdminUser) -> dict:
+    with connection() as database:
+        row = database.execute("UPDATE entrance_syllabus SET subject = ?, details = ?, sort_order = ?, active = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ? RETURNING id, subject, details, sort_order, active, updated_at", (payload.subject.strip(), payload.details.strip(), payload.sort_order, int(payload.active), syllabus_id)).fetchone()
+    if not row:
+        raise HTTPException(status_code=404, detail="Syllabus item was not found.")
+    return dict(row)
+
+
+@router.delete("/syllabus/{syllabus_id}", status_code=204)
+def delete_syllabus(syllabus_id: int, _: dict = AdminUser) -> None:
+    with connection() as database:
+        result = database.execute("DELETE FROM entrance_syllabus WHERE id = ?", (syllabus_id,))
+    if result.rowcount == 0:
+        raise HTTPException(status_code=404, detail="Syllabus item was not found.")
+
+
+@router.patch("/users-roles/{user_id}/status")
+def update_user_status(user_id: str, enabled: bool, _: dict = AdminUser) -> dict:
+    if not user_id.startswith("cognito:"):
+        raise HTTPException(status_code=400, detail="Only Cognito vendor accounts can be blocked from this endpoint.")
+    client, user_pool_id = cognito_admin_client()
+    username = user_id.removeprefix("cognito:")
+    try:
+        (client.admin_enable_user if enabled else client.admin_disable_user)(UserPoolId=user_pool_id, Username=username)
+        return {"id": user_id, "enabled": enabled, "status": "Enabled" if enabled else "Disabled"}
+    except (BotoCoreError, ClientError) as error:
+        raise HTTPException(status_code=503, detail="Vendor account status could not be changed.") from error
 
 
 @router.post("/ai")
