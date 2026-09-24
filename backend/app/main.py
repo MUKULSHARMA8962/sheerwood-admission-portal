@@ -1,5 +1,6 @@
 from contextlib import asynccontextmanager
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
+from decimal import Decimal
 import hashlib
 import os
 import json
@@ -12,18 +13,20 @@ import httpx
 from dotenv import load_dotenv
 from fastapi import BackgroundTasks, Depends, FastAPI, File, Header, HTTPException, Request, Response, UploadFile, status
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, RedirectResponse
+from starlette.concurrency import run_in_threadpool
 
 # Local development settings live in backend/.env. Server environment variables
 # take priority, so production secrets can remain in the process/service config.
 load_dotenv(Path(__file__).resolve().parents[1] / ".env")
 
 from .database import connection, initialize_database
+from . import easebuzz
 from .dependencies import CurrentUser, require_roles
 from .notifications import send_admission_approval_notification, send_admission_submission_notifications
 from .otp import OTPConfigurationError, normalize_phone_number, verify_otp
 from .referrals import resolve_referral
-from .schemas import AdmissionDecisionRequest, CognitoTokenExchangeRequest, CreateApplicationRequest, LoginRequest, ParentalConsentRequest, ParentalConsentWithdrawalRequest, RegisterRequest, RegistrationFeePaymentRequest, SaveApplicationDraftRequest
+from .schemas import AdmissionDecisionRequest, CognitoTokenExchangeRequest, CreateApplicationRequest, LoginRequest, ParentalConsentRequest, ParentalConsentWithdrawalRequest, RegisterRequest, SaveApplicationDraftRequest
 from .security import hash_password, new_session_token, session_expiry, verify_password
 from .routers import admin, ai, otp, parent, teacher
 
@@ -384,75 +387,217 @@ def create_application(payload: CreateApplicationRequest, user: Annotated[dict[s
     return dict(application)
 
 
-@app.post("/api/applications/{application_number}/registration-fee")
-def record_registration_fee_payment(
-    application_number: str,
-    payload: RegistrationFeePaymentRequest,
-    background_tasks: BackgroundTasks,
-    user: Annotated[dict[str, Any], Depends(require_roles("parent"))],
-) -> dict[str, Any]:
-    """Record the completed registration-fee step for the portal payment flow."""
+def registration_fee_amount(database: Any) -> str:
+    row = database.execute("SELECT setting_value FROM school_settings WHERE setting_key = 'registration_fee_amount'").fetchone()
+    amount = Decimal(str(row["setting_value"] if row else "1500"))
+    if amount <= 0:
+        raise HTTPException(status_code=503, detail="Registration fee is not configured correctly.")
+    return f"{amount:.2f}"
+
+
+def payment_payload(database: Any, application_number: str, parent_id: int) -> dict[str, Any]:
+    application = owned_application(database, application_number, parent_id)
+    order_by = "CASE WHEN status = 'paid' THEN 0 ELSE 1 END, created_at DESC" if application["registration_fee_status"] == "paid" else "created_at DESC"
+    attempt = database.execute(
+        f"""SELECT txnid, amount, status, created_at, paid_at FROM registration_fee_payments
+        WHERE application_number = ? AND parent_id = ? ORDER BY {order_by} LIMIT 1""",
+        (application_number, parent_id),
+    ).fetchone()
+    return {
+        "application_number": application_number,
+        "amount": attempt["amount"] if attempt and attempt["status"] in {"pending", "paid"} else registration_fee_amount(database),
+        "registration_fee_status": application["registration_fee_status"],
+        "registration_fee_paid_at": application["registration_fee_paid_at"],
+        "payment_status": attempt["status"] if attempt else "not_started",
+        "txnid": attempt["txnid"] if attempt else None,
+        "can_retry": not attempt or attempt["status"] != "pending" or datetime.fromisoformat(attempt["created_at"]) <= datetime.now(UTC) - timedelta(minutes=20),
+    }
+
+
+def confirm_easebuzz_transaction(database: Any, txnid: str, background_tasks: BackgroundTasks) -> bool:
+    attempt = database.execute("SELECT * FROM registration_fee_payments WHERE txnid = ?", (txnid,)).fetchone()
+    if not attempt:
+        return False
+    if attempt["status"] == "paid":
+        return True
+    result = easebuzz.retrieve_transaction(txnid)
+    transaction = easebuzz.verified_transaction(result, txnid=txnid, amount=attempt["amount"])
+    if not transaction:
+        return False
     paid_at = datetime.now(UTC).isoformat()
+    database.execute(
+        "UPDATE registration_fee_payments SET status = 'paid', easebuzz_id = ?, paid_at = ?, updated_at = ? WHERE txnid = ? AND status != 'paid'",
+        (str(transaction.get("easebuzz_id") or ""), paid_at, paid_at, txnid),
+    )
+    application = database.execute(
+        "SELECT status, registration_fee_status, student_name, desired_class, application_data, documents_json FROM applications WHERE application_number = ? AND parent_id = ?",
+        (attempt["application_number"], attempt["parent_id"]),
+    ).fetchone()
+    if not application or application["registration_fee_status"] == "paid":
+        return True
+    database.execute(
+        """UPDATE applications SET registration_fee_status = 'paid', registration_fee_paid_at = ?,
+        status = CASE WHEN status = 'draft' THEN 'pending' ELSE status END
+        WHERE application_number = ? AND parent_id = ? AND registration_fee_status != 'paid'""",
+        (paid_at, attempt["application_number"], attempt["parent_id"]),
+    )
+    database.execute(
+        """UPDATE new_admissions SET registration_fee_status = 'paid', registration_fee_paid_at = ?,
+        status = CASE WHEN status = 'draft' THEN 'pending' ELSE status END, updated_at = ?
+        WHERE application_number = ? AND parent_id = ? AND registration_fee_status != 'paid'""",
+        (paid_at, paid_at, attempt["application_number"], attempt["parent_id"]),
+    )
+    if application["status"] in {"", "draft", "needs_information"}:
+        parent = database.execute("SELECT email, full_name FROM users WHERE id = ?", (attempt["parent_id"],)).fetchone()
+        if parent:
+            try:
+                form_data = json.loads(application["application_data"] or "{}")
+                documents = json.loads(application["documents_json"] or "[]")
+            except (TypeError, ValueError):
+                form_data, documents = {}, []
+            background_tasks.add_task(
+                send_admission_submission_notifications,
+                parent_email=parent["email"], parent_name=parent["full_name"],
+                student_name=application["student_name"], application_number=attempt["application_number"],
+                desired_class=application["desired_class"],
+                application_data=form_data if isinstance(form_data, dict) else {},
+                documents=documents if isinstance(documents, list) else [],
+            )
+    return True
+
+
+@app.get("/api/applications/{application_number}/registration-fee")
+def get_registration_fee(application_number: str, user: Annotated[dict[str, Any], Depends(require_roles("parent"))]) -> dict[str, Any]:
+    with connection() as database:
+        return payment_payload(database, application_number, user["id"])
+
+
+@app.post("/api/applications/{application_number}/registration-fee")
+def reject_unverified_registration_fee(application_number: str, user: Annotated[dict[str, Any], Depends(require_roles("parent"))]) -> None:
+    """Old clients must not be able to mark a payment as complete themselves."""
+    with connection() as database:
+        owned_application(database, application_number, user["id"])
+    raise HTTPException(status_code=410, detail="Use Easebuzz checkout to pay the registration fee.")
+
+
+@app.post("/api/applications/{application_number}/registration-fee/initiate")
+def initiate_registration_fee(application_number: str, user: Annotated[dict[str, Any], Depends(require_roles("parent"))]) -> dict[str, Any]:
     with connection() as database:
         application = owned_application(database, application_number, user["id"])
         if application["status"] in FINAL_APPLICATION_STATUSES:
-            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="This admission already has a final decision.")
-        active_consent = active_parental_consent(database, application_number, user["id"])
-        if not active_consent:
-            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Parent or guardian consent must be confirmed before payment.")
+            raise HTTPException(status_code=409, detail="This admission already has a final decision.")
         if application["registration_fee_status"] == "paid":
-            return {
-                "application_number": application_number,
-                "registration_fee_status": "paid",
-                "registration_fee_paid_at": application["registration_fee_paid_at"],
-                "method": payload.method,
-            }
-        notify_submission = application["status"] in {"", "draft", "needs_information"}
+            return payment_payload(database, application_number, user["id"])
+        consent = active_parental_consent(database, application_number, user["id"])
+        if not consent:
+            raise HTTPException(status_code=409, detail="Parent or guardian consent must be confirmed before payment.")
         _, document_counts = document_review_summary(database, application_number)
         if document_counts["uploaded"] < document_counts["required"]:
-            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Upload all required documents before paying the registration fee.")
-
-        database.execute(
-            """UPDATE applications
-            SET registration_fee_status = 'paid', registration_fee_paid_at = ?,
-                status = CASE WHEN status = 'draft' THEN 'pending' ELSE status END
-            WHERE application_number = ? AND parent_id = ?""",
-            (paid_at, application_number, user["id"]),
-        )
-        database.execute(
-            """UPDATE new_admissions
-            SET registration_fee_status = 'paid', registration_fee_paid_at = ?,
-                status = CASE WHEN status = 'draft' THEN 'pending' ELSE status END,
-                updated_at = ?
-            WHERE application_number = ? AND parent_id = ?""",
-            (paid_at, paid_at, application_number, user["id"]),
-        )
-        if notify_submission:
-            saved_application = database.execute(
-                "SELECT student_name, desired_class, application_data, documents_json FROM applications WHERE application_number = ? AND parent_id = ?",
-                (application_number, user["id"]),
-            ).fetchone()
-
-    if notify_submission:
+            raise HTTPException(status_code=409, detail="Upload all required documents before paying the registration fee.")
+        latest = database.execute(
+            "SELECT txnid, created_at FROM registration_fee_payments WHERE application_number = ? AND status = 'pending' ORDER BY created_at DESC LIMIT 1",
+            (application_number,),
+        ).fetchone()
+        if latest and datetime.fromisoformat(latest["created_at"]) > datetime.now(UTC) - timedelta(minutes=20):
+            raise HTTPException(status_code=409, detail="A payment is already in progress. Check its status before starting another.")
+        if latest:
+            database.execute(
+                "UPDATE registration_fee_payments SET status = 'expired', updated_at = ? WHERE txnid = ?",
+                (datetime.now(UTC).isoformat(), latest["txnid"]),
+            )
+        amount = registration_fee_amount(database)
+        txnid = f"SHW{uuid4().hex[:25].upper()}"
         try:
-            saved_application_data = json.loads(saved_application["application_data"] or "{}")
-        except (TypeError, json.JSONDecodeError):
-            saved_application_data = {}
-        try:
-            saved_documents = json.loads(saved_application["documents_json"] or "[]")
-        except (TypeError, json.JSONDecodeError):
-            saved_documents = []
-        background_tasks.add_task(
-            send_admission_submission_notifications,
-            parent_email=user["email"],
-            parent_name=user["full_name"],
-            student_name=saved_application["student_name"],
-            application_number=application_number,
-            desired_class=saved_application["desired_class"],
-            application_data=saved_application_data if isinstance(saved_application_data, dict) else {},
-            documents=saved_documents if isinstance(saved_documents, list) else [],
+            checkout_url = easebuzz.initiate_payment(
+                txnid=txnid, amount=amount, firstname=consent["parent_name"],
+                email=user["email"], phone=consent["parent_mobile"], application_number=application_number,
+            )
+        except easebuzz.EasebuzzError as error:
+            raise HTTPException(status_code=503, detail=str(error)) from error
+        now = datetime.now(UTC).isoformat()
+        inserted = database.execute(
+            "INSERT INTO registration_fee_payments (txnid, application_number, parent_id, amount, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?) ON CONFLICT DO NOTHING",
+            (txnid, application_number, user["id"], amount, now, now),
         )
-    return {"application_number": application_number, "registration_fee_status": "paid", "registration_fee_paid_at": paid_at, "method": payload.method}
+        if inserted.rowcount != 1:
+            raise HTTPException(status_code=409, detail="Another payment is already in progress. Check its status before retrying.")
+    return {"application_number": application_number, "amount": amount, "payment_status": "pending", "txnid": txnid, "checkout_url": checkout_url}
+
+
+@app.post("/api/applications/{application_number}/registration-fee/verify")
+def verify_registration_fee(application_number: str, background_tasks: BackgroundTasks, user: Annotated[dict[str, Any], Depends(require_roles("parent"))]) -> dict[str, Any]:
+    with connection() as database:
+        application = owned_application(database, application_number, user["id"])
+        if application["registration_fee_status"] == "paid":
+            return payment_payload(database, application_number, user["id"])
+        attempts = database.execute(
+            "SELECT txnid FROM registration_fee_payments WHERE application_number = ? AND parent_id = ? ORDER BY created_at DESC LIMIT 5",
+            (application_number, user["id"]),
+        ).fetchall()
+        verification_error = None
+        for attempt in attempts:
+            try:
+                if confirm_easebuzz_transaction(database, attempt["txnid"], background_tasks):
+                    break
+            except easebuzz.EasebuzzError as error:
+                verification_error = error
+        else:
+            if verification_error:
+                raise HTTPException(status_code=503, detail=str(verification_error)) from verification_error
+        return payment_payload(database, application_number, user["id"])
+
+
+def process_easebuzz_return(payload: dict[str, str], background_tasks: BackgroundTasks) -> None:
+    try:
+        valid_hash = easebuzz.verify_response_hash(payload)
+    except easebuzz.EasebuzzError:
+        valid_hash = False
+    if not valid_hash:
+        raise HTTPException(status_code=400, detail="Invalid Easebuzz payment response.")
+    with connection() as database:
+        attempt = database.execute("SELECT * FROM registration_fee_payments WHERE txnid = ?", (payload.get("txnid"),)).fetchone()
+        if not attempt or not easebuzz.amount_matches(payload.get("amount"), attempt["amount"]) or payload.get("udf1") != attempt["application_number"] or payload.get("productinfo") != easebuzz.PRODUCT_INFO:
+            raise HTTPException(status_code=400, detail="Easebuzz payment details do not match the application.")
+        if payload.get("status", "").lower() == "success":
+            try:
+                confirm_easebuzz_transaction(database, attempt["txnid"], background_tasks)
+            except easebuzz.EasebuzzError:
+                pass  # Keep pending; the authenticated status endpoint can retry verification.
+        elif attempt["status"] == "pending":
+            database.execute("UPDATE registration_fee_payments SET status = 'failed', updated_at = ? WHERE txnid = ?", (datetime.now(UTC).isoformat(), attempt["txnid"]))
+
+
+@app.post("/api/payments/easebuzz/return")
+async def easebuzz_payment_return(request: Request, background_tasks: BackgroundTasks) -> RedirectResponse:
+    payload = {key: str(value) for key, value in (await request.form()).items()}
+    await run_in_threadpool(process_easebuzz_return, payload, background_tasks)
+    return RedirectResponse(os.getenv("EASEBUZZ_FRONTEND_RETURN_URL", "https://sheerwoodadmission.com/fee-payment?payment=returned"), status_code=303)
+
+
+def process_easebuzz_webhook(payload: dict[str, str], background_tasks: BackgroundTasks) -> dict[str, str]:
+    txnid = payload.get("txnid", "")
+    with connection() as database:
+        attempt = database.execute("SELECT * FROM registration_fee_payments WHERE txnid = ?", (txnid,)).fetchone()
+        if not attempt:
+            raise HTTPException(status_code=404, detail="Unknown transaction.")
+        if payload.get("amount") and not easebuzz.amount_matches(payload["amount"], attempt["amount"]):
+            raise HTTPException(status_code=400, detail="Payment amount mismatch.")
+        try:
+            confirmed = confirm_easebuzz_transaction(database, txnid, background_tasks)
+        except easebuzz.EasebuzzError as error:
+            raise HTTPException(status_code=503, detail=str(error)) from error
+    return {"status": "paid" if confirmed else "pending"}
+
+
+@app.post("/api/payments/easebuzz/webhook")
+async def easebuzz_payment_webhook(request: Request, background_tasks: BackgroundTasks) -> dict[str, str]:
+    content_type = request.headers.get("content-type", "")
+    if "application/json" in content_type:
+        body = await request.json()
+        payload = {key: str(value) for key, value in body.items()} if isinstance(body, dict) else {}
+    else:
+        payload = {key: str(value) for key, value in (await request.form()).items()}
+    return await run_in_threadpool(process_easebuzz_webhook, payload, background_tasks)
 
 
 @app.post("/api/applications/{application_number}/parental-consent", status_code=status.HTTP_201_CREATED)

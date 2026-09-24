@@ -52,10 +52,6 @@ class SaveApplicationDraftRequest(BaseModel):
     first_visit: str = Field(default="", max_length=40)
 
 
-class RegistrationFeePaymentRequest(BaseModel):
-    method: str = Field(min_length=2, max_length=80)
-
-
 class RegistrationFeeSettingsRequest(BaseModel):
     amount: int = Field(ge=0, le=10_000_000)
 

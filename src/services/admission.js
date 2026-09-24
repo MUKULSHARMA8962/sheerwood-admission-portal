@@ -202,15 +202,35 @@ export async function saveAdmissionDraft(accessToken, data, status = "draft") {
   return result;
 }
 
-export async function recordRegistrationFeePayment(accessToken, applicationNumber, method) {
+export async function getRegistrationFee(accessToken, applicationNumber) {
   if (!accessToken || !applicationNumber) throw new Error("Please save the application before paying the registration fee.");
   const response = await fetch(`${API_BASE_URL}/applications/${encodeURIComponent(applicationNumber)}/registration-fee`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json", Authorization: `Bearer ${accessToken}` },
-    body: JSON.stringify({ method }),
+    headers: { Authorization: `Bearer ${accessToken}` },
   });
   const result = await response.json().catch(() => ({}));
-  if (!response.ok) throw new Error(result.detail || "Registration fee could not be recorded.");
+  if (!response.ok) throw new Error(result.detail || "Registration fee could not be loaded.");
+  return result;
+}
+
+export async function initiateRegistrationFeePayment(accessToken, applicationNumber) {
+  if (!accessToken || !applicationNumber) throw new Error("Please save the application before paying the registration fee.");
+  const response = await fetch(`${API_BASE_URL}/applications/${encodeURIComponent(applicationNumber)}/registration-fee/initiate`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${accessToken}` },
+  });
+  const result = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(result.detail || "Could not start Easebuzz checkout.");
+  return result;
+}
+
+export async function verifyRegistrationFeePayment(accessToken, applicationNumber) {
+  if (!accessToken || !applicationNumber) throw new Error("Please save the application before checking the registration fee.");
+  const response = await fetch(`${API_BASE_URL}/applications/${encodeURIComponent(applicationNumber)}/registration-fee/verify`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${accessToken}` },
+  });
+  const result = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(result.detail || "Could not verify the payment yet. Please try again.");
   return result;
 }
 

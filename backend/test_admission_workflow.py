@@ -1,6 +1,7 @@
 """Run the full parent-to-admin admission workflow against a temporary SQLite DB."""
 
 import os
+import hashlib
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
@@ -22,15 +23,28 @@ def main():
             "POSTGRES_PASSWORD": "",
             "SMTP_HOST": "",
             "SMTP_FROM_EMAIL": "",
+            "EASEBUZZ_MERCHANT_KEY": "test-merchant-key",
+            "EASEBUZZ_SALT": "test-merchant-salt",
+            "EASEBUZZ_ENV": "test",
+            "EASEBUZZ_CALLBACK_URL": "http://localhost:8000/api/payments/easebuzz/return",
         })
 
         from fastapi.testclient import TestClient
         from app import main as main_module
+        from app import notifications
+        from app import easebuzz
         from app.database import connection
         from app.main import app
         from app.security import hash_password
 
         main_module.verify_otp = lambda _phone_number, _otp: True
+        notifications.send_email = lambda **_kwargs: None
+        easebuzz.initiate_payment = lambda **_kwargs: "https://testpay.easebuzz.in/pay/" + "a" * 64
+        transaction_state = {"status": "pending", "amount": "1500.00"}
+        easebuzz.retrieve_transaction = lambda txnid: {
+            "status": 1,
+            "data": {"status": transaction_state["status"], "txnid": txnid, "amount": transaction_state["amount"], "easebuzz_id": "EBZ-WORKFLOW-1"},
+        }
 
         application_number = "TEST-ADM-2027-000001"
         exception_application_number = "TEST-ADM-2027-000002"
@@ -84,7 +98,7 @@ def main():
             assert fee_pending_funnel["pending_registration_fee"] == 1
             assert fee_pending_funnel["login_only"] == 0
 
-            expect(client.post(f"/api/applications/{application_number}/registration-fee", headers=parent_headers, json={"method": "UPI"}), 409)
+            expect(client.post(f"/api/applications/{application_number}/registration-fee/initiate", headers=parent_headers), 409)
             consent = expect(client.post(f"/api/applications/{application_number}/parental-consent", headers=parent_headers, json={
                 "parent_name": "Test Father",
                 "relationship_to_child": "Father",
@@ -102,8 +116,31 @@ def main():
             assert consent_event["otp_verified"] == 0
             assert consent_event["consent_text_version"] == "v1.0"
 
-            fee_payment = expect(client.post(f"/api/applications/{application_number}/registration-fee", headers=parent_headers, json={"method": "UPI"}), 200)
+            expect(client.post(f"/api/applications/{application_number}/registration-fee", headers=parent_headers, json={"method": "UPI"}), 410)
+            started = expect(client.post(f"/api/applications/{application_number}/registration-fee/initiate", headers=parent_headers), 200)
+            assert started["amount"] == "1500.00"
+            assert started["checkout_url"].startswith("https://testpay.easebuzz.in/pay/")
+            expect(client.post(f"/api/applications/{application_number}/registration-fee/initiate", headers=parent_headers), 409)
+            expect(client.post("/api/payments/easebuzz/return", data={"txnid": started["txnid"], "status": "success", "hash": "forged"}, follow_redirects=False), 400)
+            callback = {
+                "key": "test-merchant-key", "txnid": started["txnid"], "amount": "1500.00",
+                "productinfo": easebuzz.PRODUCT_INFO, "firstname": "Test Father",
+                "email": "parent.workflow@test.example", "udf1": application_number, "status": "success",
+            }
+            signed = "|".join(("test-merchant-salt", *(str(callback.get(field, "")) for field in easebuzz.REVERSE_FIELDS)))
+            callback["hash"] = hashlib.sha512(signed.encode()).hexdigest()
+            expect(client.post("/api/payments/easebuzz/return", data=callback, follow_redirects=False), 303)
+            pending = expect(client.post(f"/api/applications/{application_number}/registration-fee/verify", headers=parent_headers), 200)
+            assert pending["registration_fee_status"] == "pending"
+            transaction_state["status"] = "success"
+            transaction_state["amount"] = "1.00"
+            mismatched = expect(client.post(f"/api/applications/{application_number}/registration-fee/verify", headers=parent_headers), 200)
+            assert mismatched["registration_fee_status"] == "pending"
+            transaction_state["amount"] = "1500.00"
+            fee_payment = expect(client.post(f"/api/applications/{application_number}/registration-fee/verify", headers=parent_headers), 200)
             assert fee_payment["registration_fee_status"] == "paid"
+            assert expect(client.post("/api/payments/easebuzz/webhook", json={"txnid": started["txnid"]}), 200)["status"] == "paid"
+            assert expect(client.post(f"/api/applications/{application_number}/registration-fee/verify", headers=parent_headers), 200)["registration_fee_status"] == "paid"
             paid_funnel = expect(client.get("/api/admin/admission-funnel", headers=admin_headers), 200)
             assert paid_funnel["pending_registration_fee"] == 0
 

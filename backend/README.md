@@ -74,6 +74,44 @@ The parent-facing Admission Details and New User Dashboard refresh these
 statuses automatically. Parent draft saves do not overwrite an admin's final
 approval/rejection or document-review state.
 
+## Easebuzz registration-fee checkout
+
+Set `EASEBUZZ_MERCHANT_KEY`, `EASEBUZZ_SALT`, `EASEBUZZ_ENV=test`,
+`EASEBUZZ_CALLBACK_URL`, and `EASEBUZZ_FRONTEND_RETURN_URL` in the **server-only**
+`backend/.env` (see `.env.example`). The Easebuzz dashboard login email is not
+an API key. Obtain separate test/live merchant key and salt from the Easebuzz
+dashboard, then switch to `EASEBUZZ_ENV=prod` only after a full test payment.
+The callback URL must be a publicly reachable HTTPS URL ending in
+`/api/payments/easebuzz/return`; the frontend return URL should end in
+`/fee-payment?payment=returned`. Configure the optional S2S transaction webhook
+in Easebuzz to POST to the public HTTPS URL
+`/api/payments/easebuzz/webhook` on the API host.
+For the confirmed production domain, use
+`https://sheerwoodadmission.com/api/payments/easebuzz/return` and
+`https://sheerwoodadmission.com/fee-payment?payment=returned` for those two
+environment values; configure the webhook as
+`https://sheerwoodadmission.com/api/payments/easebuzz/webhook`. The ignored
+local `backend/.env` is not uploaded by Git, so set these values and the live
+merchant key/salt separately in the production server's `backend/.env`, then
+restart its FastAPI service. Never store the dashboard login password here.
+
+The parent starts a hosted Easebuzz checkout via
+`POST /api/applications/{application_number}/registration-fee/initiate`.
+The server chooses the current admin-configured amount and stores a pending
+transaction. The callback, webhook, and authenticated `verify` endpoint query
+Easebuzz's transaction API before marking the application paid. The old direct
+POST to `/registration-fee` now returns `410` and cannot mark an unpaid fee as
+paid. Duplicate callbacks are idempotent. A new checkout is allowed after a
+pending attempt is 20 minutes old; check the previous attempt first to avoid
+accidental duplicate payments. A successful payment against an older attempt
+is still recorded, so reconcile duplicates in the Easebuzz dashboard.
+
+No live payment is made by the test suite. For production, perform a small
+approved test transaction and verify the amount, application, webhook, browser
+return, admin funnel, and Easebuzz dashboard match before accepting parents'
+payments. Settlement/payout APIs are separate from fee collection and are not
+needed for this checkout flow.
+
 ## Configure Sheerwood AI
 
 Create `backend/.env` from `.env.example`, then add an OpenAI API key **only** in that server-side file:
@@ -135,26 +173,59 @@ COGNITO_REDIRECT_URI=https://sheerwoodadmission.com/callback
 
 Then set `VITE_COGNITO_TOKEN_EXCHANGE_URL=/api/auth/cognito/token` in the frontend production environment and rebuild React. The browser sends the authorization code and PKCE verifier to the same-origin API; only the API sends the confidential secret to Cognito. The old seeded username/password endpoints remain only when `AUTH_MODE=local`. Do not use local mode in production.
 
-## Configure email OTP
+## Configure email delivery and OTP
 
-The admission login now supports email OTP. Add SMTP details to `backend/.env` (see `.env.example`):
+The admission login and admission notifications use the same server-side mail
+settings. To send through Gmail, enable 2-Step Verification for the sending
+account, create a Google App Password, and set these values in `backend/.env`:
+
+```dotenv
+OTP_SECRET_KEY=replace-with-a-long-random-secret
+SMTP_HOST=smtp.gmail.com
+SMTP_PORT=587
+SMTP_USERNAME=yourgmail@gmail.com
+SMTP_PASSWORD=your_google_app_password
+SMTP_FROM_EMAIL=yourgmail@gmail.com
+```
+
+Use the complete Gmail address for both `SMTP_USERNAME` and `SMTP_FROM_EMAIL`.
+Use the App Password for `SMTP_PASSWORD`, not the normal Google password. The
+backend uses STARTTLS on port 587 automatically; `SMTP_USE_TLS` is not needed.
+If `SMTP_FROM_EMAIL` is left blank, Gmail uses `SMTP_USERNAME` as the sender.
+Keep the password only in `backend/.env` or your server's secret manager. After
+updating the settings, restart the backend. The existing AWS SES configuration
+can still be used by leaving `SMTP_HOST` blank or setting its SMTP credentials.
+
+To send one test message using the same mail service as the portal, run this
+from the `backend` directory (it sends a real email):
 
 ```bash
-export OTP_SECRET_KEY="replace-with-a-long-random-secret"
+python send_gmail_test.py recipient@example.com
+```
+
+For another SMTP provider, set its host, username, password, and sender in
+`backend/.env` (see `.env.example`). For example:
+
+```bash
 export SMTP_HOST="smtp.your-provider.com"
 export SMTP_PORT="587"
-export SMTP_USE_TLS="true"
 export SMTP_USERNAME="your-smtp-username"
 export SMTP_PASSWORD="your-smtp-app-password"
 export SMTP_FROM_EMAIL="admissions@your-school.edu"
-export ADMISSION_NOTIFICATION_EMAILS="admissions@your-school.edu,principal@your-school.edu"
 ```
+
+Optionally set `ADMISSION_NOTIFICATION_EMAILS` to additional comma-separated
+addresses such as `admissions@your-school.edu,principal@your-school.edu`.
 
 When a parent submits an admission application, the portal sends a confirmation
 to the parent's account email and a notification to every portal user with the
 `admin` role. Use `ADMISSION_NOTIFICATION_EMAILS` for additional admissions
 recipients who do not have a portal admin account. Email delivery is best-effort:
 the application saves successfully even if the SMTP provider is temporarily unavailable.
+The submission email includes every form field in a formatted message and in
+PDF and PowerPoint (`.pptx`) attachments. Blank fields are marked "Not provided";
+photographs and documents are listed by filename and status. Original uploaded
+files remain in private document storage and are not attached to the email.
 
 Endpoints:
 

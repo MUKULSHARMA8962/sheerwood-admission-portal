@@ -13,14 +13,20 @@ import boto3
 
 def configured_sender() -> str:
     """Return the From address used by the active delivery provider."""
+    smtp_sender = os.getenv("SMTP_FROM_EMAIL", "").strip()
+    if smtp_sender:
+        return smtp_sender
+    if os.getenv("SMTP_HOST", "").strip().lower() == "smtp.gmail.com":
+        gmail_account = os.getenv("SMTP_USERNAME", "").strip()
+        if gmail_account:
+            return gmail_account
     return (
-        os.getenv("SMTP_FROM_EMAIL")
-        or os.getenv("SES_FROM_EMAIL")
+        os.getenv("SES_FROM_EMAIL")
         or "admissions@sheerwoodadmission.com"
     ).strip()
 
 
-def _send_via_smtp(*, recipient: str, subject: str, body: str, sender: str, attachments: Iterable[tuple[str, bytes, str]] = ()) -> None:
+def _send_via_smtp(*, recipient: str, subject: str, body: str, sender: str, html_body: str | None = None, attachments: Iterable[tuple[str, bytes, str]] = ()) -> None:
     host = os.getenv("SMTP_HOST", "").strip()
     username = os.getenv("SMTP_USERNAME", "").strip()
     password = os.getenv("SMTP_PASSWORD", "")
@@ -37,6 +43,8 @@ def _send_via_smtp(*, recipient: str, subject: str, body: str, sender: str, atta
     message["To"] = recipient
     message["Subject"] = subject
     message.set_content(body)
+    if html_body:
+        message.add_alternative(html_body, subtype="html")
     for filename, content, content_type in attachments:
         maintype, subtype = content_type.split("/", 1)
         message.add_attachment(content, maintype=maintype, subtype=subtype, filename=filename)
@@ -50,14 +58,14 @@ def _send_via_smtp(*, recipient: str, subject: str, body: str, sender: str, atta
         smtp.send_message(message)
 
 
-def send_email(*, recipient: str, subject: str, body: str, attachments: Iterable[tuple[str, bytes, str]] = ()) -> None:
+def send_email(*, recipient: str, subject: str, body: str, html_body: str | None = None, attachments: Iterable[tuple[str, bytes, str]] = ()) -> None:
     """Deliver through SMTP when configured, otherwise use the AWS SES API."""
     sender = configured_sender()
     if not sender:
         raise ValueError("A sender email address must be configured on the server.")
 
     if os.getenv("SMTP_HOST", "").strip():
-        _send_via_smtp(recipient=recipient, subject=subject, body=body, sender=sender, attachments=attachments)
+        _send_via_smtp(recipient=recipient, subject=subject, body=body, sender=sender, html_body=html_body, attachments=attachments)
         return
 
     attachment_list = list(attachments)
@@ -66,6 +74,8 @@ def send_email(*, recipient: str, subject: str, body: str, attachments: Iterable
     raw_message["To"] = recipient
     raw_message["Subject"] = subject
     raw_message.set_content(body)
+    if html_body:
+        raw_message.add_alternative(html_body, subtype="html")
     for filename, content, content_type in attachment_list:
         maintype, subtype = content_type.split("/", 1)
         raw_message.add_attachment(content, maintype=maintype, subtype=subtype, filename=filename)

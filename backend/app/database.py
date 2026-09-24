@@ -208,6 +208,23 @@ def initialize_database() -> None:
                 FOREIGN KEY(parent_id) REFERENCES users(id) ON DELETE SET NULL
             );
 
+            CREATE TABLE IF NOT EXISTS registration_fee_payments (
+                txnid TEXT PRIMARY KEY,
+                application_number TEXT NOT NULL,
+                parent_id INTEGER NOT NULL,
+                amount TEXT NOT NULL,
+                status TEXT NOT NULL DEFAULT 'pending',
+                easebuzz_id TEXT,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL,
+                paid_at TEXT,
+                FOREIGN KEY(parent_id) REFERENCES users(id)
+            );
+            CREATE INDEX IF NOT EXISTS registration_fee_payments_application_idx
+            ON registration_fee_payments(application_number, created_at);
+            CREATE UNIQUE INDEX IF NOT EXISTS registration_fee_payments_one_pending_idx
+            ON registration_fee_payments(application_number) WHERE status = 'pending';
+
             CREATE TABLE IF NOT EXISTS admission_documents (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 application_number TEXT NOT NULL,
@@ -522,6 +539,21 @@ def initialize_postgres_database() -> None:
             updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP::text
         )
         """,
+        """
+        CREATE TABLE IF NOT EXISTS registration_fee_payments (
+            txnid TEXT PRIMARY KEY,
+            application_number TEXT NOT NULL,
+            parent_id BIGINT NOT NULL REFERENCES users(id),
+            amount TEXT NOT NULL,
+            status TEXT NOT NULL DEFAULT 'pending',
+            easebuzz_id TEXT,
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL,
+            paid_at TEXT
+        )
+        """,
+        "CREATE INDEX IF NOT EXISTS registration_fee_payments_application_idx ON registration_fee_payments(application_number, created_at)",
+        "CREATE UNIQUE INDEX IF NOT EXISTS registration_fee_payments_one_pending_idx ON registration_fee_payments(application_number) WHERE status = 'pending'",
         """
         CREATE TABLE IF NOT EXISTS admission_documents (
             id BIGSERIAL PRIMARY KEY,
