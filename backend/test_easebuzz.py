@@ -45,6 +45,32 @@ class EasebuzzTests(unittest.TestCase):
         sequence = "|".join((*(str(payload.get(field, "")) for field in easebuzz.HASH_FIELDS), "merchant-salt"))
         self.assertEqual(payload["hash"], hashlib.sha512(sequence.encode()).hexdigest())
 
+    def test_initiate_accepts_easebuzz_complete_checkout_url_only_on_expected_host(self):
+        checkout_url = "https://testpay.easebuzz.in/pay/" + "b" * 64
+        with patch.object(easebuzz.httpx, "post", return_value=FakeResponse({"status": 1, "data": checkout_url})):
+            self.assertEqual(
+                easebuzz.initiate_payment(
+                    txnid="SHW456", amount="1500.00", firstname="Parent", email="parent@example.com",
+                    phone="9876543210", application_number="APP-456",
+                ),
+                checkout_url,
+            )
+
+        with patch.object(easebuzz.httpx, "post", return_value=FakeResponse({"status": 1, "data": "https://untrusted.example/pay/" + "b" * 64})):
+            with self.assertRaisesRegex(easebuzz.EasebuzzError, "Check the live merchant credentials"):
+                easebuzz.initiate_payment(
+                    txnid="SHW789", amount="1500.00", firstname="Parent", email="parent@example.com",
+                    phone="9876543210", application_number="APP-789",
+                )
+
+    def test_initiate_surfaces_gateway_rejection_reason(self):
+        with patch.object(easebuzz.httpx, "post", return_value=FakeResponse({"status": 0, "error_desc": "Merchant account is inactive"})):
+            with self.assertRaisesRegex(easebuzz.EasebuzzError, "Merchant account is inactive"):
+                easebuzz.initiate_payment(
+                    txnid="SHW999", amount="1500.00", firstname="Parent", email="parent@example.com",
+                    phone="9876543210", application_number="APP-999",
+                )
+
     def test_transaction_lookup_is_signed_and_success_must_match_id_and_amount(self):
         result = {"status": 1, "data": {"status": "success", "txnid": "SHW123", "amount": "1500.00"}}
         with patch.object(easebuzz.httpx, "post", return_value=FakeResponse(result)) as post:
