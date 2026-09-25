@@ -462,6 +462,8 @@ def confirm_easebuzz_transaction(database: Any, txnid: str, background_tasks: Ba
                 desired_class=application["desired_class"],
                 application_data=form_data if isinstance(form_data, dict) else {},
                 documents=documents if isinstance(documents, list) else [],
+                payment_amount=attempt["amount"],
+                transaction_id=txnid,
             )
     return True
 
@@ -743,8 +745,8 @@ def save_application_draft(
     desired_class = admission_value("class", "Class 4")
     board = admission_value("boardOther") if admission_value("board") == "Other" else admission_value("board")
     saved_on = datetime.now(UTC).date().isoformat()
-    referral = resolve_referral(payload.lead_source, payload.referral_code)
     with connection() as database:
+        referral = resolve_referral(payload.lead_source, payload.referral_code, database)
         existing = database.execute(
             """SELECT id, status, documents_status, registration_fee_status, lead_source,
                       vendor_id, campaign_id, referral_code, first_visit, submitted_at
@@ -1126,6 +1128,37 @@ def decide_application(application_id: int, payload: AdmissionDecisionRequest, b
             application_number=updated["application_number"],
         )
     return dict(updated)
+
+
+@app.get("/api/vendor/dashboard")
+def vendor_dashboard(user: Annotated[dict[str, Any], Depends(require_roles("vendor"))]) -> dict[str, Any]:
+    """Return only the logged-in vendor's referral link and attributed leads."""
+    vendor_id = str(user.get("vendor_id") or "").strip()
+    if not vendor_id:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="This vendor login is not linked to a referral account.")
+    with connection() as database:
+        vendor = database.execute(
+            "SELECT vendor_id, full_name, referral_code, is_enabled FROM vendor_accounts WHERE vendor_id = ?",
+            (vendor_id,),
+        ).fetchone()
+        if not vendor or not bool(vendor["is_enabled"]):
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="This vendor login is blocked.")
+        applications = database.execute(
+            """SELECT application_number, student_name, desired_class, status, submitted_at
+               FROM applications WHERE vendor_id = ? ORDER BY (submitted_at IS NULL), submitted_at DESC, id DESC LIMIT 100""",
+            (vendor_id,),
+        ).fetchall()
+    leads = [dict(row) for row in applications]
+    return {
+        "vendor": {"vendor_id": vendor["vendor_id"], "full_name": vendor["full_name"], "referral_code": vendor["referral_code"]},
+        "referral_path": f"/apply?source=vendor&referral_code={vendor['referral_code']}",
+        "summary": {
+            "applications": len(leads),
+            "submitted": sum(1 for lead in leads if lead["submitted_at"]),
+            "approved": sum(1 for lead in leads if lead["status"] == "approved"),
+        },
+        "applications": leads,
+    }
 
 
 @app.get("/api/students")

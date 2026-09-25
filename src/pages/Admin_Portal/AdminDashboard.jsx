@@ -25,7 +25,7 @@ function shortName(value, fallback = "Not set") {
 
 function vendorName(application) {
   const names = { DIRECT: "Direct Website", EDU001: "Edustoke", EZY001: "Ezyschooling", GLO001: "Global Education", HIP001: "Edhippo" };
-  return names[application.vendor_id] || String(application.lead_source || "Direct Website").replaceAll("_", " ").replace(/\b\w/g, (letter) => letter.toUpperCase());
+  return application.vendor_name || names[application.vendor_id] || String(application.lead_source || "Direct Website").replaceAll("_", " ").replace(/\b\w/g, (letter) => letter.toUpperCase());
 }
 
 function dateLabel(value) {

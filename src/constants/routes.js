@@ -22,6 +22,7 @@ export const ROUTES = {
   aiAssistant: "/ai-assistant",
   admin: (screen = "dashboard") => `/admin/${screen}`,
   teacherDashboard: "/teacher/dashboard",
+  vendorDashboard: "/vendor/dashboard",
 };
 
 export const API_ROUTES = {
@@ -33,6 +34,10 @@ export const API_ROUTES = {
   adminDocuments: `${API_BASE_URL}/admin/documents`,
   adminAdmissions: `${API_BASE_URL}/admin/admissions`,
   adminAdmissionFunnel: `${API_BASE_URL}/admin/admission-funnel`,
+  adminVendors: `${API_BASE_URL}/admin/vendors`,
+  adminSettings: `${API_BASE_URL}/admin/settings`,
+  adminSyllabus: `${API_BASE_URL}/admin/syllabus`,
+  vendorDashboard: `${API_BASE_URL}/vendor/dashboard`,
   applicationDecision: (applicationId) => `${API_BASE_URL}/applications/${encodeURIComponent(applicationId)}/decision`,
   aiChat: `${API_BASE_URL}/ai/chat`,
   otp: (action) => `${API_BASE_URL}/auth/otp/${action}`,

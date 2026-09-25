@@ -37,19 +37,16 @@ class AdmissionNotificationTests(TestCase):
                 desired_class="Class 5",
                 application_data=form,
                 documents=documents,
+                payment_amount="1,500.00",
+                transaction_id="SHW123",
             )
 
         self.assertEqual(send.call_count, 2)
         for call in send.call_args_list:
             message = call.kwargs
-            self.assertIn("Middle Name: Not provided", message["body"])
-            self.assertIn("PEN Number: Not provided", message["body"])
-            self.assertIn("Extra Column: Extra value", message["body"])
-            self.assertIn("Student Photograph: asha.png", message["body"])
-            self.assertIn("Birth Certificate: Not uploaded", message["body"])
-            self.assertNotIn("private-id", message["body"])
-            self.assertIn("&lt;script&gt;", message["html_body"])
-            self.assertNotIn("<script>", message["html_body"])
+            self.assertIn("REGISTRATION FEE PAYMENT CONFIRMED", message["body"])
+            self.assertIn("Registration fee paid: ₹1,500.00", message["body"])
+            self.assertIn("Easebuzz transaction reference: SHW123", message["body"])
             attachment_types = {item[2] for item in message["attachments"]}
             self.assertEqual(attachment_types, {
                 "application/pdf",
@@ -68,6 +65,25 @@ class AdmissionNotificationTests(TestCase):
                 )
                 self.assertIn("Extra Column: Extra value", slide_text)
                 self.assertIn("Middle Name: Not provided", slide_text)
+
+        messages = {call.kwargs["recipient"]: call.kwargs for call in send.call_args_list}
+        parent_message = messages["parent@example.com"]
+        self.assertEqual(parent_message["subject"], "Registration payment received — APP/2027/1")
+        self.assertIn("Admissions Office for review", parent_message["body"])
+        self.assertNotIn("Aadhaar Number", parent_message["body"])
+
+        admin_message = messages["admin@example.com"]
+        self.assertEqual(admin_message["subject"], "New paid admission application — APP/2027/1")
+        self.assertIn("Middle Name: Not provided", admin_message["body"])
+        self.assertIn("PEN Number: Not provided", admin_message["body"])
+        self.assertIn("Extra Column: Extra value", admin_message["body"])
+        self.assertIn("Student Photograph: asha.png", admin_message["body"])
+        self.assertIn("Birth Certificate: Not uploaded", admin_message["body"])
+        self.assertNotIn("private-id", admin_message["body"])
+        self.assertIn("&lt;script&gt;", admin_message["html_body"])
+        self.assertNotIn("<script>", admin_message["html_body"])
+        self.assertIn("background:#12c9e8", admin_message["html_body"])
+        self.assertIn(">SHEERWOOD<", admin_message["html_body"].upper())
 
     def test_one_delivery_failure_does_not_skip_other_recipients(self) -> None:
         with patch.object(notifications, "configured_sender", return_value="sender@example.com"), \

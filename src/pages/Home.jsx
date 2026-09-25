@@ -11,6 +11,7 @@ import principalDeskPortrait from "../assets/principal-desk-portrait.png";
 import homeHeroVideo from "../assets/home-hero-background.mp4";
 import campusFilm from "../assets/campus-film.mp4";
 import ThemeToggle from "../components/ThemeToggle";
+import SchoolCrest from "../components/SchoolCrest";
 import { useCognitoAuth } from "../auth/useCognitoAuth";
 import "./Home.css";
 import "./HomeFooter.css";
@@ -106,7 +107,7 @@ export default function Home() {
     <div>
       <header className="navbar">
         <a className="brand" href="#home">
-          <span className="logo">S</span>
+          <SchoolCrest className="logo" />
           <span><strong>Sheerwood</strong><small>International School</small></span>
         </a>
 
@@ -150,7 +151,7 @@ export default function Home() {
 
           <aside className="hero-art home-hero-card" aria-label="Sheerwood campus highlights">
             <span className="hero-card-eyebrow">SHEERWOOD CAMPUS</span>
-            <div className="hero-card-mark">S</div>
+            <SchoolCrest className="hero-card-mark" />
             <h2>Inspired by<br />the hills.</h2>
             <p>A vibrant campus where academic ambition meets open skies and possibility.</p>
             <div className="hero-card-details"><span><b>45 acres</b><small>Green campus</small></span><span><b>40+</b><small>Years of learning</small></span></div>
@@ -221,7 +222,7 @@ export default function Home() {
           <header className="home-posts-header"><div><span className="label">SCHOOL UPDATES</span><h2 id="school-posts-title">What&apos;s happening at <em>Sheerwood.</em></h2></div><div className="home-update-tabs" role="tablist" aria-label="Choose posts day">{[["today", "Today"], ["tomorrow", "Tomorrow"]].map(([day, label]) => <button key={day} type="button" role="tab" aria-selected={postsDay === day} className={postsDay === day ? "active" : ""} onClick={() => setPostsDay(day)}>{label}</button>)}</div></header>
           <div className="home-social-feed">
             {homePosts[postsDay].map((post) => <article className="home-post-card" key={post.title}>
-              <span className="home-post-avatar" aria-hidden="true">S</span>
+              <SchoolCrest className="home-post-avatar" />
               <div className="home-post-body">
                 <header><strong>Sheerwood International School</strong><span className="post-verified" title="Verified school account">✓</span><span>@SheerwoodSchool · {post.time}</span><button type="button" aria-label="More post options">•••</button></header>
                 <p><span className="home-post-category">{post.category}</span>{post.title} {post.text}</p>
@@ -244,7 +245,7 @@ export default function Home() {
       </section>
 
       <footer id="contact" className="school-footer">
-        <section className="footer-overview"><div className="footer-brand"><span className="footer-crest">S</span><span><strong>Sheerwood</strong><small>International School</small></span></div><p>Nurturing knowledge, character and possibility for every learner.</p><address>◎ Sherwood College, Nainital<br /><br />▯ +91 98765 43210<br />✉ admissions@sherwood.edu.in</address></section>
+        <section className="footer-overview"><div className="footer-brand"><SchoolCrest className="footer-crest" /><span><strong>Sheerwood</strong><small>International School</small></span></div><p>Nurturing knowledge, character and possibility for every learner.</p><address>◎ Sherwood College, Nainital<br /><br />▯ +91 98765 43210<br />✉ admissions@sherwood.edu.in</address></section>
         <section><h3>Admissions</h3><a href="#admission">Admission Process</a><Link to="/admission-details">Online Application</Link><a href="#admission">Important Dates</a><Link to="/track-application">Track Application</Link></section>
         <section><h3>Academics</h3><a href="#about">Our Learning Approach</a><a href="#campus">Campus Life</a><a href="#campus">Clubs &amp; Societies</a><a href="#campus">Events &amp; Activities</a></section>
         <section><h3>Facilities</h3><a href="#campus">Infrastructure</a><a href="#campus">Sports &amp; Activities</a><a href="#contact">Contact Us</a><Link to="/ai-assistant">Ask Sheerwood AI</Link></section>

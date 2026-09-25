@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import "./Parent_Guardian.css";
 import AccountMenu from "../../components/AccountMenu";
+import SchoolCrest from "../../components/SchoolCrest";
 import { getAdmissionData, saveAdmissionDraft, uploadAdmissionDocument } from "../../services/admission";
 import { useCognitoAuth } from "../../auth/useCognitoAuth";
 
@@ -129,7 +130,7 @@ export default function ParentGuardian() {
   return (
     <main className="guardian-page">
       <header className="guardian-header">
-        <Link className="guardian-brand" to="/new-user-dashboard"><span>S</span><div><strong>Sheerwood</strong><small>International School</small></div></Link>
+        <Link className="guardian-brand" to="/new-user-dashboard"><SchoolCrest /><div><strong>Sheerwood</strong><small>International School</small></div></Link>
         <AccountMenu />
       </header>
 

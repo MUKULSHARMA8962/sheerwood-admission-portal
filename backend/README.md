@@ -217,15 +217,18 @@ export SMTP_FROM_EMAIL="admissions@your-school.edu"
 Optionally set `ADMISSION_NOTIFICATION_EMAILS` to additional comma-separated
 addresses such as `admissions@your-school.edu,principal@your-school.edu`.
 
-When a parent submits an admission application, the portal sends a confirmation
-to the parent's account email and a notification to every portal user with the
-`admin` role. Use `ADMISSION_NOTIFICATION_EMAILS` for additional admissions
-recipients who do not have a portal admin account. Email delivery is best-effort:
-the application saves successfully even if the SMTP provider is temporarily unavailable.
-The submission email includes every form field in a formatted message and in
-PDF and PowerPoint (`.pptx`) attachments. Blank fields are marked "Not provided";
-photographs and documents are listed by filename and status. Original uploaded
-files remain in private document storage and are not attached to the email.
+When Easebuzz confirms a registration payment, the portal sends a professional
+confirmation to the parent's account email and a notification to every portal
+user with the `admin` role. Use `ADMISSION_NOTIFICATION_EMAILS` for additional
+admissions recipients who do not have a portal admin account. The parent
+confirmation includes the application ID, paid amount, Easebuzz transaction
+reference, and the next review step. The admissions notification also contains
+the completed form. Both include PDF and PowerPoint (`.pptx`) application
+attachments. Blank fields are marked "Not provided"; photographs and documents
+are listed by filename and status. Original uploaded files remain in private
+document storage and are not attached to the email. Email delivery is
+best-effort: payment remains recorded even if the SMTP provider is temporarily
+unavailable.
 
 Endpoints:
 
@@ -233,6 +236,23 @@ Endpoints:
 - `POST /api/auth/otp/email/verify` with `{ "email": "parent@example.com", "otp": "123456" }`
 
 Email OTPs are securely generated, HMAC-hashed before storage, expire after five minutes, and are invalidated after successful verification or too many failed attempts.
+
+## Vendor accounts
+
+An admin can create vendor logins from **Admin → Vendors**. The portal sends the
+new vendor a Cognito invitation email, assigns a unique referral ID, and
+generates a link in this format:
+
+```text
+https://sheerwoodadmission.com/apply?source=vendor&referral_code=VENDOR001
+```
+
+Only applications that start from an active vendor link are attributed to that
+vendor. Blocking a vendor disables both the Cognito login and its referral link;
+it does not alter historical applications. The API credential used by the
+backend must be allowed to create the `vendor` Cognito group and call
+`AdminCreateUser`, `AdminAddUserToGroup`, `AdminEnableUser`, and
+`AdminDisableUser`.
 
 | Role | Email | Password |
 | --- | --- | --- |

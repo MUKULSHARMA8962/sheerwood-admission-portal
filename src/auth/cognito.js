@@ -1,7 +1,7 @@
 const SESSION_KEY = "sheerwood.cognito.session";
 const TRANSACTION_PREFIX = "sheerwood.cognito.transaction.";
 const DEFAULT_SCOPES = "openid email";
-const GROUP_ROLE_PRIORITY = ["admin", "teacher", "student", "parent", "admission"];
+const GROUP_ROLE_PRIORITY = ["admin", "teacher", "student", "parent", "admission", "vendor"];
 
 function base64UrlEncode(bytes) {
   let binary = "";
@@ -205,6 +205,7 @@ export function getDefaultRouteForRole(role) {
     teacher: "/teacher/dashboard",
     admin: "/admin/dashboard",
     admission: "/admission-details",
+    vendor: "/vendor/dashboard",
   }[role] || "/dashboard";
 }
 

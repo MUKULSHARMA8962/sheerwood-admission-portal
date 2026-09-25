@@ -1,0 +1,17 @@
+.school-crest {
+  display: block !important;
+  flex: 0 0 auto;
+  overflow: visible !important;
+  color: transparent !important;
+  background: transparent !important;
+  clip-path: none !important;
+  font-size: 0 !important;
+  line-height: 0 !important;
+}
+
+.school-crest > img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}

@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { completeCognitoSignIn, getDefaultRouteForRole } from "./cognito";
 import { useCognitoAuth } from "./useCognitoAuth";
+import SchoolCrest from "../components/SchoolCrest";
 import "./AuthCallback.css";
 
 export default function AuthCallback() {
@@ -29,5 +30,5 @@ export default function AuthCallback() {
     };
   }, [location.search, navigate, setSession]);
 
-  return <main className="auth-callback-page"><section className="auth-callback-card"><span className="auth-callback-crest">S</span><p>SHEERWOOD COLLEGE</p><h1>{error ? "We could not sign you in" : "Signing you in securely…"}</h1><div className={error ? "auth-callback-status error" : "auth-callback-status"}>{error || "Completing your Cognito sign-in. Please wait."}</div>{error && <button onClick={() => navigate("/login", { replace: true })}>Return to sign in</button>}</section></main>;
+  return <main className="auth-callback-page"><section className="auth-callback-card"><SchoolCrest className="auth-callback-crest" /><p>SHEERWOOD COLLEGE</p><h1>{error ? "We could not sign you in" : "Signing you in securely…"}</h1><div className={error ? "auth-callback-status error" : "auth-callback-status"}>{error || "Completing your Cognito sign-in. Please wait."}</div>{error && <button onClick={() => navigate("/login", { replace: true })}>Return to sign in</button>}</section></main>;
 }

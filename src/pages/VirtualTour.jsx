@@ -6,6 +6,7 @@ import academics from "../assets/gallery-academics.png";
 import sports from "../assets/gallery-sports.png";
 import hostel from "../assets/gallery-hostel.png";
 import auditorium from "../assets/sheerwood-auditorium-web.jpg";
+import SchoolCrest from "../components/SchoolCrest";
 import "./VirtualTour.css";
 
 const tourStops = [
@@ -23,7 +24,7 @@ export default function VirtualTour() {
   return (
     <div className="virtual-tour-page">
       <header className="virtual-tour-nav">
-        <Link className="virtual-tour-brand" to="/"><span>S</span><div><strong>Sheerwood</strong><small>International School</small></div></Link>
+        <Link className="virtual-tour-brand" to="/"><SchoolCrest /><div><strong>Sheerwood</strong><small>International School</small></div></Link>
         <div><Link to="/">Home</Link><Link to="/gallery">Gallery</Link><Link to="/calendar">Calendar</Link><Link className="tour-admission-link" to="/login?flow=admission">Start Admission</Link></div>
       </header>
 

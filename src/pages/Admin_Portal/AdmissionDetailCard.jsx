@@ -10,10 +10,10 @@ function formatDate(value) {
 
 function vendorName(application) {
   const names = { EDU001: "Edustoke", EZY001: "Ezyschooling", GLO001: "Global Education", HIP001: "Edhippo" };
-  return names[application.vendor_id] || String(application.lead_source || "Direct / unknown").replaceAll("_", " ");
+  return application.vendor_name || names[application.vendor_id] || String(application.lead_source || "Direct / unknown").replaceAll("_", " ");
 }
 
-export default function AdmissionDetailCard({ application, onClose, onApprove, onApproveWithException, onReject, saving, documentBusyId, onOpenDocument, onReviewDocument, onDeleteDocument }) {
+export default function AdmissionDetailCard({ application, onClose, onApprove, onApproveWithException, onReject, onPrint, saving, documentBusyId, onOpenDocument, onReviewDocument, onDeleteDocument }) {
   if (!application) return null;
   const requiredDocuments = application.document_summary?.required || 5;
   const verifiedDocuments = application.document_summary?.verified || 0;
@@ -55,7 +55,7 @@ export default function AdmissionDetailCard({ application, onClose, onApprove, o
         })}</div> : <p className="admin-admission-detail-no-documents">No documents are uploaded yet.</p>}</section>
         <AdmissionStageCards application={application} documents={application.documents || []} />
       </div>
-      <footer><p className={canApprove || isExceptionalApproval ? "admin-admission-detail-approval-hint ready" : "admin-admission-detail-approval-hint"}>{approvalHint}</p><div><button type="button" className="admin-admission-detail-approve" onClick={onApprove} disabled={!canApprove || saving}>{saving ? "Saving…" : "Approve Admission"}</button>{canApproveWithException && <button type="button" className="admin-admission-detail-exception" onClick={onApproveWithException} disabled={saving}>{saving ? "Saving…" : "Approve with exception"}</button>}<button type="button" className="admin-admission-detail-reject" onClick={onReject} disabled={isFinal || saving}>Reject Application</button><button type="button" className="admin-admission-detail-close" onClick={onClose}>Close details</button></div></footer>
+      <footer><p className={canApprove || isExceptionalApproval ? "admin-admission-detail-approval-hint ready" : "admin-admission-detail-approval-hint"}>{approvalHint}</p><div><button type="button" className="admin-admission-detail-print" onClick={onPrint}>Print application</button><button type="button" className="admin-admission-detail-approve" onClick={onApprove} disabled={!canApprove || saving}>{saving ? "Saving…" : "Approve Admission"}</button>{canApproveWithException && <button type="button" className="admin-admission-detail-exception" onClick={onApproveWithException} disabled={saving}>{saving ? "Saving…" : "Approve with exception"}</button>}<button type="button" className="admin-admission-detail-reject" onClick={onReject} disabled={isFinal || saving}>Reject Application</button><button type="button" className="admin-admission-detail-close" onClick={onClose}>Close details</button></div></footer>
     </section>
   </div>;
 }

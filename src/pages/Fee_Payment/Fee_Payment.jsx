@@ -3,6 +3,7 @@ import { Link, useNavigate } from "react-router-dom";
 import "./Fee_Payment.css";
 import "./FeePaymentStatus.css";
 import ParentalConsentModal from "../../components/ParentalConsentModal";
+import SchoolCrest from "../../components/SchoolCrest";
 import { getAdmissionData, getStoredAdmissionId, getRegistrationFee, initiateRegistrationFeePayment, recordParentalConsent, verifyRegistrationFeePayment } from "../../services/admission";
 import { useCognitoAuth } from "../../auth/useCognitoAuth";
 
@@ -95,7 +96,7 @@ export default function FeePayment() {
   const amount = fee?.amount ? `₹ ${Number(fee.amount).toLocaleString("en-IN", { minimumFractionDigits: 2 })}` : "Loading…";
 
   return <main className="fee-page">
-    <header className="fee-header"><Link className="fee-brand" to="/new-user-dashboard"><span>S</span><div><strong>Sheerwood</strong><small>International School</small></div></Link><span>Secure payment <b>●</b></span></header>
+    <header className="fee-header"><Link className="fee-brand" to="/new-user-dashboard"><SchoolCrest /><div><strong>Sheerwood</strong><small>International School</small></div></Link><span>Secure payment <b>●</b></span></header>
     <section className="fee-shell">
       <div className="fee-heading"><p>APPLICATION # {applicationNumber || "ASSIGNED AFTER FIRST SAVE"}</p><h1>Fee Payment</h1><small>Complete your application fee to submit your admission request.</small></div>
       <div className="fee-content">

@@ -134,12 +134,20 @@ def _completed_application_form(application_data: dict[str, Any] | None, documen
 
 
 def _application_html(*, title: str, student_name: str, application_number: str, desired_class: str, form_lines: list[str], closing: str) -> str:
-    """Render the same form fields as an email-safe HTML table."""
+    """Render the same form fields in the portal's cyan-and-white email style."""
     parts = [
-        '<div style="font-family:Arial,sans-serif;color:#173d2d;max-width:720px;margin:0 auto;line-height:1.5">',
-        f'<h1 style="font-size:24px;margin:0 0 8px">{escape(title)}</h1>',
-        f'<p style="margin:0 0 18px">Application ID: <strong>{escape(application_number)}</strong><br>'
-        f'Student: {escape(student_name)}<br>Class applying for: {escape(desired_class)}</p>',
+        '<div style="margin:0;padding:28px 14px;background:#12c9e8;font-family:Arial,sans-serif;color:#073c49;line-height:1.5">',
+        '<div style="max-width:720px;margin:0 auto;overflow:hidden;border-radius:26px;background:#ffffff;box-shadow:0 10px 28px rgba(1,68,83,.22)">',
+        '<div style="padding:30px 30px 24px;text-align:center;background:#ffffff">',
+        '<div style="display:inline-block;color:#0a90b0;font-size:25px;font-weight:800;letter-spacing:-1px">Sheerwood</div>',
+        '<div style="margin-top:1px;color:#0c5162;font-size:9px;font-weight:800;letter-spacing:2px">INTERNATIONAL SCHOOL</div>',
+        '<div style="width:54px;height:4px;margin:17px auto 15px;border-radius:999px;background:#f5be3f"></div>',
+        f'<h1 style="margin:0;color:#073c49;font-family:Georgia,serif;font-size:27px;font-weight:600;line-height:1.2">{escape(title)}</h1>',
+        f'<p style="margin:14px 0 0;color:#397080;font-size:14px">Application ID: <strong style="color:#073c49">{escape(application_number)}</strong><br>'
+        f'Student: {escape(student_name)} &nbsp;•&nbsp; Class applying for: {escape(desired_class)}</p>',
+        '</div>',
+        '<div style="height:7px;background:#064b5b"></div>',
+        '<div style="padding:26px 30px 8px;background:#ffffff">',
     ]
     table_open = False
     for line in form_lines:
@@ -152,21 +160,30 @@ def _application_html(*, title: str, student_name: str, application_number: str,
             if table_open:
                 parts.append("</tbody></table>")
                 table_open = False
-            parts.append(f'<h2 style="font-size:17px;margin:22px 0 8px">{escape(line.strip().rstrip(":"))}</h2>')
+            parts.append(f'<h2 style="margin:22px 0 9px;padding:10px 13px;border-radius:8px;color:#ffffff;background:#064b5b;font-size:14px;letter-spacing:.3px">{escape(line.strip().rstrip(":"))}</h2>')
             continue
         if not table_open:
-            parts.append('<table style="width:100%;border-collapse:collapse;font-size:14px"><tbody>')
+            parts.append('<table role="presentation" style="width:100%;border-collapse:separate;border-spacing:0;font-size:13px"><tbody>')
             table_open = True
         label, value = line.strip().split(":", 1)
         parts.append(
             '<tr>'
-            f'<th style="text-align:left;vertical-align:top;width:38%;padding:7px 10px;border:1px solid #dce7df;background:#f4f8f5">{escape(label)}</th>'
-            f'<td style="vertical-align:top;padding:7px 10px;border:1px solid #dce7df">{escape(value.strip())}</td>'
+            f'<th style="text-align:left;vertical-align:top;width:38%;padding:9px 11px;border:1px solid #cdeef4;color:#07586b;background:#effbfe;font-size:12px">{escape(label)}</th>'
+            f'<td style="vertical-align:top;padding:9px 11px;border:1px solid #cdeef4;color:#164955;background:#ffffff">{escape(value.strip())}</td>'
             '</tr>'
         )
     if table_open:
         parts.append("</tbody></table>")
-    parts.append(f'<p style="margin:22px 0 0">{escape(closing)}</p></div>')
+    parts.extend([
+        '</div>',
+        '<div style="padding:20px 30px 28px;background:#f1fcff">',
+        f'<p style="margin:0;color:#1f5d6c;font-size:13px;line-height:1.65">{escape(closing)}</p>',
+        '<p style="margin:16px 0 0;color:#4e7b86;font-size:11px">Sheerwood International School Admissions</p>',
+        '</div>',
+        '</div>',
+        '<p style="max-width:720px;margin:15px auto 0;color:#e9fdff;font-size:10px;text-align:center">This is an automated message from the Sheerwood Admissions Portal.</p>',
+        '</div>',
+    ])
     return "".join(parts)
 
 
@@ -274,20 +291,29 @@ def send_admission_submission_notifications(
     desired_class: str,
     application_data: dict[str, Any] | None = None,
     documents: list[dict[str, Any]] | None = None,
+    payment_amount: str = "",
+    transaction_id: str = "",
 ) -> None:
-    """Notify the applicant and every configured admin after first submission."""
+    """Notify the applicant and every configured admin after confirmed payment."""
     parent_recipient = _valid_email(parent_email)
     parent_display_name = parent_name.strip() or "Parent"
     student_display_name = student_name.strip() or "Applicant"
     application_display = application_number.strip()
     class_display = desired_class.strip() or "selected class"
     completed_form = _completed_application_form(application_data, documents)
+    payment_lines = ["REGISTRATION FEE PAYMENT CONFIRMED", ""]
+    if payment_amount:
+        payment_lines.append(f"Registration fee paid: ₹{payment_amount}")
+    if transaction_id:
+        payment_lines.append(f"Easebuzz transaction reference: {transaction_id}")
+    payment_lines.append("")
+    completed_application = [*payment_lines, "COMPLETED APPLICATION FORM", *completed_form]
     attachment_stem = re.sub(r"[^A-Za-z0-9._-]", "-", application_display) or "application"
-    attachments = [(f"{attachment_stem}-application.pdf", _application_pdf(application_number=application_display, student_name=student_display_name, desired_class=class_display, form_lines=completed_form), "application/pdf")]
+    attachments = [(f"{attachment_stem}-application.pdf", _application_pdf(application_number=application_display, student_name=student_display_name, desired_class=class_display, form_lines=completed_application), "application/pdf")]
     try:
         attachments.append((
             f"{attachment_stem}-application.pptx",
-            build_admission_pptx(application_number=application_display, student_name=student_display_name, desired_class=class_display, form_lines=completed_form),
+            build_admission_pptx(application_number=application_display, student_name=student_display_name, desired_class=class_display, form_lines=completed_application),
             "application/vnd.openxmlformats-officedocument.presentationml.presentation",
         ))
     except Exception:
@@ -297,27 +323,27 @@ def send_admission_submission_notifications(
     if parent_recipient:
         messages.append((
             parent_recipient,
-            f"Sheerwood admission application received — {application_display}",
+            f"Registration payment received — {application_display}",
             "\n".join([
                 f"Dear {parent_display_name},",
                 "",
-                f"Your admission application for {student_display_name} has been received.",
+                f"We have received the registration payment and admission application for {student_display_name}.",
                 f"Application ID: {application_display}",
                 f"Class applying for: {class_display}",
                 "",
-                "COMPLETED APPLICATION FORM",
-                *completed_form,
-                "Please sign in to the Admission Dashboard to upload documents and track verification and approval.",
+                *payment_lines,
+                "Your application is now with the Admissions Office for review. We will email you with the next steps.",
+                "Please retain this email and the transaction reference for your records.",
                 "",
                 "Sheerwood International School Admissions",
             ]),
             _application_html(
-                title="Admission application received",
+                title="Registration payment received",
                 student_name=student_display_name,
                 application_number=application_display,
                 desired_class=class_display,
-                form_lines=completed_form,
-                closing="Sign in to the Admission Dashboard to upload documents and track verification and approval.",
+                form_lines=payment_lines,
+                closing="Your application is now with the Admissions Office for review. Please retain this email and the transaction reference for your records.",
             ),
             attachments,
         ))
@@ -325,24 +351,25 @@ def send_admission_submission_notifications(
     for admin_email in _admin_recipients():
         messages.append((
             admin_email,
-            f"New admission application — {application_display}",
+            f"New paid admission application — {application_display}",
             "\n".join([
-                "A new admission application has been submitted.",
+                "A new admission application and registration payment have been confirmed.",
                 "",
                 f"Student: {student_display_name}",
                 f"Application ID: {application_display}",
                 f"Class applying for: {class_display}",
                 "",
+                *payment_lines,
                 "COMPLETED APPLICATION FORM",
                 *completed_form,
                 "Open the Admin Admissions dashboard to review documents and update the application.",
             ]),
             _application_html(
-                title="New admission application",
+                title="New paid admission application",
                 student_name=student_display_name,
                 application_number=application_display,
                 desired_class=class_display,
-                form_lines=completed_form,
+                form_lines=completed_application,
                 closing="Open the Admin Admissions dashboard to review documents and update the application.",
             ),
             attachments,
@@ -376,4 +403,17 @@ def send_admission_approval_notification(*, parent_email: str, parent_name: str,
         "", "Regards,", "Admissions Office", "Sheerwood College",
     ])
     attachment = [(f"{application_number.replace('/', '-')}-entrance-syllabus.pdf", _syllabus_pdf(application_number=application_number, student_name=display_student, syllabus=syllabus), "application/pdf")]
-    _send_messages([(recipient, f"Admission accepted — {application_number}", body, None, attachment)])
+    _send_messages([(
+        recipient,
+        f"Admission accepted — {application_number}",
+        body,
+        _application_html(
+            title="Admission accepted",
+            student_name=display_student,
+            application_number=application_number,
+            desired_class="Entrance Test",
+            form_lines=syllabus_lines,
+            closing="Please keep the attached syllabus for entrance-test preparation. Sign in to the parent admission portal or contact the Admissions Office for further instructions.",
+        ),
+        attachment,
+    )])

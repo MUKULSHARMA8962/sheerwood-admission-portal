@@ -9,6 +9,7 @@ import {
 } from "../services/admission";
 import { useCognitoAuth } from "../auth/useCognitoAuth";
 import AccountMenu from "../components/AccountMenu";
+import SchoolCrest from "../components/SchoolCrest";
 import "./AdmissionDetails.css";
 
 const steps = [
@@ -174,7 +175,7 @@ export default function AdmissionDetails() {
   return (
     <main className="admission-page">
       <header className="admission-header">
-        <Link className="admission-brand" to="/new-user-dashboard"><span>S</span><div><strong>Sheerwood</strong><small>International School</small></div></Link>
+        <Link className="admission-brand" to="/new-user-dashboard"><SchoolCrest /><div><strong>Sheerwood</strong><small>International School</small></div></Link>
         <AccountMenu />
       </header>
 

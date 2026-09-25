@@ -322,6 +322,17 @@ def initialize_database() -> None:
                 updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
             );
 
+            CREATE TABLE IF NOT EXISTS vendor_accounts (
+                vendor_id TEXT PRIMARY KEY,
+                full_name TEXT NOT NULL,
+                email TEXT NOT NULL UNIQUE,
+                cognito_username TEXT NOT NULL UNIQUE,
+                referral_code TEXT NOT NULL UNIQUE,
+                is_enabled INTEGER NOT NULL DEFAULT 1,
+                created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+            );
+
             CREATE TABLE IF NOT EXISTS consent_events (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 consent_id TEXT NOT NULL UNIQUE,
@@ -652,6 +663,18 @@ def initialize_postgres_database() -> None:
             details TEXT NOT NULL,
             sort_order INTEGER NOT NULL DEFAULT 0,
             active BOOLEAN NOT NULL DEFAULT TRUE,
+            updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP::text
+        )
+        """,
+        """
+        CREATE TABLE IF NOT EXISTS vendor_accounts (
+            vendor_id TEXT PRIMARY KEY,
+            full_name TEXT NOT NULL,
+            email TEXT NOT NULL UNIQUE,
+            cognito_username TEXT NOT NULL UNIQUE,
+            referral_code TEXT NOT NULL UNIQUE,
+            is_enabled BOOLEAN NOT NULL DEFAULT TRUE,
+            created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP::text,
             updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP::text
         )
         """,

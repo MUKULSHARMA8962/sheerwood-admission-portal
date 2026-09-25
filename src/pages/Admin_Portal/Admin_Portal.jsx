@@ -2,7 +2,10 @@ import { useCallback, useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { deleteAdminDocument, downloadAdminDocument, getAdminDocuments, reviewAdminDocument } from "../../services/api";
 import { useCognitoAuth } from "../../auth/useCognitoAuth";
+import SchoolCrest from "../../components/SchoolCrest";
 import AdminUsers from "./AdminUsers";
+import AdminVendors from "./AdminVendors";
+import AdminSettings from "./AdminSettings";
 import AdminDashboard from "./AdminDashboard";
 import NewAdmissionTable from "./NewAdmissionTable";
 import DocumentPreviewModal from "../DocumentPreviewModal";
@@ -14,6 +17,8 @@ const screens = [
   ["▤", "Admissions", "admissions"],
   ["♙", "Teachers", "teachers"],
   ["◉", "Students", "students"],
+  ["◈", "Vendors", "vendors"],
+  ["⚙", "Settings", "settings"],
   ["◈", "Users & Roles", "users"],
 ];
 
@@ -26,7 +31,7 @@ function Sidebar({ screen }) {
   const navigate = useNavigate();
   const { signOut } = useCognitoAuth();
   return <aside className="admin-sidebar">
-    <Link className="admin-brand" to="/admin/dashboard"><span>S</span><div><strong>Sheerwood</strong><small>School Admin</small></div></Link>
+    <Link className="admin-brand" to="/admin/dashboard"><SchoolCrest /><div><strong>Sheerwood</strong><small>School Admin</small></div></Link>
     <nav aria-label="Admin portal navigation">{screens.map(([icon, label, target]) => <button className={screen === target ? "active" : ""} key={target} onClick={() => navigate(`/admin/${target}`)}><span>{icon}</span>{label}</button>)}</nav>
     <button className="admin-logout" onClick={signOut}><span>↪</span> Logout</button>
   </aside>;
@@ -172,6 +177,10 @@ export default function AdminPortal() {
     ? <DocumentQueue setNotice={setNotice} />
     : currentScreen === "users"
       ? <AdminUsers setNotice={setNotice} />
+      : currentScreen === "vendors"
+        ? <AdminVendors setNotice={setNotice} />
+        : currentScreen === "settings"
+          ? <AdminSettings setNotice={setNotice} />
       : currentScreen === "admissions"
         ? <NewAdmissionTable setNotice={setNotice} />
         : <AdminDashboard view={currentScreen === "dashboard" ? "overview" : currentScreen} onNavigate={(target) => navigate(`/admin/${target}`)} />;
@@ -181,6 +190,8 @@ export default function AdminPortal() {
     admissions: ["ADMISSION OPERATIONS", "New Admission Dashboard", "Manage verification and admission approvals using live application data."],
     teachers: ["SCHOOL OPERATIONS", "Teacher Dashboard", "Review staff availability, subject allocation and attendance."],
     students: ["SCHOOL OPERATIONS", "Student Dashboard", "Review student enrollment, class allocation and attendance."],
+    vendors: ["VENDOR ACCESS", "Vendor Logins", "Create vendor access, distribute referral links, and block accounts when required."],
+    settings: ["ADMISSION CONFIGURATION", "Settings", "Set the registration payment amount and manage entrance-test syllabus content."],
     users: ["ACCESS CONTROL", "Users & Roles", "Manage database users and their portal roles."],
   };
   const [eyebrow, heading, description] = headings[currentScreen] || headings.admissions;

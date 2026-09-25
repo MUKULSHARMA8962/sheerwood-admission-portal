@@ -12,7 +12,7 @@ from botocore.exceptions import BotoCoreError, ClientError
 from ..ai import AIConfigurationError, AIProviderRateLimitError, AIProviderUnavailableError, generate_ai_reply
 from ..database import connection
 from ..dependencies import require_roles
-from ..schemas import AIRequest, AnnouncementRequest, CreateUserRequest, DocumentReviewRequest, RegistrationFeeSettingsRequest, SyllabusRequest, UserRoleUpdate
+from ..schemas import AIRequest, AnnouncementRequest, CreateUserRequest, DocumentReviewRequest, RegistrationFeeSettingsRequest, SyllabusRequest, UserRoleUpdate, VendorCreateRequest
 from ..security import hash_password
 
 router = APIRouter(prefix="/api/admin", tags=["Admin UI"])
@@ -111,6 +111,15 @@ def cognito_admin_client():
     return boto3.client("cognito-idp", region_name=region), user_pool_id
 
 
+def ensure_vendor_group(client, user_pool_id: str) -> None:
+    """Create the dedicated vendor group once, without failing if it already exists."""
+    try:
+        client.create_group(UserPoolId=user_pool_id, GroupName="vendor", Description="Admission referral vendors")
+    except ClientError as error:
+        if error.response.get("Error", {}).get("Code") != "GroupExistsException":
+            raise
+
+
 @router.get("/dashboard")
 def dashboard(_: dict = AdminUser) -> dict:
     return {"summary": {"students": 1248, "teachers": 74, "new_applications": 126, "pending_approvals": 38, "fees_collected": 840000, "attendance": 93.6}, "priority_tasks": [{"title": "Admission approvals pending", "count": 38}, {"title": "Documents awaiting verification", "count": 12}, {"title": "Fee payment follow-ups", "count": 6}]}
@@ -120,6 +129,8 @@ def dashboard(_: dict = AdminUser) -> dict:
 def admissions(_: dict = AdminUser) -> list[dict]:
     with connection() as database:
         rows = database.execute("SELECT * FROM applications ORDER BY id DESC").fetchall()
+        vendor_rows = database.execute("SELECT vendor_id, full_name FROM vendor_accounts").fetchall()
+        vendor_names = {row["vendor_id"]: row["full_name"] for row in vendor_rows}
         result = []
         for row in rows:
             application = dict(row)
@@ -143,6 +154,7 @@ def admissions(_: dict = AdminUser) -> list[dict]:
                 parent_name = "Parent details pending"
             application.pop("application_data", None)
             application.pop("documents_json", None)
+            application["vendor_name"] = vendor_names.get(application.get("vendor_id"), "")
             application.update({
                 "documents_status": documents_status,
                 "document_summary": summary,
@@ -402,7 +414,7 @@ def users_roles(_: dict = AdminUser) -> list[dict]:
             attributes = {item["Name"]: item["Value"] for item in cognito_user.get("Attributes", [])}
             groups = client.admin_list_groups_for_user(UserPoolId=user_pool_id, Username=cognito_user["Username"]).get("Groups", [])
             group_names = [group["GroupName"] for group in groups]
-            role = next((candidate for candidate in ("admin", "teacher", "student", "parent", "admission") if candidate in group_names), "admission")
+            role = next((candidate for candidate in ("admin", "teacher", "student", "parent", "admission", "vendor") if candidate in group_names), "admission")
             result.append({"id": f"cognito:{cognito_user['Username']}", "email": attributes.get("email", ""), "full_name": attributes.get("name") or attributes.get("email", cognito_user["Username"]), "role": role, "cognito_subject": attributes.get("sub"), "groups": group_names, "status": cognito_user.get("UserStatus", "")})
         return result
     except (BotoCoreError, ClientError) as error:
@@ -413,6 +425,8 @@ def users_roles(_: dict = AdminUser) -> list[dict]:
 
 @router.post("/users-roles", status_code=201)
 def create_user(payload: CreateUserRequest, _: dict = AdminUser) -> dict:
+    if payload.role == "vendor":
+        raise HTTPException(status_code=400, detail="Create vendor logins from the Vendors section so a referral ID is assigned.")
     full_name = payload.full_name.strip()
     email = payload.email.strip().lower()
     password = (payload.password or secrets.token_urlsafe(16)).strip()
@@ -442,9 +456,15 @@ def update_user_role(user_id: str, payload: UserRoleUpdate, _: dict = AdminUser)
         username = user_id.removeprefix("cognito:")
         try:
             groups = client.admin_list_groups_for_user(UserPoolId=user_pool_id, Username=username).get("Groups", [])
-            for group in ("admin", "teacher", "student", "parent", "admission"):
+            for group in ("admin", "teacher", "student", "parent", "admission", "vendor"):
                 if any(item["GroupName"] == group for item in groups) and group != payload.role:
                     client.admin_remove_user_from_group(UserPoolId=user_pool_id, Username=username, GroupName=group)
+            if payload.role == "vendor":
+                with connection() as database:
+                    vendor = database.execute("SELECT 1 FROM vendor_accounts WHERE cognito_username = ?", (username,)).fetchone()
+                if not vendor:
+                    raise HTTPException(status_code=400, detail="Create vendor logins from the Vendors section so a referral ID is assigned.")
+                ensure_vendor_group(client, user_pool_id)
             client.admin_add_user_to_group(UserPoolId=user_pool_id, Username=username, GroupName=payload.role)
             client.admin_update_user_attributes(UserPoolId=user_pool_id, Username=username, UserAttributes=[{"Name": "name", "Value": payload.full_name}, {"Name": "email", "Value": payload.email}])
             return {"id": user_id, "email": payload.email, "full_name": payload.full_name, "role": payload.role, "cognito_subject": "", "groups": [payload.role]}
@@ -458,6 +478,91 @@ def update_user_role(user_id: str, payload: UserRoleUpdate, _: dict = AdminUser)
             raise HTTPException(status_code=404, detail="User was not found.")
         row = database.execute("SELECT id, email, full_name, role, cognito_subject FROM users WHERE id = ?", (user_id,)).fetchone()
     return dict(row)
+
+
+@router.get("/vendors")
+def list_vendors(_: dict = AdminUser) -> list[dict]:
+    with connection() as database:
+        rows = database.execute(
+            """SELECT v.vendor_id, v.full_name, v.email, v.cognito_username, v.referral_code,
+                      v.is_enabled, v.created_at, v.updated_at,
+                      COUNT(a.id) AS applications,
+                      SUM(CASE WHEN a.submitted_at IS NOT NULL THEN 1 ELSE 0 END) AS submitted,
+                      SUM(CASE WHEN a.status = 'approved' THEN 1 ELSE 0 END) AS approved
+               FROM vendor_accounts v
+               LEFT JOIN applications a ON a.vendor_id = v.vendor_id
+               GROUP BY v.vendor_id, v.full_name, v.email, v.cognito_username, v.referral_code,
+                        v.is_enabled, v.created_at, v.updated_at
+               ORDER BY v.created_at DESC"""
+        ).fetchall()
+    return [{**dict(row), "is_enabled": bool(row["is_enabled"]), "applications": int(row["applications"] or 0), "submitted": int(row["submitted"] or 0), "approved": int(row["approved"] or 0)} for row in rows]
+
+
+@router.post("/vendors", status_code=201)
+def create_vendor(payload: VendorCreateRequest, _: dict = AdminUser) -> dict:
+    full_name = payload.full_name.strip()
+    email = payload.email.strip().lower()
+    vendor_id = payload.vendor_id.strip().upper()
+    if not full_name or not email:
+        raise HTTPException(status_code=400, detail="Vendor name and email are required.")
+
+    with connection() as database:
+        existing = database.execute("SELECT 1 FROM vendor_accounts WHERE vendor_id = ? OR lower(email) = ?", (vendor_id, email)).fetchone()
+    if existing:
+        raise HTTPException(status_code=409, detail="A vendor with this referral ID or email already exists.")
+
+    client, user_pool_id = cognito_admin_client()
+    try:
+        ensure_vendor_group(client, user_pool_id)
+        response = client.admin_create_user(
+            UserPoolId=user_pool_id,
+            Username=email,
+            UserAttributes=[
+                {"Name": "email", "Value": email},
+                {"Name": "name", "Value": full_name},
+            ],
+            DesiredDeliveryMediums=["EMAIL"],
+        )
+        username = response["User"]["Username"]
+        client.admin_add_user_to_group(UserPoolId=user_pool_id, Username=username, GroupName="vendor")
+    except ClientError as error:
+        error_code = error.response.get("Error", {}).get("Code", "Cognito error")
+        if error_code == "UsernameExistsException":
+            raise HTTPException(status_code=409, detail="A Cognito account already exists for this vendor email.") from error
+        logger.exception("Vendor creation failed: %s", error_code)
+        raise HTTPException(status_code=503, detail=f"Vendor login could not be created: {error_code}") from error
+
+    try:
+        with connection() as database:
+            database.execute(
+                """INSERT INTO vendor_accounts (vendor_id, full_name, email, cognito_username, referral_code)
+                   VALUES (?, ?, ?, ?, ?)""",
+                (vendor_id, full_name, email, username, vendor_id),
+            )
+    except Exception:
+        try:
+            client.admin_delete_user(UserPoolId=user_pool_id, Username=username)
+        except (BotoCoreError, ClientError):
+            logger.exception("Could not remove the Cognito vendor user after database creation failed.")
+        raise
+    return {"vendor_id": vendor_id, "full_name": full_name, "email": email, "cognito_username": username, "referral_code": vendor_id, "is_enabled": True, "status": "Invitation sent"}
+
+
+@router.patch("/vendors/{vendor_id}/status")
+def update_vendor_status(vendor_id: str, enabled: bool, _: dict = AdminUser) -> dict:
+    normalized_vendor_id = vendor_id.strip().upper()
+    with connection() as database:
+        vendor = database.execute("SELECT cognito_username FROM vendor_accounts WHERE vendor_id = ?", (normalized_vendor_id,)).fetchone()
+    if not vendor:
+        raise HTTPException(status_code=404, detail="Vendor account was not found.")
+    client, user_pool_id = cognito_admin_client()
+    try:
+        (client.admin_enable_user if enabled else client.admin_disable_user)(UserPoolId=user_pool_id, Username=vendor["cognito_username"])
+    except (BotoCoreError, ClientError) as error:
+        raise HTTPException(status_code=503, detail="Vendor account status could not be changed.") from error
+    with connection() as database:
+        database.execute("UPDATE vendor_accounts SET is_enabled = ?, updated_at = CURRENT_TIMESTAMP WHERE vendor_id = ?", (int(enabled), normalized_vendor_id))
+    return {"vendor_id": normalized_vendor_id, "is_enabled": enabled, "status": "Enabled" if enabled else "Blocked"}
 
 
 @router.get("/settings")

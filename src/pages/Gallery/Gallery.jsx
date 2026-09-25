@@ -12,6 +12,7 @@ import campusEvent from "../../assets/sheerwood-campus-event-web.jpg";
 import studentAuditorium from "../../assets/sheerwood-auditorium-web.jpg";
 import studentFormation from "../../assets/sheerwood-student-formation-web.jpg";
 import studentGroup from "../../assets/sheerwood-student-group-web.jpg";
+import SchoolCrest from "../../components/SchoolCrest";
 import "./Gallery.css";
 
 const filters = ["All", "Student", "Campus", "Hostel"];
@@ -38,7 +39,7 @@ export default function Gallery() {
   return (
     <main className="gallery-page">
       <header className="gallery-header">
-        <Link className="gallery-brand" to="/"><span>S</span><div><strong>Sheerwood</strong><small>International School</small></div></Link>
+        <Link className="gallery-brand" to="/"><SchoolCrest /><div><strong>Sheerwood</strong><small>International School</small></div></Link>
         <nav><Link to="/">Home</Link><Link to="/#about">About</Link><Link to="/#campus">Campus Life</Link><Link className="current" to="/gallery">Gallery</Link><Link to="/admission-details">Admission</Link><Link to="/login">Parent Login</Link></nav>
       </header>
 

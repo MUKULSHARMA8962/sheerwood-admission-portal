@@ -63,6 +63,12 @@ class SyllabusRequest(BaseModel):
     active: bool = True
 
 
+class VendorCreateRequest(BaseModel):
+    full_name: str = Field(min_length=1, max_length=120)
+    email: str = Field(min_length=5, max_length=254)
+    vendor_id: str = Field(min_length=3, max_length=40, pattern=r"^[A-Za-z0-9_-]+$")
+
+
 class ParentalConsentRequest(BaseModel):
     parent_name: str = Field(min_length=2, max_length=120)
     relationship_to_child: str = Field(min_length=2, max_length=80)
@@ -80,12 +86,12 @@ class ParentalConsentWithdrawalRequest(BaseModel):
 class CreateUserRequest(BaseModel):
     full_name: str = Field(min_length=1, max_length=120)
     email: str = Field(min_length=5, max_length=254)
-    role: Literal["parent", "teacher", "student", "admin", "admission"]
+    role: Literal["parent", "teacher", "student", "admin", "admission", "vendor"]
     password: str | None = Field(default=None, min_length=8, max_length=128)
 
 
 class UserRoleUpdate(BaseModel):
-    role: Literal["parent", "teacher", "student", "admin", "admission"]
+    role: Literal["parent", "teacher", "student", "admin", "admission", "vendor"]
     full_name: str = Field(min_length=1, max_length=120)
     email: str = Field(min_length=5, max_length=254)
 

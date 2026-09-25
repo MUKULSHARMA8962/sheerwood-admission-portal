@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import "./Student_Information.css";
 import AccountMenu from "../../components/AccountMenu";
+import SchoolCrest from "../../components/SchoolCrest";
 import "./StudentBirthDate.css";
 import { getAdmissionData, saveAdmissionDraft, uploadAdmissionDocument } from "../../services/admission";
 import { useCognitoAuth } from "../../auth/useCognitoAuth";
@@ -206,7 +207,7 @@ export default function StudentInformation() {
   return (
     <main className="student-page">
       <header className="student-header">
-        <Link className="student-brand" to="/new-user-dashboard"><span>S</span><div><strong>Sheerwood</strong><small>International School</small></div></Link>
+        <Link className="student-brand" to="/new-user-dashboard"><SchoolCrest /><div><strong>Sheerwood</strong><small>International School</small></div></Link>
         <AccountMenu />
       </header>
 

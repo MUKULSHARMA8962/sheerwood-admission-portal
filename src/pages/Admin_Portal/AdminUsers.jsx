@@ -57,7 +57,7 @@ export default function AdminUsers({ setNotice }) {
         <i>{user.full_name?.slice(0, 1) || "U"}</i>
         <div className="admin-user-fields"><small>ID: {user.id}</small><input value={user.full_name || ""} onChange={(event) => editUser(user.id, "full_name", event.target.value)} aria-label={`Edit name for ${user.full_name}`} /><input type="email" value={user.email || ""} onChange={(event) => editUser(user.id, "email", event.target.value)} aria-label={`Edit email for ${user.full_name}`} /><span>{user.status || (user.cognito_subject ? "Cognito linked" : "Database account")}</span></div>
         <em>{user.role}</em>
-        <div className="admin-user-actions"><select value={user.role} onChange={(event) => editUser(user.id, "role", event.target.value)} aria-label={`Change role for ${user.full_name}`}><option value="parent">Parent</option><option value="teacher">Teacher</option><option value="student">Student</option><option value="admin">Admin</option><option value="admission">Admission</option></select><button type="button" onClick={() => saveUser(user)}>Save</button></div>
+        <div className="admin-user-actions"><select value={user.role} onChange={(event) => editUser(user.id, "role", event.target.value)} aria-label={`Change role for ${user.full_name}`}><option value="parent">Parent</option><option value="teacher">Teacher</option><option value="student">Student</option><option value="admin">Admin</option><option value="admission">Admission</option><option value="vendor">Vendor</option></select><button type="button" onClick={() => saveUser(user)}>Save</button></div>
       </article>)}
     </section>
   </>;

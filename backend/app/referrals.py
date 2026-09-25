@@ -22,13 +22,22 @@ REFERRALS = {
 }
 
 
-def resolve_referral(source: str | None, referral_code: str | None = None) -> Referral | None:
+def resolve_referral(source: str | None, referral_code: str | None = None, database=None) -> Referral | None:
     normalized_source = str(source or "").strip().lower()
+    normalized_code = str(referral_code or "").strip().upper()
+    if normalized_source == "vendor" and normalized_code and database is not None:
+        vendor = database.execute(
+            "SELECT vendor_id, referral_code FROM vendor_accounts WHERE referral_code = ? AND is_enabled = 1",
+            (normalized_code,),
+        ).fetchone()
+        if vendor:
+            return Referral("vendor", vendor["vendor_id"], f"VENDOR_{vendor['vendor_id']}", vendor["referral_code"])
+        return None
+
     referral = REFERRALS.get(normalized_source)
     if not referral:
         return None
 
-    normalized_code = str(referral_code or "").strip().upper()
     if normalized_code and normalized_code != referral.referral_code:
         return None
     return referral

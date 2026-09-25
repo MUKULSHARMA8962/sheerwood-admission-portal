@@ -3,6 +3,7 @@ import { decideAdminAdmission, deleteAdminDocument, downloadAdminDocument, getAd
 import { useCognitoAuth } from "../../auth/useCognitoAuth";
 import AdmissionDetailCard from "./AdmissionDetailCard";
 import DocumentPreviewModal from "../DocumentPreviewModal";
+import { applicationPrintHtml, blobToDataUrl } from "./printApplication";
 import "./NewAdmissionTable.css";
 
 const statusLabels = {
@@ -36,7 +37,7 @@ function sourceLabel(value) {
 
 function vendorName(application) {
   const names = { EDU001: "Edustoke", EZY001: "Ezyschooling", GLO001: "Global Education", HIP001: "Edhippo" };
-  return names[application.vendor_id] || sourceLabel(application.lead_source);
+  return application.vendor_name || names[application.vendor_id] || sourceLabel(application.lead_source);
 }
 
 function parentDisplayName(value) {
@@ -93,14 +94,14 @@ export default function NewAdmissionTable({ setNotice }) {
     return matchesSearch && matchesVendor;
   }), [applications, query, vendorFilter]);
 
-  const vendorOptions = useMemo(() => [
-    ["all", "All vendors"],
-    ["DIRECT", "Direct Website"],
-    ["EDU001", "Edustoke"],
-    ["EZY001", "Ezyschooling"],
-    ["GLO001", "Global Education"],
-    ["HIP001", "Edhippo"],
-  ], []);
+  const vendorOptions = useMemo(() => {
+    const sources = new Map([["DIRECT", "Direct Website"]]);
+    applications.forEach((application) => {
+      const id = application.vendor_id || "DIRECT";
+      sources.set(id, vendorName(application));
+    });
+    return [["all", "All vendors"], ...Array.from(sources.entries()).sort(([first], [second]) => first.localeCompare(second))];
+  }, [applications]);
 
   async function updateAdmission(application, decision, options = {}) {
     if (!session?.accessToken || savingId) return;
@@ -211,6 +212,31 @@ export default function NewAdmissionTable({ setNotice }) {
     }
   }
 
+  async function printApplication(application) {
+    if (!application || !session?.accessToken) return;
+    const printWindow = window.open("", "_blank");
+    if (!printWindow) {
+      setError("Allow pop-ups for this site to print the application form.");
+      return;
+    }
+    printWindow.document.write("<p style='font-family:Arial;padding:24px'>Preparing printable application…</p>");
+    const photoKeys = new Set(["student-photo", "father-photo", "mother-photo"]);
+    try {
+      const results = await Promise.all((application.documents || []).filter((document) => photoKeys.has(document.document_key) && String(document.content_type || "").startsWith("image/")).map(async (document) => {
+        const { blob } = await downloadAdminDocument(session.accessToken, document.id, document.file_name);
+        return [document.document_key, { dataUrl: await blobToDataUrl(blob) }];
+      }));
+      const photographs = Object.fromEntries(results);
+      printWindow.document.open();
+      printWindow.document.write(applicationPrintHtml(application, photographs));
+      printWindow.document.close();
+      printWindow.addEventListener("load", () => printWindow.print(), { once: true });
+    } catch (reason) {
+      printWindow.close();
+      setError(reason.message || "The application could not be prepared for printing.");
+    }
+  }
+
   return <section className="new-admission-admin-panel">
     <header className="new-admission-table-header">
       <div><p>NEW ADMISSION</p><h2>Admission applications</h2><span>Verification and approval are saved separately.</span></div>
@@ -247,7 +273,7 @@ export default function NewAdmissionTable({ setNotice }) {
         </tbody>
       </table>
     </div>
-    <AdmissionDetailCard application={selectedApplication} onClose={() => setSelectedApplication(null)} onApprove={() => approve(selectedApplication)} onApproveWithException={() => approveWithException(selectedApplication)} onReject={() => updateAdmission(selectedApplication, "rejected")} saving={savingId === selectedApplication?.id} documentBusyId={documentBusyId} onOpenDocument={(document) => void openDocumentPreview(document)} onReviewDocument={(document, decision) => void reviewDocument(document, decision)} onDeleteDocument={(document) => void deleteDocument(document)} />
+    <AdmissionDetailCard application={selectedApplication} onClose={() => setSelectedApplication(null)} onApprove={() => approve(selectedApplication)} onApproveWithException={() => approveWithException(selectedApplication)} onReject={() => updateAdmission(selectedApplication, "rejected")} onPrint={() => void printApplication(selectedApplication)} saving={savingId === selectedApplication?.id} documentBusyId={documentBusyId} onOpenDocument={(document) => void openDocumentPreview(document)} onReviewDocument={(document, decision) => void reviewDocument(document, decision)} onDeleteDocument={(document) => void deleteDocument(document)} />
     <DocumentPreviewModal preview={documentPreview} deleting={documentBusyId === documentPreview?.document?.id} onClose={() => setDocumentPreview(null)} onDownload={downloadPreview} onDelete={() => void deleteDocument(documentPreview?.document)} actions={[
       { label: "Mark under review", className: "admission-document-review", onClick: () => void reviewDocument(documentPreview?.document, "under_verification"), disabled: documentBusyId !== null },
       { label: "Verify", className: "admission-document-verify", onClick: () => void reviewDocument(documentPreview?.document, "verified"), disabled: documentBusyId !== null },

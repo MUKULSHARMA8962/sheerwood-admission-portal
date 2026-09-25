@@ -18,6 +18,7 @@ import Register from "../pages/Register";
 import SchoolCalendar from "../pages/SchoolCalendar";
 import StudentDashboard from "../pages/StudentDashboard";
 import VirtualTour from "../pages/VirtualTour";
+import VendorDashboard from "../pages/VendorDashboard";
 import { ROUTES } from "../constants/routes";
 import { Protected } from "./RouteGuard";
 import DirectCognitoEntry from "./DirectCognitoEntry";
@@ -53,6 +54,7 @@ export default function AppRoutes() {
       <Route path="/admin" element={<Protected roles={["admin"]}><Navigate to={ROUTES.admin()} replace /></Protected>} />
       <Route path="/admin/:screen" element={<Protected roles={["admin"]}><AdminPortal /></Protected>} />
       <Route path={ROUTES.teacherDashboard} element={<Protected roles={["teacher"]}><TeacherPortal /></Protected>} />
+      <Route path={ROUTES.vendorDashboard} element={<Protected roles={["vendor"]}><VendorDashboard /></Protected>} />
       <Route path="*" element={<Navigate to={ROUTES.home} replace />} />
     </Routes>
   );

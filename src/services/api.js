@@ -31,6 +31,74 @@ export async function createAdminUser(accessToken, user) {
   return data;
 }
 
+export async function getAdminSettings(accessToken) {
+  return getAdminData(API_ROUTES.adminSettings, accessToken, "Settings could not be loaded.");
+}
+
+export async function updateRegistrationFee(accessToken, amount) {
+  const response = await fetch(`${API_ROUTES.adminSettings}/registration-fee`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json", Authorization: `Bearer ${accessToken}` },
+    body: JSON.stringify({ amount: Number(amount) }),
+  });
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(data.detail || "Registration fee could not be updated.");
+  return data;
+}
+
+export function getAdminSyllabus(accessToken) {
+  return getAdminData(API_ROUTES.adminSyllabus, accessToken, "Entrance-test syllabus could not be loaded.");
+}
+
+export async function saveAdminSyllabus(accessToken, item) {
+  const isExisting = Boolean(item.id);
+  const response = await fetch(isExisting ? `${API_ROUTES.adminSyllabus}/${encodeURIComponent(item.id)}` : API_ROUTES.adminSyllabus, {
+    method: isExisting ? "PATCH" : "POST",
+    headers: { "Content-Type": "application/json", Authorization: `Bearer ${accessToken}` },
+    body: JSON.stringify({ subject: item.subject, details: item.details, sort_order: Number(item.sort_order) || 0, active: Boolean(item.active) }),
+  });
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(data.detail || "Syllabus item could not be saved.");
+  return data;
+}
+
+export async function deleteAdminSyllabus(accessToken, syllabusId) {
+  const response = await fetch(`${API_ROUTES.adminSyllabus}/${encodeURIComponent(syllabusId)}`, { method: "DELETE", headers: { Authorization: `Bearer ${accessToken}` } });
+  if (!response.ok) {
+    const data = await response.json().catch(() => ({}));
+    throw new Error(data.detail || "Syllabus item could not be deleted.");
+  }
+}
+
+export function getAdminVendors(accessToken) {
+  return getAdminData(API_ROUTES.adminVendors, accessToken, "Vendor accounts could not be loaded.");
+}
+
+export async function createAdminVendor(accessToken, vendor) {
+  const response = await fetch(API_ROUTES.adminVendors, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Authorization: `Bearer ${accessToken}` },
+    body: JSON.stringify({ full_name: vendor.full_name, email: vendor.email, vendor_id: vendor.vendor_id }),
+  });
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(data.detail || "Vendor login could not be created.");
+  return data;
+}
+
+export async function updateAdminVendorStatus(accessToken, vendorId, enabled) {
+  const response = await fetch(`${API_ROUTES.adminVendors}/${encodeURIComponent(vendorId)}/status?enabled=${Boolean(enabled)}`, {
+    method: "PATCH",
+    headers: { Authorization: `Bearer ${accessToken}` },
+  });
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(data.detail || "Vendor status could not be updated.");
+  return data;
+}
+
+export function getVendorDashboard(accessToken) {
+  return getAdminData(API_ROUTES.vendorDashboard, accessToken, "Vendor dashboard could not be loaded.");
+}
+
 export async function getAdminDocuments(accessToken) {
   const response = await fetch(API_ROUTES.adminDocuments, { headers: { Authorization: `Bearer ${accessToken}` } });
   const data = await response.json().catch(() => ({}));

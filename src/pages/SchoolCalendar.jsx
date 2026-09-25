@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
+import SchoolCrest from "../components/SchoolCrest";
 import "./SchoolCalendar.css";
 
 const weekdayNames = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
@@ -49,7 +50,7 @@ export default function SchoolCalendar() {
   return (
     <div className="school-calendar-page">
       <header className="calendar-navbar">
-        <Link className="calendar-brand" to="/"><span>S</span><div><strong>Sheerwood</strong><small>International School</small></div></Link>
+        <Link className="calendar-brand" to="/"><SchoolCrest /><div><strong>Sheerwood</strong><small>International School</small></div></Link>
         <nav><Link to="/">Home</Link><Link to="/gallery">Gallery</Link><Link to="/login?flow=admission">Admissions</Link></nav>
         <Link className="calendar-login" to="/login">Parent Login</Link>
       </header>

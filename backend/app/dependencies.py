@@ -30,7 +30,7 @@ def cognito_role(claims: dict[str, Any]) -> str:
         groups = []
     normalize = lambda value: str(value or "").strip().lower().replace(".", "")
     normalized_groups = [normalize(value) for value in groups]
-    group_priority = ("admin", "teacher", "student", "parent", "admission")
+    group_priority = ("admin", "teacher", "student", "parent", "admission", "vendor")
     group_role = next((role for role in group_priority if role in normalized_groups), None)
     claim_role = normalize(claims.get(configured_claim) or claims.get("custom:role") or claims.get("role"))
     return group_role or claim_role or normalize(os.getenv("COGNITO_DEFAULT_ROLE", "admission"))
@@ -79,8 +79,18 @@ def provision_cognito_user(claims: dict[str, Any]) -> dict[str, Any]:
     email = username.lower()
     full_name = str(claims.get("name") or username).strip()
 
-    # Student and admission sessions can still derive a local identity without
+    # Student, admission, and vendor sessions can still derive a local identity without
     # requiring a DB row when the project is using Cognito-only access.
+    if role == "vendor":
+        with connection() as database:
+            vendor = database.execute(
+                "SELECT vendor_id, is_enabled FROM vendor_accounts WHERE cognito_username = ? OR lower(email) = ?",
+                (username, email),
+            ).fetchone()
+        if not vendor or not bool(vendor["is_enabled"]):
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="This vendor login has been disabled or is not provisioned.")
+        return {"id": subject, "email": email, "full_name": full_name, "role": role, "vendor_id": vendor["vendor_id"]}
+
     if role == "student":
         return {"id": subject, "email": email, "full_name": full_name, "role": role}
 
