@@ -67,6 +67,29 @@ def valid_payment_email(value: object) -> str:
     return email if len(email) <= 254 and PAYMENT_EMAIL_PATTERN.fullmatch(email) else ""
 
 
+def guardian_email_from_application(application_data: object, fallback: object = "") -> str:
+    """Use the first valid parent/guardian form email, never a raw username."""
+    guardians = application_data.get("guardians", {}) if isinstance(application_data, dict) else {}
+    if isinstance(guardians, dict):
+        for guardian in guardians.values():
+            if isinstance(guardian, dict):
+                email = valid_payment_email(guardian.get("email"))
+                if email:
+                    return email
+    return valid_payment_email(fallback)
+
+
+def parent_notification_email(database: Any, application_number: str, parent_id: int, fallback: object = "") -> str:
+    """Use the most recent active consent contact for parent e-mail delivery."""
+    consent = database.execute(
+        """SELECT parent_email FROM consent_events
+        WHERE application_number = ? AND parent_id = ? AND status = 'active'
+        ORDER BY id DESC LIMIT 1""",
+        (application_number, parent_id),
+    ).fetchone()
+    return valid_payment_email(consent["parent_email"] if consent else "") or valid_payment_email(fallback)
+
+
 def normalized_document_status(value: str) -> str:
     return LEGACY_DOCUMENT_STATUSES.get(value, value or "pending")
 
@@ -464,7 +487,8 @@ def confirm_easebuzz_transaction(database: Any, txnid: str, background_tasks: Ba
                 form_data, documents = {}, []
             background_tasks.add_task(
                 send_admission_submission_notifications,
-                parent_email=parent["email"], parent_name=parent["full_name"],
+                parent_email=parent_notification_email(database, attempt["application_number"], attempt["parent_id"], parent["email"]),
+                parent_name=parent["full_name"],
                 student_name=application["student_name"], application_number=attempt["application_number"],
                 desired_class=application["desired_class"],
                 application_data=form_data if isinstance(form_data, dict) else {},
@@ -888,7 +912,7 @@ def save_application_draft(
     if notify_submission:
         background_tasks.add_task(
             send_admission_submission_notifications,
-            parent_email=user["email"],
+            parent_email=guardian_email_from_application(payload.data, user["email"]),
             parent_name=user["full_name"],
             student_name=student_name,
             application_number=payload.application_number,
@@ -1141,10 +1165,11 @@ def decide_application(application_id: int, payload: AdmissionDecisionRequest, b
         )
         updated = database.execute("SELECT * FROM applications WHERE id = ?", (application_id,)).fetchone()
         parent = database.execute("SELECT email, full_name FROM users WHERE id = ?", (updated["parent_id"],)).fetchone()
+        parent_email = parent_notification_email(database, updated["application_number"], updated["parent_id"], parent["email"]) if parent else ""
     if next_status == "approved" and application["status"] != "approved" and parent:
         background_tasks.add_task(
             send_admission_approval_notification,
-            parent_email=parent["email"],
+            parent_email=parent_email,
             parent_name=parent["full_name"],
             student_name=updated["student_name"],
             application_number=updated["application_number"],
