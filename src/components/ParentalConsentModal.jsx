@@ -7,6 +7,7 @@ const consentAcknowledgements = [
   "I consent to the collection and processing of my child's personal data for the stated purposes only.",
   "I understand that I may withdraw consent and that doing so may affect access to the school portal services.",
 ];
+const validEmail = (value) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.trim());
 
 function initialConsentDetails(applicationData = {}) {
   const guardians = applicationData.guardians && typeof applicationData.guardians === "object" ? applicationData.guardians : {};
@@ -42,7 +43,7 @@ export default function ParentalConsentModal({ applicationData, isConfirming, on
     && details.parentName.trim()
     && details.relationship.trim()
     && details.parentMobile.trim()
-    && details.parentEmail.trim()
+    && validEmail(details.parentEmail)
     && details.childName.trim()
     && details.childDob;
 
@@ -60,7 +61,9 @@ export default function ParentalConsentModal({ applicationData, isConfirming, on
   async function submit(event) {
     event.preventDefault();
     if (!isComplete) {
-      setError("Complete the parent, child and acknowledgement fields to confirm consent.");
+      setError(details.parentEmail.trim() && !validEmail(details.parentEmail)
+        ? "Enter a valid parent/guardian email address before continuing."
+        : "Complete the parent, child and acknowledgement fields to confirm consent.");
       return;
     }
     setError("");

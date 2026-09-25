@@ -71,6 +71,10 @@ class EasebuzzTests(unittest.TestCase):
                     phone="9876543210", application_number="APP-999",
                 )
 
+    def test_hosted_checkout_url_rejects_untrusted_or_malformed_urls(self):
+        self.assertIsNone(easebuzz.hosted_checkout_url("https://pay.easebuzz.in/pay/not-an-access-key", "prod"))
+        self.assertIsNone(easebuzz.hosted_checkout_url("http://pay.easebuzz.in/pay/" + "c" * 64, "prod"))
+
     def test_transaction_lookup_is_signed_and_success_must_match_id_and_amount(self):
         result = {"status": 1, "data": {"status": "success", "txnid": "SHW123", "amount": "1500.00"}}
         with patch.object(easebuzz.httpx, "post", return_value=FakeResponse(result)) as post:

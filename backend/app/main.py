@@ -58,6 +58,13 @@ PARENTAL_CONSENT_PURPOSES = [
     "Academic progress tracking",
     "Parent or guardian communication",
 ]
+PAYMENT_EMAIL_PATTERN = re.compile(r"^[^\s@]+@[^\s@]+\.[^\s@]+$")
+
+
+def valid_payment_email(value: object) -> str:
+    """Return a conservative, gateway-compatible email address or an empty value."""
+    email = str(value or "").strip().lower()
+    return email if len(email) <= 254 and PAYMENT_EMAIL_PATTERN.fullmatch(email) else ""
 
 
 def normalized_document_status(value: str) -> str:
@@ -509,10 +516,19 @@ def initiate_registration_fee(application_number: str, user: Annotated[dict[str,
             )
         amount = registration_fee_amount(database)
         txnid = f"SHW{uuid4().hex[:25].upper()}"
+        # Cognito usernames are not necessarily e-mail addresses.  The consent
+        # record is the parent-confirmed contact address, so prefer it for the
+        # gateway and use the Cognito claim only as a valid-address fallback.
+        payment_email = valid_payment_email(consent["parent_email"]) or valid_payment_email(user["email"])
+        if not payment_email:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="Enter a valid parent/guardian email address and confirm consent before paying.",
+            )
         try:
             checkout_url = easebuzz.initiate_payment(
                 txnid=txnid, amount=amount, firstname=consent["parent_name"],
-                email=user["email"], phone=consent["parent_mobile"], application_number=application_number,
+                email=payment_email, phone=consent["parent_mobile"], application_number=application_number,
             )
         except easebuzz.EasebuzzError as error:
             raise HTTPException(status_code=503, detail=str(error)) from error
@@ -619,6 +635,12 @@ def record_parental_consent(
         parent_mobile = otp_phone_number(payload.parent_mobile)
     except ValueError as error:
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(error)) from error
+    parent_email = valid_payment_email(payload.parent_email)
+    if not parent_email:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Enter a valid parent/guardian email address.",
+        )
 
     consent_id = str(uuid4())
     recorded_at = datetime.now(UTC).isoformat()
@@ -636,7 +658,7 @@ def record_parental_consent(
                 user["id"],
                 payload.parent_name.strip(),
                 parent_mobile,
-                payload.parent_email.strip().lower(),
+                parent_email,
                 payload.child_name.strip(),
                 payload.child_dob,
                 payload.relationship_to_child.strip(),
