@@ -95,7 +95,7 @@ export default function ParentalConsentModal({ applicationData, isConfirming, on
             <p>Under the Digital Personal Data Protection Act, 2023, we are required to obtain your verifiable consent before collecting or processing personal data belonging to your child, who is under 18 years of age. Please read the following carefully before providing consent.</p>
 
             <h2>1. Who is collecting this data</h2>
-            <p>Sheerwood International School, having its website at {schoolWebsite}, is the Data Fiduciary responsible for your child's personal data collected through this platform.</p>
+            <p>Sherwood College, having its website at {schoolWebsite}, is the Data Fiduciary responsible for your child's personal data collected through this platform.</p>
 
             <h2>2. What data we collect</h2>
             <p>We collect the following categories of personal data about your child:</p>

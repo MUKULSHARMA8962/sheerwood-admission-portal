@@ -164,9 +164,9 @@ async def lifespan(_: FastAPI):
 
 
 app = FastAPI(
-    title="Sheerwood Admission Portal API",
+    title="Sherwood College Admission Portal API",
     version="1.0.0",
-    description="FastAPI backend for Sheerwood parent, teacher and admin portals.",
+    description="FastAPI backend for Sherwood College parent, teacher and admin portals.",
     lifespan=lifespan,
 )
 app.add_middleware(
@@ -321,7 +321,7 @@ async def exchange_cognito_code(payload: CognitoTokenExchangeRequest) -> JSONRes
 @app.get("/", tags=["System"])
 def root() -> dict[str, str]:
     return {
-        "message": "Sheerwood Admission Portal API is running.",
+        "message": "Sherwood College Admission Portal API is running.",
         "docs": "/docs",
         "health": "/api/health",
     }
@@ -598,7 +598,7 @@ def process_easebuzz_return(payload: dict[str, str], background_tasks: Backgroun
         raise HTTPException(status_code=400, detail="Invalid Easebuzz payment response.")
     with connection() as database:
         attempt = database.execute("SELECT * FROM registration_fee_payments WHERE txnid = ?", (payload.get("txnid"),)).fetchone()
-        if not attempt or not easebuzz.amount_matches(payload.get("amount"), attempt["amount"]) or payload.get("udf1") != attempt["application_number"] or payload.get("productinfo") != easebuzz.PRODUCT_INFO:
+        if not attempt or not easebuzz.amount_matches(payload.get("amount"), attempt["amount"]) or payload.get("udf1") != attempt["application_number"] or not easebuzz.is_expected_product_info(payload.get("productinfo")):
             raise HTTPException(status_code=400, detail="Easebuzz payment details do not match the application.")
         if payload.get("status", "").lower() == "success":
             try:
@@ -848,10 +848,31 @@ def save_application_draft(
             cursor = database.execute(
                 """INSERT INTO applications
                 (application_number, student_name, parent_name, desired_class, status, documents_status, submitted_on, parent_id, application_data, documents_json, lead_source, vendor_id, campaign_id, referral_code, first_visit, submitted_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id""",
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT(application_number) DO UPDATE SET
+                    student_name = excluded.student_name,
+                    desired_class = excluded.desired_class,
+                    status = excluded.status,
+                    documents_status = excluded.documents_status,
+                    application_data = excluded.application_data,
+                    documents_json = excluded.documents_json,
+                    submitted_on = excluded.submitted_on,
+                    lead_source = excluded.lead_source,
+                    vendor_id = excluded.vendor_id,
+                    campaign_id = excluded.campaign_id,
+                    referral_code = excluded.referral_code,
+                    first_visit = excluded.first_visit,
+                    submitted_at = excluded.submitted_at
+                WHERE applications.parent_id = excluded.parent_id
+                RETURNING id""",
                 (payload.application_number, student_name, user["full_name"], desired_class, application_status, documents_status, saved_on, user["id"], application_data, documents_json, lead_source, vendor_id, campaign_id, referral_code, first_visit or None, submitted_at or None),
             )
-            application_id = cursor.fetchone()["id"]
+            application = cursor.fetchone()
+            if not application:
+                # A different parent claimed the randomly generated number between
+                # the ownership check above and this insert.  Do not overwrite it.
+                raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="This application number belongs to another parent.")
+            application_id = application["id"]
         database.execute(
             """INSERT INTO new_admissions
             (application_number, parent_id, academic_session, application_date, class_applying_for,

@@ -139,8 +139,8 @@ def _application_html(*, title: str, student_name: str, application_number: str,
         '<div style="margin:0;padding:28px 14px;background:#12c9e8;font-family:Arial,sans-serif;color:#073c49;line-height:1.5">',
         '<div style="max-width:720px;margin:0 auto;overflow:hidden;border-radius:26px;background:#ffffff;box-shadow:0 10px 28px rgba(1,68,83,.22)">',
         '<div style="padding:30px 30px 24px;text-align:center;background:#ffffff">',
-        '<div style="display:inline-block;color:#0a90b0;font-size:25px;font-weight:800;letter-spacing:-1px">Sheerwood</div>',
-        '<div style="margin-top:1px;color:#0c5162;font-size:9px;font-weight:800;letter-spacing:2px">INTERNATIONAL SCHOOL</div>',
+        '<div style="display:inline-block;color:#0a90b0;font-size:25px;font-weight:800;letter-spacing:-1px">Sherwood</div>',
+        '<div style="margin-top:1px;color:#0c5162;font-size:9px;font-weight:800;letter-spacing:2px">COLLEGE</div>',
         '<div style="width:54px;height:4px;margin:17px auto 15px;border-radius:999px;background:#f5be3f"></div>',
         f'<h1 style="margin:0;color:#073c49;font-family:Georgia,serif;font-size:27px;font-weight:600;line-height:1.2">{escape(title)}</h1>',
         f'<p style="margin:14px 0 0;color:#397080;font-size:14px">Application ID: <strong style="color:#073c49">{escape(application_number)}</strong><br>'
@@ -178,10 +178,10 @@ def _application_html(*, title: str, student_name: str, application_number: str,
         '</div>',
         '<div style="padding:20px 30px 28px;background:#f1fcff">',
         f'<p style="margin:0;color:#1f5d6c;font-size:13px;line-height:1.65">{escape(closing)}</p>',
-        '<p style="margin:16px 0 0;color:#4e7b86;font-size:11px">Sheerwood International School Admissions</p>',
+        '<p style="margin:16px 0 0;color:#4e7b86;font-size:11px">Sherwood College Admissions</p>',
         '</div>',
         '</div>',
-        '<p style="max-width:720px;margin:15px auto 0;color:#e9fdff;font-size:10px;text-align:center">This is an automated message from the Sheerwood Admissions Portal.</p>',
+        '<p style="max-width:720px;margin:15px auto 0;color:#e9fdff;font-size:10px;text-align:center">This is an automated message from the Sherwood College Admissions Portal.</p>',
         '</div>',
     ])
     return "".join(parts)
@@ -213,7 +213,7 @@ def _pdf_escape(value: str) -> str:
 def _application_pdf(*, application_number: str, student_name: str, desired_class: str, form_lines: list[str]) -> bytes:
     """Create a small dependency-free PDF receipt from the completed form."""
     lines = [
-        "Sheerwood College",
+        "Sherwood College",
         "Admission Application Form",
         f"Application ID: {application_number}",
         f"Student: {student_name}",
@@ -256,7 +256,7 @@ def _application_pdf(*, application_number: str, student_name: str, desired_clas
 
 def _syllabus_pdf(*, application_number: str, student_name: str, syllabus: list[dict[str, Any]]) -> bytes:
     lines = [
-        "Sheerwood College",
+        "Sherwood College",
         "Entrance Test Syllabus",
         f"Application ID: {application_number}",
         f"Student: {student_name}",
@@ -335,7 +335,7 @@ def send_admission_submission_notifications(
                 "Your application is now with the Admissions Office for review. We will email you with the next steps.",
                 "Please retain this email and the transaction reference for your records.",
                 "",
-                "Sheerwood International School Admissions",
+                "Sherwood College Admissions",
             ]),
             _application_html(
                 title="Registration payment received",
@@ -396,11 +396,11 @@ def send_admission_approval_notification(*, parent_email: str, parent_name: str,
     body = "\n".join([
         f"Dear {display_name},", "",
         "ADMISSION ACCEPTED", "",
-        f"We are pleased to inform you that {display_student}'s admission application has been accepted by Sheerwood College.",
+        f"We are pleased to inform you that {display_student}'s admission application has been accepted by Sherwood College.",
         "", f"Application ID: {application_number}", "", *syllabus_lines, "",
         "Please keep the attached syllabus for the entrance-test preparation.",
         "For further instructions, sign in to the parent admission portal or contact the admissions office.",
-        "", "Regards,", "Admissions Office", "Sheerwood College",
+        "", "Regards,", "Admissions Office", "Sherwood College",
     ])
     attachment = [(f"{application_number.replace('/', '-')}-entrance-syllabus.pdf", _syllabus_pdf(application_number=application_number, student_name=display_student, syllabus=syllabus), "application/pdf")]
     _send_messages([(

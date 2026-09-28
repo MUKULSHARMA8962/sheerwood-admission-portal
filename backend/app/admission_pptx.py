@@ -150,8 +150,8 @@ def build_admission_pptx(*, application_number: str, student_name: str, desired_
         + '<a:hlink><a:srgbClr val="0563C1"/></a:hlink><a:folHlink><a:srgbClr val="954F72"/></a:folHlink>'
     )
     theme = (
-        f'<a:theme xmlns:a="{A}" name="Sheerwood"><a:themeElements>'
-        f'<a:clrScheme name="Sheerwood">{color_scheme}</a:clrScheme>'
+        f'<a:theme xmlns:a="{A}" name="Sherwood College"><a:themeElements>'
+        f'<a:clrScheme name="Sherwood College">{color_scheme}</a:clrScheme>'
         '<a:fontScheme name="Arial"><a:majorFont><a:latin typeface="Arial"/></a:majorFont>'
         '<a:minorFont><a:latin typeface="Arial"/></a:minorFont></a:fontScheme>'
         '<a:fmtScheme name="Default"><a:fillStyleLst><a:solidFill><a:schemeClr val="accent1"/></a:solidFill></a:fillStyleLst>'
@@ -164,8 +164,8 @@ def build_admission_pptx(*, application_number: str, student_name: str, desired_
     with ZipFile(buffer, "w", ZIP_DEFLATED) as package:
         package.writestr("[Content_Types].xml", content_types)
         package.writestr("_rels/.rels", f'<Relationships xmlns="{PKG}"><Relationship Id="rId1" Type="{R}/officeDocument" Target="ppt/presentation.xml"/><Relationship Id="rId2" Type="http://schemas.openxmlformats.org/package/2006/relationships/metadata/core-properties" Target="docProps/core.xml"/><Relationship Id="rId3" Type="{R}/extended-properties" Target="docProps/app.xml"/></Relationships>')
-        package.writestr("docProps/core.xml", '<cp:coreProperties xmlns:cp="http://schemas.openxmlformats.org/package/2006/metadata/core-properties" xmlns:dc="http://purl.org/dc/elements/1.1/"><dc:creator>Sheerwood Admission Portal</dc:creator></cp:coreProperties>')
-        package.writestr("docProps/app.xml", f'<Properties xmlns="http://schemas.openxmlformats.org/officeDocument/2006/extended-properties"><Application>Sheerwood Admission Portal</Application><Slides>{len(slides)}</Slides></Properties>')
+        package.writestr("docProps/core.xml", '<cp:coreProperties xmlns:cp="http://schemas.openxmlformats.org/package/2006/metadata/core-properties" xmlns:dc="http://purl.org/dc/elements/1.1/"><dc:creator>Sherwood College Admission Portal</dc:creator></cp:coreProperties>')
+        package.writestr("docProps/app.xml", f'<Properties xmlns="http://schemas.openxmlformats.org/officeDocument/2006/extended-properties"><Application>Sherwood College Admission Portal</Application><Slides>{len(slides)}</Slides></Properties>')
         package.writestr("ppt/presentation.xml", presentation)
         package.writestr("ppt/_rels/presentation.xml.rels", presentation_rels)
         package.writestr("ppt/presProps.xml", f'<p:presentationPr xmlns:p="{P}"/>')

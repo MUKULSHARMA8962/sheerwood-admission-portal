@@ -45,7 +45,7 @@ def _raise_ai_http_error(error: Exception) -> None:
     if isinstance(error, AIConfigurationError):
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="AI service is not configured yet. Please ask the school administrator to add the server API key.",
+            detail="AI service is not configured yet. Please ask the college administrator to add the server API key.",
         ) from error
     if isinstance(error, AIProviderRateLimitError):
         raise HTTPException(

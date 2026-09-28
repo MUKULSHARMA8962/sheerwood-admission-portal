@@ -24,7 +24,7 @@ export default function Register() {
     <button className="register-back" onClick={() => navigate("/")}>← Back to website</button>
     <section className="register-shell">
       <aside className="register-visual" style={{ backgroundImage: `linear-gradient(135deg, #032e20e6, #07512eac), url(${campusImage})` }}>
-        <Link className="register-brand" to="/"><SchoolCrest /><div><strong>Sheerwood</strong><small>College</small></div></Link>
+        <Link className="register-brand" to="/"><SchoolCrest /><div><strong>Sherwood</strong><small>College</small></div></Link>
         <div className="register-visual-copy"><p>PARENT ADMISSION PORTAL</p><h1>Every great journey begins with a first step.</h1><span>Create your parent account to start, save and track your child’s admission application.</span></div>
         <div className="register-benefits"><span>✓ Save your application progress</span><span>✓ Upload documents securely</span><span>✓ Track admissions in one place</span></div>
       </aside>

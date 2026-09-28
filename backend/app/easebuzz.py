@@ -10,7 +10,8 @@ from urllib.parse import urlparse
 import httpx
 
 
-PRODUCT_INFO = "Sheerwood admission registration fee"
+PRODUCT_INFO = "Sherwood College admission registration fee"
+LEGACY_PRODUCT_INFO = "Sheerwood admission registration fee"
 HASH_FIELDS = ("key", "txnid", "amount", "productinfo", "firstname", "email", *(f"udf{i}" for i in range(1, 11)))
 REVERSE_FIELDS = ("status", *(f"udf{i}" for i in range(10, 0, -1)), "email", "firstname", "productinfo", "amount", "txnid", "key")
 
@@ -79,6 +80,11 @@ def amount_matches(value: object, expected: str) -> bool:
         return Decimal(str(value)) == Decimal(expected)
     except (InvalidOperation, TypeError, ValueError):
         return False
+
+
+def is_expected_product_info(value: object) -> bool:
+    """Accept checkout responses already issued with the former brand label."""
+    return str(value or "") in {PRODUCT_INFO, LEGACY_PRODUCT_INFO}
 
 
 def verify_response_hash(payload: dict[str, str]) -> bool:

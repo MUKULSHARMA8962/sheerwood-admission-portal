@@ -89,7 +89,7 @@ export default function ApplicationStages() {
   }
 
   return <main className="stage-page">
-    <header className="stage-header"><Link className="stage-brand" to={ROUTES.newUserDashboard}><SchoolCrest /><div><strong>Sheerwood</strong><small>International School</small></div></Link><AccountMenu /></header>
+    <header className="stage-header"><Link className="stage-brand" to={ROUTES.newUserDashboard}><SchoolCrest /><div><strong>Sherwood</strong><small>College</small></div></Link><AccountMenu /></header>
     <section className="stage-shell"><div className="stage-main"><div className="stage-title"><div><p>STEP 5 OF 7 · NEW APPLICATION</p><h1>Document Upload</h1><small>Upload documents now. The admissions team verifies each document before a final decision.</small></div><button onClick={() => navigate(ROUTES.newUserDashboard)}>← Dashboard</button></div>
       <ol className="stage-progress" aria-label="Application progress">{steps.map((step, index) => <li className={index === 4 ? "current" : index < 4 ? "complete" : ""} key={step}><span>{index < 4 ? "✓" : index + 1}</span><b>{step}</b></li>)}</ol>
       {message && <div className="stage-message" role="status">{message}<button onClick={() => setMessage("")} aria-label="Dismiss">×</button></div>}

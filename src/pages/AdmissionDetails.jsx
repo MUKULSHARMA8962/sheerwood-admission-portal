@@ -175,7 +175,7 @@ export default function AdmissionDetails() {
   return (
     <main className="admission-page">
       <header className="admission-header">
-        <Link className="admission-brand" to="/new-user-dashboard"><SchoolCrest /><div><strong>Sheerwood</strong><small>International School</small></div></Link>
+        <Link className="admission-brand" to="/new-user-dashboard"><SchoolCrest /><div><strong>Sherwood</strong><small>College</small></div></Link>
         <AccountMenu />
       </header>
 
@@ -221,7 +221,7 @@ export default function AdmissionDetails() {
         </div>
 
         <aside className="admission-help">
-          <section className="help-assistant"><div><span>✦</span><p><b>Sheerwood Assistant</b><small><i /> Online</small></p></div><button onClick={() => navigate("/ai-assistant")}>Ask a question →</button></section>
+          <section className="help-assistant"><div><span>✦</span><p><b>Sherwood Assistant</b><small><i /> Online</small></p></div><button onClick={() => navigate("/ai-assistant")}>Ask a question →</button></section>
           <section className="help-card"><h2>Quick Help</h2><button onClick={() => setMessage("Please keep the student's Aadhaar Card, Birth Certificate issued by the Nagar Nigam/Municipal Department, and most recent mark sheet ready. The original Transfer Certificate is submitted after admission is confirmed.")}>What documents are required?</button><button onClick={() => setMessage("For Class 3, the child should be 7 years or above as of the academic year start date. One to two months below the stated age is also considered.")}>What is the age criteria for Class 3?</button><button onClick={() => setMessage("The entrance test is online, with English and Mathematics papers. Each paper is one hour.")}>How is the entrance test conducted?</button><button onClick={() => setMessage("Admissions close as and when seats are filled. Please contact the admissions team to confirm current availability.")}>When do admissions close?</button></section>
         </aside>
       </section>

@@ -30,7 +30,7 @@ export default function StudentDashboard() {
 
   return <main className="student-dashboard">
     <aside className="student-sidebar">
-      <Link className="student-brand" to="/"><SchoolCrest /><div><strong>Sheerwood</strong><small>Student Portal</small></div></Link>
+      <Link className="student-brand" to="/"><SchoolCrest /><div><strong>Sherwood</strong><small>Student Portal</small></div></Link>
       <nav aria-label="Student dashboard navigation">{navigation.map(([icon, label]) => <button className={activeNav === label ? "active" : ""} key={label} onClick={() => { setActiveNav(label); if (label !== "Dashboard") setNotice(`${label} workspace selected.`); }}><i>{icon}</i><span>{label}</span>{label === "Homework" && <b>3</b>}</button>)}</nav>
       <section className="student-sidebar-help"><span>✧</span><b>AI Study Assistant</b><small>Homework help, MCQs and revision support.</small><button onClick={() => setAiOpen(true)}>Ask AI →</button></section>
       <button className="student-logout" onClick={signOut}>↪ Logout</button>

@@ -1,5 +1,5 @@
 export const schoolInformationContext = `
-Official information for Sheerwood International School:
+Official information for Sherwood College:
 
 Admissions and eligibility
 - Age eligibility as of the academic-year start date: Class 3 — 7 years or above; Class 4 — 8.5 years or above; Class 5 — 9.5 years or above; Class 6 — 10.5 years or above; Class 7 — 11.5 years or above; Class 9 — 12.5 years or above; Class 11 — 14.5 years or above. A child who is one or two months below the stated age is also considered.

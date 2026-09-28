@@ -68,7 +68,7 @@ def send_otp(phone_number: str, otp: str) -> None:
         sns = boto3.client("sns", region_name=os.getenv("AWS_REGION", "us-east-1"))
         sns.publish(
             PhoneNumber=phone_number,
-            Message=f"Your Sheerwood login OTP is {otp}. It is valid for 5 minutes. Do not share this code.",
+            Message=f"Your Sherwood College login OTP is {otp}. It is valid for 5 minutes. Do not share this code.",
             MessageAttributes={
                 "AWS.SNS.SMS.SMSType": {"DataType": "String", "StringValue": "Transactional"},
             },
@@ -82,8 +82,8 @@ def send_email_otp(email: str, otp: str) -> None:
     try:
         send_email(
             recipient=email,
-            subject="Your Sheerwood verification code",
-            body=f"Your Sheerwood verification code is {otp}. It is valid for 5 minutes. Do not share this code.",
+            subject="Your Sherwood College verification code",
+            body=f"Your Sherwood College verification code is {otp}. It is valid for 5 minutes. Do not share this code.",
         )
     except Exception as error:
         raise OTPDeliveryError("Unable to send the email OTP right now. Please try again shortly.") from error

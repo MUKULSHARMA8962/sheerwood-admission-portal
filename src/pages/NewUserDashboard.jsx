@@ -137,7 +137,7 @@ export default function NewUserDashboard() {
   }
 
   return <main className="new-admission-dashboard" id="admission-dashboard">
-    <header className="new-admission-dashboard-header"><Link to="/" className="new-admission-dashboard-brand"><SchoolCrest /><b>Sheerwood International School</b></Link><div><span>{user?.name || "Parent"}</span><button onClick={() => navigate("/admission-details")}>+ New Admission</button><AccountMenu /></div></header>
+    <header className="new-admission-dashboard-header"><Link to="/" className="new-admission-dashboard-brand"><SchoolCrest /><b>Sherwood College</b></Link><div><span>{user?.name || "Parent"}</span><button onClick={() => navigate("/admission-details")}>+ New Admission</button><AccountMenu /></div></header>
     <nav className="new-admission-dashboard-menu" aria-label="Admission dashboard menu"><div><a href="#admission-dashboard" className="active">Overview</a><a href="#application-table">Application</a><a href="#filled-application-form">Filled Form</a><a href="#document-status">Documents &amp; Status</a></div><button type="button" onClick={() => navigate("/admission-details")}>Edit admission form</button></nav>
     <section className="new-admission-dashboard-shell">
       <header className="new-admission-dashboard-title"><div><p>NEW ADMISSION</p><h1>Admission Dashboard</h1><span>Track your application from document verification to final approval.</span><small className="new-admission-live-note"><i /> Live status {lastUpdated ? `updated ${lastUpdated.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}` : "connecting…"}</small></div><button onClick={loadStatus} disabled={loading}>↻ Refresh</button></header>

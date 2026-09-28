@@ -17,9 +17,9 @@ import "./Gallery.css";
 
 const filters = ["All", "Student", "Campus", "Hostel"];
 const photos = [
-  { image: campusAerial, title: "Sheerwood Campus", category: "Campus", size: "wide aerial-view" },
+  { image: campusAerial, title: "Sherwood College Campus", category: "Campus", size: "wide aerial-view" },
   { image: studentFormation, title: "School performance", category: "Student", size: "tall" },
-  { image: studentGroup, title: "Sheerwood student leaders", category: "Student", size: "wide" },
+  { image: studentGroup, title: "Sherwood College student leaders", category: "Student", size: "wide" },
   { image: campusEvent, title: "A special campus occasion", category: "Student", size: "square" },
   { image: studentAuditorium, title: "Learning together", category: "Student", size: "wide auditorium-view" },
   { image: campus, title: "A welcoming campus", category: "Campus", size: "tall campus-view" },
@@ -39,12 +39,12 @@ export default function Gallery() {
   return (
     <main className="gallery-page">
       <header className="gallery-header">
-        <Link className="gallery-brand" to="/"><SchoolCrest /><div><strong>Sheerwood</strong><small>International School</small></div></Link>
+        <Link className="gallery-brand" to="/"><SchoolCrest /><div><strong>Sherwood</strong><small>College</small></div></Link>
         <nav><Link to="/">Home</Link><Link to="/#about">About</Link><Link to="/#campus">Campus Life</Link><Link className="current" to="/gallery">Gallery</Link><Link to="/admission-details">Admission</Link><Link to="/login">Parent Login</Link></nav>
       </header>
 
       <section className="gallery-content">
-        <p className="gallery-kicker">SHEERWOOD MOMENTS</p><h1>Our <em>Gallery</em></h1><p className="gallery-intro">A glimpse into the everyday moments that make life at Sheerwood vibrant, meaningful and memorable.</p>
+        <p className="gallery-kicker">SHERWOOD COLLEGE MOMENTS</p><h1>Our <em>Gallery</em></h1><p className="gallery-intro">A glimpse into the everyday moments that make life at Sherwood College vibrant, meaningful and memorable.</p>
         <div className="gallery-filters" role="tablist" aria-label="Gallery categories">{filters.map((filter) => <button className={activeFilter === filter ? "active" : ""} key={filter} role="tab" aria-selected={activeFilter === filter} onClick={() => setActiveFilter(filter)}>{filter}</button>)}</div>
         <div className="gallery-grid">{visiblePhotos.map((photo, index) => <button className={`gallery-photo ${photo.size}`} key={`${photo.title}-${index}`} onClick={() => setSelectedPhoto(photo)}><img src={photo.image} alt={photo.title} loading="lazy" /><span><b>{photo.title}</b><small>{photo.category}</small></span></button>)}</div>
       </section>

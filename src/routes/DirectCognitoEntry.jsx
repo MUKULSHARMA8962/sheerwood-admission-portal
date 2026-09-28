@@ -22,5 +22,5 @@ export default function DirectCognitoEntry() {
 
   if (!error && isConfigured) return null;
 
-  return <main className="auth-callback-page"><section className="auth-callback-card"><p>SHEERWOOD INTERNATIONAL SCHOOL</p><h1>We could not start sign-in</h1><div className="auth-callback-status error" role="alert">{error || getCognitoConfigurationError()}</div></section></main>;
+  return <main className="auth-callback-page"><section className="auth-callback-card"><p>SHERWOOD COLLEGE</p><h1>We could not start sign-in</h1><div className="auth-callback-status error" role="alert">{error || getCognitoConfigurationError()}</div></section></main>;
 }

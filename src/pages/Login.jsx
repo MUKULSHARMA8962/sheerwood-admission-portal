@@ -27,7 +27,7 @@ export default function Login() {
   return (
     <main className="auth-callback-page" aria-live="polite">
       <section className="auth-callback-card">
-        <p>SHEERWOOD COLLEGE</p>
+        <p>SHERWOOD COLLEGE</p>
         <h1>{error || !isConfigured ? "We could not start sign-in" : "Redirecting securely…"}</h1>
         <div className={error || !isConfigured ? "auth-callback-status error" : "auth-callback-status"} role={error || !isConfigured ? "alert" : undefined}>{message}</div>
       </section>

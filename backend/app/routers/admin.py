@@ -569,7 +569,7 @@ def update_vendor_status(vendor_id: str, enabled: bool, _: dict = AdminUser) -> 
 def settings(_: dict = AdminUser) -> dict:
     with connection() as database:
         fee = database.execute("SELECT setting_value FROM school_settings WHERE setting_key = 'registration_fee_amount'").fetchone()
-    return {"school_name": "Sheerwood College", "academic_session": "2027–28", "branches": 1, "classes": "2–12", "subjects": 42, "registration_fee_amount": int(fee["setting_value"] if fee else 1500), "notification_channels": ["app", "email", "sms"]}
+    return {"school_name": "Sherwood College", "academic_session": "2027–28", "branches": 1, "classes": "2–12", "subjects": 42, "registration_fee_amount": int(fee["setting_value"] if fee else 1500), "notification_channels": ["app", "email", "sms"]}
 
 
 @router.patch("/settings/registration-fee")

@@ -31,7 +31,7 @@ function Sidebar({ screen }) {
   const navigate = useNavigate();
   const { signOut } = useCognitoAuth();
   return <aside className="admin-sidebar">
-    <Link className="admin-brand" to="/admin/dashboard"><SchoolCrest /><div><strong>Sheerwood</strong><small>School Admin</small></div></Link>
+    <Link className="admin-brand" to="/admin/dashboard"><SchoolCrest /><div><strong>Sherwood</strong><small>College Admin</small></div></Link>
     <nav aria-label="Admin portal navigation">{screens.map(([icon, label, target]) => <button className={screen === target ? "active" : ""} key={target} onClick={() => navigate(`/admin/${target}`)}><span>{icon}</span>{label}</button>)}</nav>
     <button className="admin-logout" onClick={signOut}><span>↪</span> Logout</button>
   </aside>;

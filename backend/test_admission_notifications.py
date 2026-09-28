@@ -83,7 +83,8 @@ class AdmissionNotificationTests(TestCase):
         self.assertIn("&lt;script&gt;", admin_message["html_body"])
         self.assertNotIn("<script>", admin_message["html_body"])
         self.assertIn("background:#12c9e8", admin_message["html_body"])
-        self.assertIn(">SHEERWOOD<", admin_message["html_body"].upper())
+        self.assertIn(">SHERWOOD<", admin_message["html_body"].upper())
+        self.assertIn(">COLLEGE<", admin_message["html_body"].upper())
 
     def test_one_delivery_failure_does_not_skip_other_recipients(self) -> None:
         with patch.object(notifications, "configured_sender", return_value="sender@example.com"), \

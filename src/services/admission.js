@@ -5,6 +5,10 @@ const REFERRAL_ATTRIBUTION_KEY = "sheerwood-admission-referral";
 const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || "/api").replace(/\/$/, "");
 
 let admissionStorageScope = "anonymous";
+// Form pages save automatically and also save when a parent continues,
+// uploads a file, or submits. Keep those writes in order so a slow automatic
+// save cannot race the explicit action that follows it.
+let draftSaveQueue = Promise.resolve();
 
 function scopedStorageKey(baseKey) {
   return `${baseKey}:${admissionStorageScope}`;
@@ -188,18 +192,34 @@ export function syncAdmissionDataFromDatabase(data = {}) {
   return savedData;
 }
 
-export async function saveAdmissionDraft(accessToken, data, status = "draft") {
+export function saveAdmissionDraft(accessToken, data, status = "draft") {
   const mergedData = { ...getAdmissionData(), ...data };
   sessionStorage.setItem(scopedStorageKey(APPLICATION_DATA_KEY), JSON.stringify(mergedData));
   const referral = getReferralAttribution();
-  const response = await fetch(`${API_BASE_URL}/applications/draft`, {
-    method: "PUT",
-    headers: { "Content-Type": "application/json", Authorization: `Bearer ${accessToken}` },
-    body: JSON.stringify({ application_number: getNewAdmissionId(), data: mergedData, documents: getAdmissionDocuments(), status, ...referral }),
-  });
-  const result = await response.json().catch(() => ({}));
-  if (!response.ok) throw new Error(result.detail || "Application could not be saved.");
-  return result;
+  const applicationNumber = getNewAdmissionId();
+  const documents = getAdmissionDocuments();
+  const save = async () => {
+    const response = await fetch(`${API_BASE_URL}/applications/draft`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${accessToken}` },
+      body: JSON.stringify({ application_number: applicationNumber, data: mergedData, documents, status, ...referral }),
+    });
+    const result = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      const validationMessage = Array.isArray(result.detail) ? result.detail[0]?.msg : "";
+      const fallbackMessage = response.status >= 500
+        ? "The application service is temporarily unavailable. Your changes are still on this device; please try again."
+        : "Application could not be saved.";
+      throw new Error(typeof result.detail === "string" ? result.detail : validationMessage || fallbackMessage);
+    }
+    return result;
+  };
+
+  const queuedSave = draftSaveQueue.then(save, save);
+  // Let the next save proceed even if this one fails, while returning the
+  // original rejection to its caller so the page can show the error.
+  draftSaveQueue = queuedSave.catch(() => {});
+  return queuedSave;
 }
 
 export async function getRegistrationFee(accessToken, applicationNumber) {

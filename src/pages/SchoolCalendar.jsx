@@ -50,18 +50,18 @@ export default function SchoolCalendar() {
   return (
     <div className="school-calendar-page">
       <header className="calendar-navbar">
-        <Link className="calendar-brand" to="/"><SchoolCrest /><div><strong>Sheerwood</strong><small>International School</small></div></Link>
+        <Link className="calendar-brand" to="/"><SchoolCrest /><div><strong>Sherwood</strong><small>College</small></div></Link>
         <nav><Link to="/">Home</Link><Link to="/gallery">Gallery</Link><Link to="/login?flow=admission">Admissions</Link></nav>
         <Link className="calendar-login" to="/login">Parent Login</Link>
       </header>
 
       <main>
         <section className="calendar-hero">
-          <div><span className="calendar-eyebrow">SHEERWOOD INTERNATIONAL SCHOOL</span><h1>School <em>Calendar</em></h1><p>Keep up with campus events, parent sessions, activities and important admissions dates.</p></div>
+          <div><span className="calendar-eyebrow">SHERWOOD COLLEGE</span><h1>College <em>Calendar</em></h1><p>Keep up with campus events, parent sessions, activities and important admissions dates.</p></div>
           <button type="button" onClick={chooseToday}>◉ Jump to today</button>
         </section>
 
-        <section className="calendar-layout" aria-label="School events calendar">
+        <section className="calendar-layout" aria-label="College events calendar">
           <div className="month-calendar-card">
             <header className="month-calendar-header"><button type="button" onClick={() => changeMonth(-1)} aria-label="Previous month">‹</button><h2>{monthName}</h2><button type="button" onClick={() => changeMonth(1)} aria-label="Next month">›</button></header>
             <div className="calendar-weekdays">{weekdayNames.map((day) => <span key={day}>{day}</span>)}</div>
@@ -75,17 +75,17 @@ export default function SchoolCalendar() {
                 return <button key={dateKey} type="button" onClick={() => setSelectedDate(date)} className={`${isToday ? "today" : ""} ${isSelected ? "selected" : ""}`} aria-label={`${date.toDateString()}${eventCount ? `, ${eventCount} events` : ""}`}><span>{date.getDate()}</span>{eventCount > 0 && <i>{eventCount}</i>}</button>;
               })}
             </div>
-            <footer><span><i className="calendar-dot today-dot" />Today</span><span><i className="calendar-dot event-dot" />School event</span></footer>
+            <footer><span><i className="calendar-dot today-dot" />Today</span><span><i className="calendar-dot event-dot" />College event</span></footer>
           </div>
 
           <aside className="selected-events-card">
             <header><div><span className="calendar-eyebrow">EVENT SCHEDULE</span><h2>{selectedLabel}</h2></div><span className="calendar-date-number">{selectedDate.getDate()}</span></header>
-            {selectedEvents.length > 0 ? <div className="calendar-event-list">{selectedEvents.map((event) => <article key={`${event.time}-${event.title}`}><time>{event.time}</time><div><span>{event.type}</span><h3>{event.title}</h3><p>⌖ {event.place}</p></div></article>)}</div> : <div className="calendar-no-events"><span>◌</span><h3>No events scheduled</h3><p>Select another date to see upcoming school activities.</p></div>}
+            {selectedEvents.length > 0 ? <div className="calendar-event-list">{selectedEvents.map((event) => <article key={`${event.time}-${event.title}`}><time>{event.time}</time><div><span>{event.type}</span><h3>{event.title}</h3><p>⌖ {event.place}</p></div></article>)}</div> : <div className="calendar-no-events"><span>◌</span><h3>No events scheduled</h3><p>Select another date to see upcoming college activities.</p></div>}
           </aside>
         </section>
 
         <section className="calendar-upcoming" aria-labelledby="coming-up-title">
-          <header><div><span className="calendar-eyebrow">NEXT AT SHEERWOOD</span><h2 id="coming-up-title">Coming <em>up.</em></h2></div><Link to="/login?flow=admission">Plan a campus visit <span>→</span></Link></header>
+          <header><div><span className="calendar-eyebrow">NEXT AT SHERWOOD COLLEGE</span><h2 id="coming-up-title">Coming <em>up.</em></h2></div><Link to="/login?flow=admission">Plan a campus visit <span>→</span></Link></header>
           <div>{events.map((event) => <article key={`upcoming-${event.time}-${event.title}`}><time><b>{new Date(`${event.date}T12:00:00`).toLocaleDateString("en-IN", { day: "2-digit" })}</b><small>{new Date(`${event.date}T12:00:00`).toLocaleDateString("en-IN", { month: "short" })}</small></time><div><span>{event.type}</span><h3>{event.title}</h3><p>{event.time} · {event.place}</p></div></article>)}</div>
         </section>
       </main>
