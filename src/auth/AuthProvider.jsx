@@ -3,6 +3,7 @@ import { useAuth } from "react-oidc-context";
 import { deriveRole } from "./cognito";
 import { CognitoAuthContext } from "./CognitoAuthContext";
 import { setAdmissionStorageOwner } from "../services/admission";
+import { clearBrowserAuthStorage, markSignedOut } from "./signOutState";
 
 const INACTIVITY_TIMEOUT_MS = 60_000;
 const activityEvents = ["pointerdown", "pointermove", "keydown", "touchstart", "wheel", "scroll"];
@@ -31,11 +32,19 @@ export function CognitoAuthProvider({ children }) {
   }, [session]);
 
   const signOut = useCallback(async () => {
-    await auth.removeUser();
+    try {
+      await auth.removeUser();
+    } catch {
+      // Continue with the hosted logout even if the browser store is already
+      // unavailable or has been cleared by another tab.
+    }
+    markSignedOut();
+    clearBrowserAuthStorage();
+    setAdmissionStorageOwner("");
     const clientId = import.meta.env.VITE_COGNITO_CLIENT_ID || "2oii9hos09ek2r06iasb4otbgg";
     const logoutUri = import.meta.env.VITE_COGNITO_LOGOUT_URI || `${window.location.origin}/`;
     const cognitoDomain = import.meta.env.VITE_COGNITO_DOMAIN || "https://us-east-1pgsbc8uit.auth.us-east-1.amazoncognito.com";
-    window.location.assign(`${cognitoDomain}/logout?client_id=${clientId}&logout_uri=${encodeURIComponent(logoutUri)}`);
+    window.location.replace(`${cognitoDomain}/logout?client_id=${clientId}&logout_uri=${encodeURIComponent(logoutUri)}`);
   }, [auth]);
 
   useEffect(() => {
