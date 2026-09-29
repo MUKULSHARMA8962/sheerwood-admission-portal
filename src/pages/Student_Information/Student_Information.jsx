@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import "./Student_Information.css";
+import "../PhotoRequired.css";
 import AccountMenu from "../../components/AccountMenu";
 import SchoolCrest from "../../components/SchoolCrest";
 import "./StudentBirthDate.css";
@@ -14,41 +15,25 @@ function getLocalDate() {
   return new Date(date.getTime() - date.getTimezoneOffset() * 60_000).toISOString().slice(0, 10);
 }
 
-function getAcademicYearStart() {
-  return new Date(new Date().getFullYear() + 1, 3, 1);
+function academicSessionStartYear() {
+  const session = String(getAdmissionData().admissionDetails?.session || "");
+  const year = Number(session.match(/\d{4}/)?.[0]);
+  return Number.isInteger(year) && year >= 2000 ? year : new Date().getFullYear() + 1;
 }
 
-const ageEligibilityByClass = {
-  "Class 3": { minimumMonths: 84, label: "7 years" },
-  "Class 4": { minimumMonths: 102, label: "8½ years" },
-  "Class 5": { minimumMonths: 114, label: "9½ years" },
-  "Class 6": { minimumMonths: 126, label: "10½ years" },
-  "Class 7": { minimumMonths: 138, label: "11½ years" },
-  "Class 9": { minimumMonths: 150, label: "12½ years" },
-  "Class 11": { minimumMonths: 174, label: "14½ years" },
-};
+function getBirthDateGuideline(applyingClass, sessionStartYear) {
+  const classNumber = Number(String(applyingClass).match(/\d+/)?.[0]);
+  if (!Number.isInteger(classNumber)) return null;
 
-function getBirthDateGuideline(applyingClass) {
-  const eligibility = ageEligibilityByClass[applyingClass];
-  if (!eligibility) return null;
-
+  // For the 2027–28 session, Class 8 accepts children born in 2013 or 2014.
+  // The same one-year range is calculated for every class from the session.
+  const firstEligibleBirthYear = sessionStartYear - classNumber - 6;
+  const lastEligibleBirthYear = firstEligibleBirthYear + 1;
   return {
-    // Admissions allows one or two months of flexibility below the stated
-    // minimum age, so validate against the more generous two-month margin.
-    minMonths: eligibility.minimumMonths - 2,
-    ageRange: `${eligibility.label} or above (up to 2 months below is also considered)`,
+    firstEligibleBirthYear,
+    lastEligibleBirthYear,
+    ageRange: `born in ${firstEligibleBirthYear} or ${lastEligibleBirthYear}`,
   };
-}
-
-function ageInMonthsOnDate(birthDate, comparisonDate) {
-  const [year, month, day] = birthDate.split("-").map(Number);
-  let months = (comparisonDate.getFullYear() - year) * 12 + (comparisonDate.getMonth() + 1 - month);
-  if (comparisonDate.getDate() < day) months -= 1;
-  return months;
-}
-
-function formatDate(date) {
-  return new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "long", year: "numeric" }).format(date);
 }
 
 const initialForm = {
@@ -86,18 +71,18 @@ export default function StudentInformation() {
   const [birthDateError, setBirthDateError] = useState("");
   const [savingDraft, setSavingDraft] = useState(false);
   const hasEditedRef = useRef(false);
-  const applyingClass = location.state?.applyingClass || sessionStorage.getItem("sheerwood-applying-class") || "";
-  const birthDateGuideline = getBirthDateGuideline(applyingClass);
-  const academicYearStart = getAcademicYearStart();
+  const applyingClass = location.state?.applyingClass || sessionStorage.getItem("sheerwood-applying-class") || getAdmissionData().admissionDetails?.class || "";
+  const sessionStartYear = academicSessionStartYear();
+  const birthDateGuideline = getBirthDateGuideline(applyingClass, sessionStartYear);
 
   function validateBirthDate(value) {
     if (!value) return "Please enter the student's Date of Birth.";
     if (value > getLocalDate()) return "Date of Birth cannot be in the future.";
     if (!birthDateGuideline) return "Please select Class Applying For first, then return to validate the Date of Birth.";
 
-    const ageInMonths = ageInMonthsOnDate(value, academicYearStart);
-    if (ageInMonths < birthDateGuideline.minMonths) {
-      return `The student does not meet the minimum age guideline for ${applyingClass}.`;
+    const birthYear = Number(value.slice(0, 4));
+    if (birthYear < birthDateGuideline.firstEligibleBirthYear || birthYear > birthDateGuideline.lastEligibleBirthYear) {
+      return `For ${applyingClass}, the student must be born in ${birthDateGuideline.firstEligibleBirthYear} or ${birthDateGuideline.lastEligibleBirthYear}.`;
     }
     return "";
   }
@@ -153,7 +138,7 @@ export default function StudentInformation() {
     const dateValidationMessage = validateBirthDate(form.birthDate);
     setBirthDateError(dateValidationMessage);
     if (dateValidationMessage) {
-      setMessage("Please correct the Date of Birth as per the age guideline.");
+      setMessage(dateValidationMessage);
       return;
     }
     const requiredFields = [
@@ -199,6 +184,10 @@ export default function StudentInformation() {
       setMessage("Please enter a valid 12-digit Aadhaar Number.");
       return;
     }
+    if (!getAdmissionData().studentPhoto?.file) {
+      setMessage("Please upload the mandatory student photograph.");
+      return;
+    }
     saveAdmissionDraft(session?.accessToken, { student: form })
       .then(() => navigate("/parent-guardian", { state: { singleParent: form.singleParent, responsibleParent: form.responsibleParent } }))
       .catch((error) => setMessage(error.message));
@@ -227,7 +216,7 @@ export default function StudentInformation() {
               <label>First Name <em>*</em><input name="firstName" value={form.firstName} onChange={update} required /></label>
               <label>Middle Name<input name="middleName" value={form.middleName} onChange={update} /></label>
               <label>Last Name <em>*</em><input name="lastName" value={form.lastName} onChange={update} required /></label>
-              <label className={`birth-date-field${birthDateError ? " has-error" : ""}`}>Date of Birth <em>*</em><input name="birthDate" type="date" value={form.birthDate} onChange={update} onBlur={(event) => setBirthDateError(validateBirthDate(event.target.value))} max={getLocalDate()} required /><small className="birth-date-guideline">{birthDateGuideline ? `For ${applyingClass}: ${birthDateGuideline.ageRange} as on ${formatDate(academicYearStart)}.` : "Select Class Applying For to view the age guideline."}</small>{birthDateError && <small className="birth-date-error" role="alert">{birthDateError}</small>}</label>
+              <label className={`birth-date-field${birthDateError ? " has-error" : ""}`}>Date of Birth <em>*</em><input name="birthDate" type="date" value={form.birthDate} onChange={update} onBlur={(event) => setBirthDateError(validateBirthDate(event.target.value))} min={birthDateGuideline ? `${birthDateGuideline.firstEligibleBirthYear}-01-01` : undefined} max={birthDateGuideline ? `${birthDateGuideline.lastEligibleBirthYear}-12-31` : getLocalDate()} required /><small className="birth-date-guideline">{birthDateGuideline ? `For ${applyingClass} (${sessionStartYear}–${String(sessionStartYear + 1).slice(-2)}): ${birthDateGuideline.ageRange}.` : "Select Class Applying For to view the birth-year guideline."}</small>{birthDateError && <small className="birth-date-error" role="alert">{birthDateError}</small>}</label>
               <label>Place of Birth <em>*</em><input name="placeOfBirth" value={form.placeOfBirth} onChange={update} placeholder="Enter place of birth" required /></label>
               <label>Gender <em>*</em><select name="gender" value={form.gender} onChange={update} required><option value="" disabled>Select gender</option><option>Female</option><option>Male</option></select></label>
               <label>Blood Group <em>*</em><select name="bloodGroup" value={form.bloodGroup} onChange={update} required><option value="" disabled>Select blood group</option><option>A+</option><option>A-</option><option>B+</option><option>B-</option><option>AB+</option><option>AB-</option><option>O+</option><option>O-</option></select></label>
@@ -246,7 +235,7 @@ export default function StudentInformation() {
               {form.howHeard === "Others" && <label>Specify how you heard about us <em>*</em><input name="howHeardOther" value={form.howHeardOther} onChange={update} placeholder="Enter details" required /></label>}
             </div>
 
-            <div className="student-photo-row"><div><span>Student Photo</span><small>JPG or PNG, maximum 5 MB</small></div><div className="student-photo">{photo ? <img src={photo} alt="Student photo preview" /> : <span>{form.firstName.slice(0, 1)}{form.lastName.slice(0, 1)}</span>}</div><input ref={uploadRef} type="file" accept="image/png,image/jpeg" onChange={selectPhoto} hidden /><button type="button" className="change-photo" onClick={() => uploadRef.current?.click()}>{photo ? "● Change Photo" : "● Upload Photo"}</button></div>
+            <div className="student-photo-row"><div><span>Student Photo <em>*</em><mark className="photo-required">Mandatory</mark></span><small>JPG or PNG, maximum 5 MB</small></div><div className="student-photo">{photo ? <img src={photo} alt="Student photo preview" /> : <span>{form.firstName.slice(0, 1)}{form.lastName.slice(0, 1)}</span>}</div><input ref={uploadRef} type="file" accept="image/png,image/jpeg" onChange={selectPhoto} hidden /><button type="button" className="change-photo" onClick={() => uploadRef.current?.click()}>{photo ? "● Change Photo" : "● Upload Photo"}</button></div>
 
             <div className="student-actions"><button type="button" className="student-back" onClick={() => navigate("/admission-details")}>← Back</button><button className="student-next" type="submit">Save &amp; Next <span>→</span></button></div>
           </form>
@@ -254,7 +243,7 @@ export default function StudentInformation() {
 
         <aside className="student-help">
           <section className="student-assistant"><div><span>✦</span><p><b>Sherwood Assistant</b><small><i /> Online</small></p></div><button onClick={() => navigate("/ai-assistant")}>Ask a question →</button></section>
-          <section className="student-help-card"><h2>Quick Help</h2><button onClick={() => setMessage("Please keep the student's Aadhaar Card, Birth Certificate issued by the Nagar Nigam/Municipal Department, and most recent mark sheet ready. The original Transfer Certificate is submitted after admission is confirmed.")}>What documents are required?</button><button onClick={() => setMessage("For Class 3, the child should be 7 years or above as of the academic year start date. One to two months below the stated age is also considered.")}>What is the age criteria for Class 3?</button><button onClick={() => setMessage("The entrance test is online, with English and Mathematics papers. Each paper is one hour.")}>How is the entrance test conducted?</button><button onClick={() => setMessage("Admissions close as and when seats are filled. Please contact the admissions team to confirm current availability.")}>When do admissions close?</button><input placeholder="Type your question..." aria-label="Ask a question" /></section>
+          <section className="student-help-card"><h2>Quick Help</h2><button onClick={() => setMessage("Please keep the student's Aadhaar Card, Birth Certificate issued by the Nagar Nigam/Municipal Department, and most recent mark sheet ready. The original Transfer Certificate is submitted after admission is confirmed.")}>What documents are required?</button><button onClick={() => setMessage("For the 2027–28 session, Class 3 applicants should be born in 2018 or 2019. The Date of Birth field shows the correct range for every class.")}>What is the age criteria for Class 3?</button><button onClick={() => setMessage("The entrance test is online, with English and Mathematics papers. Each paper is one hour.")}>How is the entrance test conducted?</button><button onClick={() => setMessage("Admissions close as and when seats are filled. Please contact the admissions team to confirm current availability.")}>When do admissions close?</button><input placeholder="Type your question..." aria-label="Ask a question" /></section>
         </aside>
       </section>
     </main>

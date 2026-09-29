@@ -163,6 +163,10 @@ export default function AdmissionDetails() {
       setMessage("Current Class must be the same as or lower than Class Applying For.");
       return;
     }
+    if (!form.penNumber.trim()) {
+      setMessage("Please enter the student's PEN Number.");
+      return;
+    }
     saveAdmissionDraft(session?.accessToken, { otpVerification, admissionDetails: form, ...form })
       .then(() => {
         void syncSavedApplication();
@@ -202,7 +206,7 @@ export default function AdmissionDetails() {
                 {form.class === "Class 11" && <label>Stream <em>*</em><select name="stream" value={form.stream} onChange={update} required><option value="Select stream" disabled>Select stream</option><option value="PCMB">PCMB</option><option value="PCM">PCM</option><option value="PCB">PCB</option><option value="Commerce with Mathematics">Commerce with Mathematics</option><option value="Commerce without Mathematics">Commerce without Mathematics</option><option value="Humanities">Humanities</option></select></label>}
                 <label>Application Date<input name="date" type="date" value={form.date} readOnly /></label>
                 <label>Application ID<input value={applicationId || "Assigned after first save"} readOnly /></label>
-                <label>PEN Number <small>(Personal Education Number)</small><input name="penNumber" value={form.penNumber} onChange={update} placeholder="Enter PEN number" /></label>
+                <label>PEN Number <em>*</em><small>(Personal Education Number)</small><input name="penNumber" value={form.penNumber} onChange={update} placeholder="Enter PEN number" required /></label>
               </div>
             </section>
 
@@ -222,7 +226,7 @@ export default function AdmissionDetails() {
 
         <aside className="admission-help">
           <section className="help-assistant"><div><span>✦</span><p><b>Sherwood Assistant</b><small><i /> Online</small></p></div><button onClick={() => navigate("/ai-assistant")}>Ask a question →</button></section>
-          <section className="help-card"><h2>Quick Help</h2><button onClick={() => setMessage("Please keep the student's Aadhaar Card, Birth Certificate issued by the Nagar Nigam/Municipal Department, and most recent mark sheet ready. The original Transfer Certificate is submitted after admission is confirmed.")}>What documents are required?</button><button onClick={() => setMessage("For Class 3, the child should be 7 years or above as of the academic year start date. One to two months below the stated age is also considered.")}>What is the age criteria for Class 3?</button><button onClick={() => setMessage("The entrance test is online, with English and Mathematics papers. Each paper is one hour.")}>How is the entrance test conducted?</button><button onClick={() => setMessage("Admissions close as and when seats are filled. Please contact the admissions team to confirm current availability.")}>When do admissions close?</button></section>
+          <section className="help-card"><h2>Quick Help</h2><button onClick={() => setMessage("Please keep the student's Aadhaar Card, Birth Certificate issued by the Nagar Nigam/Municipal Department, and most recent mark sheet ready. The original Transfer Certificate is submitted after admission is confirmed.")}>What documents are required?</button><button onClick={() => setMessage("For the 2027–28 session, Class 3 applicants should be born in 2018 or 2019. The Date of Birth field shows the correct range for every class.")}>What is the age criteria for Class 3?</button><button onClick={() => setMessage("The entrance test is online, with English and Mathematics papers. Each paper is one hour.")}>How is the entrance test conducted?</button><button onClick={() => setMessage("Admissions close as and when seats are filled. Please contact the admissions team to confirm current availability.")}>When do admissions close?</button></section>
         </aside>
       </section>
     </main>

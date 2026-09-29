@@ -2,7 +2,7 @@ export const schoolInformationContext = `
 Official information for Sherwood College:
 
 Admissions and eligibility
-- Age eligibility as of the academic-year start date: Class 3 — 7 years or above; Class 4 — 8.5 years or above; Class 5 — 9.5 years or above; Class 6 — 10.5 years or above; Class 7 — 11.5 years or above; Class 9 — 12.5 years or above; Class 11 — 14.5 years or above. A child who is one or two months below the stated age is also considered.
+- For the 2027–28 academic session, birth-year eligibility is: Class 3 — 2018 or 2019; Class 4 — 2017 or 2018; Class 5 — 2016 or 2017; Class 6 — 2015 or 2016; Class 7 — 2014 or 2015; Class 8 — 2013 or 2014; Class 9 — 2012 or 2013; Class 11 — 2010 or 2011. The application form calculates the matching range for each academic session.
 - Admissions are not offered for Classes 10 and 12. For Grades 9 and 11, eligibility is based on entrance-test and interview performance; the Class 11 stream is also considered.
 - The entrance test is online, with English and Mathematics papers. Each paper is one hour.
 - The interaction panel decides the student and parent interaction outcome.
@@ -43,8 +43,8 @@ const frequentlyAskedQuestions = [
     answer: "Admissions are not offered for Classes 10 and 12. For Grades 9 and 11, admission eligibility is based on entrance-test and interview performance. For Class 11, the selected stream is also considered.",
   },
   {
-    terms: ["class 3", "class 4", "class 5", "class 6", "class 7", "class 9", "class 11", "grade 3", "grade 4", "grade 5", "grade 6", "grade 7", "grade 9", "grade 11", "age cutoff", "age criteria", "age limit"],
-    answer: "As of the academic-year start date, the minimum ages are: Class 3 — 7 years; Class 4 — 8.5 years; Class 5 — 9.5 years; Class 6 — 10.5 years; Class 7 — 11.5 years; Class 9 — 12.5 years; and Class 11 — 14.5 years. A child who is one or two months below the stated age is also considered.",
+    terms: ["class 3", "class 4", "class 5", "class 6", "class 7", "class 8", "class 9", "class 11", "grade 3", "grade 4", "grade 5", "grade 6", "grade 7", "grade 8", "grade 9", "grade 11", "birth year", "age cutoff", "age criteria", "age limit"],
+    answer: "For 2027–28, the permitted birth years are: Class 3 — 2018 or 2019; Class 4 — 2017 or 2018; Class 5 — 2016 or 2017; Class 6 — 2015 or 2016; Class 7 — 2014 or 2015; Class 8 — 2013 or 2014; Class 9 — 2012 or 2013; and Class 11 — 2010 or 2011.",
   },
   {
     terms: ["entrance test", "entrance exam", "test pattern", "sample paper", "online test", "mathematics paper"],

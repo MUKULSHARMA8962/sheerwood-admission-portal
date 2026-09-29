@@ -3,6 +3,7 @@ import { Link, useNavigate } from "react-router-dom";
 import {
   getAdmissionDocumentRecords,
   getAdmissionDocuments,
+  REQUIRED_ADMISSION_DOCUMENT_IDS,
   saveAdmissionDraft,
   syncAdmissionDocumentsFromDatabase,
   updateAdmissionDocument,
@@ -76,6 +77,14 @@ export default function ApplicationStages() {
 
   async function submit(event) {
     event.preventDefault();
+    const documentsById = new Map(documents.map((document) => [document.id, document]));
+    const missingDocuments = REQUIRED_ADMISSION_DOCUMENT_IDS
+      .map((documentId) => documentsById.get(documentId) || { id: documentId, name: documentId.replaceAll("-", " ") })
+      .filter((document) => !document.file);
+    if (missingDocuments.length) {
+      setMessage(`Upload the mandatory document${missingDocuments.length === 1 ? "" : "s"}: ${missingDocuments.map((document) => document.name).join(", ")}.`);
+      return;
+    }
     setIsSubmitting(true);
     setMessage("");
     try {
@@ -93,7 +102,10 @@ export default function ApplicationStages() {
     <section className="stage-shell"><div className="stage-main"><div className="stage-title"><div><p>STEP 5 OF 7 · NEW APPLICATION</p><h1>Document Upload</h1><small>Upload documents now. The admissions team verifies each document before a final decision.</small></div><button onClick={() => navigate(ROUTES.newUserDashboard)}>← Dashboard</button></div>
       <ol className="stage-progress" aria-label="Application progress">{steps.map((step, index) => <li className={index === 4 ? "current" : index < 4 ? "complete" : ""} key={step}><span>{index < 4 ? "✓" : index + 1}</span><b>{step}</b></li>)}</ol>
       {message && <div className="stage-message" role="status">{message}<button onClick={() => setMessage("")} aria-label="Dismiss">×</button></div>}
-      <form className="stage-form documents" onSubmit={submit}><p className="document-intro">{isLoadingDocuments ? "Loading your saved documents…" : "Upload a document or replace it here. These statuses are read directly from your saved application."}</p><div className="document-list">{documents.map((document) => <button className={document.status.toLowerCase().replaceAll(" ", "-")} type="button" key={document.id} onClick={() => chooseDocument(document.id)}><span>▣</span><b>{document.name}</b><em>{document.file || "Not uploaded"}</em><i>{document.status === "Verified" ? "✓" : document.file ? "◷" : "⇧"}</i><small>{document.status}</small></button>)}</div><input ref={fileInput} type="file" accept=".pdf,.jpg,.jpeg,.png" hidden onChange={upload} /><div className="stage-actions"><button type="button" className="stage-back" onClick={() => navigate(ROUTES.parentGuardian)}>← Back</button><button className="stage-next" type="submit" disabled={isSubmitting}>{isSubmitting ? "Submitting…" : "Submit application & continue to fee"} <span>→</span></button></div></form>
+      <form className="stage-form documents" onSubmit={submit}><p className="document-intro">{isLoadingDocuments ? "Loading your saved documents…" : "Upload all documents marked Mandatory before continuing. These statuses are read directly from your saved application."}</p><div className="document-list">{documents.map((document) => {
+        const isRequired = REQUIRED_ADMISSION_DOCUMENT_IDS.includes(document.id);
+        return <button className={document.status.toLowerCase().replaceAll(" ", "-")} type="button" key={document.id} onClick={() => chooseDocument(document.id)}><span>▣</span><b>{document.name}{isRequired && <mark className="document-required">Mandatory</mark>}</b><em>{document.file || "Not uploaded"}</em><i>{document.status === "Verified" ? "✓" : document.file ? "◷" : "⇧"}</i><small>{document.status}</small></button>;
+      })}</div><input ref={fileInput} type="file" accept=".pdf,.jpg,.jpeg,.png" hidden onChange={upload} /><div className="stage-actions"><button type="button" className="stage-back" onClick={() => navigate(ROUTES.parentGuardian)}>← Back</button><button className="stage-next" type="submit" disabled={isSubmitting}>{isSubmitting ? "Submitting…" : "Submit application & continue to fee"} <span>→</span></button></div></form>
     </div></section>
   </main>;
 }

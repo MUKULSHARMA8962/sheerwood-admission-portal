@@ -1,7 +1,7 @@
 import { getAdmissionDocumentLabel, getApplicationStatusLabel, getDocumentStatusLabel } from "../services/admission";
 import "./AdmissionStageCards.css";
 
-const requiredDocuments = ["report-card", "aadhaar-card", "birth-certificate", "passport", "national-id-card"];
+const requiredDocuments = ["report-card", "aadhaar-card", "birth-certificate"];
 
 function present(value, fallback = "Not filled") {
   if (value === 0) return "0";

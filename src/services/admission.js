@@ -56,6 +56,12 @@ const admissionDocumentLabels = {
   "mother-photo": "Mother's Photograph",
 };
 
+export const REQUIRED_ADMISSION_DOCUMENT_IDS = [
+  "report-card",
+  "aadhaar-card",
+  "birth-certificate",
+];
+
 const documentStatusLabels = {
   uploaded: "Uploaded",
   under_verification: "Under Verification",
@@ -121,15 +127,15 @@ const defaultDocuments = [
   { id: "report-card", name: "Report Card", status: "Not Uploaded", file: "" },
   { id: "aadhaar-card", name: "Aadhaar Card", status: "Not Uploaded", file: "" },
   { id: "birth-certificate", name: "Birth Certificate", status: "Not Uploaded", file: "" },
-  { id: "passport", name: "Passport", status: "Not Uploaded", file: "" },
-  { id: "national-id-card", name: "National ID Card", status: "Not Uploaded", file: "" },
 ];
+
+const admissionDocumentIds = new Set(defaultDocuments.map((document) => document.id));
 
 export function getAdmissionDocuments() {
   const documentsKey = scopedStorageKey(DOCUMENTS_KEY);
   const savedDocuments = localStorage.getItem(documentsKey);
   if (savedDocuments) {
-    const documents = JSON.parse(savedDocuments).filter((document) => document.id !== "other").map((document) => {
+    const documents = JSON.parse(savedDocuments).filter((document) => admissionDocumentIds.has(document.id)).map((document) => {
       if (document.status === "Submitted") return { ...document, status: document.file ? "Uploaded" : "Not Uploaded" };
       if (document.status === "Approved") return { ...document, status: document.file ? "Verified" : "Not Uploaded" };
       return { ...document, file: document.file || "" };

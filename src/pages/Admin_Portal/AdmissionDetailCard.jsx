@@ -15,7 +15,7 @@ function vendorName(application) {
 
 export default function AdmissionDetailCard({ application, onClose, onApprove, onApproveWithException, onReject, onPrint, saving, documentBusyId, onOpenDocument, onReviewDocument, onDeleteDocument }) {
   if (!application) return null;
-  const requiredDocuments = application.document_summary?.required || 5;
+  const requiredDocuments = application.document_summary?.required || 3;
   const verifiedDocuments = application.document_summary?.verified || 0;
   const pendingDocuments = Math.max(requiredDocuments - verifiedDocuments, 0);
   const isFinal = ["approved", "rejected"].includes(application.status);

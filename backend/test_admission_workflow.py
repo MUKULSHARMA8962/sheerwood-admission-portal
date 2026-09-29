@@ -48,7 +48,9 @@ def main():
 
         application_number = "TEST-ADM-2027-000001"
         exception_application_number = "TEST-ADM-2027-000002"
-        document_keys = ("report-card", "aadhaar-card", "birth-certificate", "passport", "national-id-card")
+        document_keys = ("report-card", "aadhaar-card", "birth-certificate")
+        photo_document_keys = ("student-photo", "father-photo", "mother-photo")
+        all_upload_keys = (*document_keys, *photo_document_keys)
         document_metadata = [{"id": key, "name": key.replace("-", " ").title(), "status": "Not Uploaded", "file": ""} for key in document_keys]
         application_data = {
             "otpVerification": {"contact": "9876543210", "status": "verified", "verifiedAt": "2027-04-01T09:00:00Z"},
@@ -76,7 +78,10 @@ def main():
             login_only_funnel = expect(client.get("/api/admin/admission-funnel", headers=admin_headers), 200)
             assert login_only_funnel["login_only"] == 1
 
-            expect(client.put("/api/applications/draft", headers=parent_headers, json={"application_number": exception_application_number, "data": application_data, "documents": document_metadata, "status": "submitted"}), 200)
+            missing_documents = client.put("/api/applications/draft", headers=parent_headers, json={"application_number": exception_application_number, "data": application_data, "documents": document_metadata, "status": "submitted"})
+            assert missing_documents.status_code == 409, missing_documents.text
+            assert "Report Card" in missing_documents.json()["detail"]
+            expect(client.put("/api/applications/draft", headers=parent_headers, json={"application_number": exception_application_number, "data": application_data, "documents": document_metadata, "status": "draft"}), 200)
             applications = expect(client.get("/api/admin/admissions", headers=admin_headers), 200)
             exception_application = next(item for item in applications if item["application_number"] == exception_application_number)
             expect(client.patch(f"/api/applications/{exception_application['id']}/decision", headers=admin_headers, json={"decision": "approved", "class_section": "Class 5", "section_allocation": "A"}), 409)
@@ -88,9 +93,15 @@ def main():
             assert exception_approved["approval_exception"] == 1
             assert exception_approved["approval_exception_reason"] == "Documents to be collected during orientation."
 
-            expect(client.put("/api/applications/draft", headers=parent_headers, json={"application_number": application_number, "data": application_data, "documents": document_metadata, "status": "submitted"}), 200)
+            expect(client.put("/api/applications/draft", headers=parent_headers, json={"application_number": application_number, "data": application_data, "documents": document_metadata, "status": "draft"}), 200)
             for key in document_keys:
                 expect(client.post(f"/api/applications/{application_number}/documents/{key}", headers=parent_headers, files={"file": (f"{key}.pdf", b"%PDF-1.4\nworkflow test document\n", "application/pdf")}), 201)
+            missing_photos = client.put("/api/applications/draft", headers=parent_headers, json={"application_number": application_number, "data": application_data, "documents": document_metadata, "status": "submitted"})
+            assert missing_photos.status_code == 409, missing_photos.text
+            assert "Student Photograph" in missing_photos.json()["detail"]
+            for key in photo_document_keys:
+                expect(client.post(f"/api/applications/{application_number}/documents/{key}", headers=parent_headers, files={"file": (f"{key}.png", b"%PDF-1.4\nworkflow test photograph\n", "application/pdf")}), 201)
+            expect(client.put("/api/applications/draft", headers=parent_headers, json={"application_number": application_number, "data": application_data, "documents": document_metadata, "status": "submitted"}), 200)
 
             fee_pending_funnel = expect(client.get("/api/admin/admission-funnel", headers=admin_headers), 200)
             assert fee_pending_funnel["submitted"] == 1
@@ -148,7 +159,7 @@ def main():
             application = next(item for item in applications if item["application_number"] == application_number)
             assert application["student_name"] == "Test Student"
             assert application["form_data"]["student"]["gender"] == "Male"
-            assert len(application["documents"]) == len(document_keys)
+            assert len(application["documents"]) == len(all_upload_keys)
             assert all(document["application_number"] == application_number for document in application["documents"])
 
             first_document = application["documents"][0]
@@ -180,7 +191,7 @@ def main():
             assert saved_admission["student_name"] == "Test Student"
             assert saved_admission["status"] == "approved"
             assert saved_admission["section_allocation"] == "A"
-            assert document_count == len(document_keys)
+            assert document_count == len(all_upload_keys)
 
     print("PASS: parent form, uploads, admin review/re-upload/verification, approval, and database persistence.")
 

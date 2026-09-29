@@ -36,7 +36,7 @@ DOCUMENT_STATUS_LABELS = {
     "reupload_required": "Re-upload Required",
     "rejected": "Rejected",
 }
-REQUIRED_DOCUMENT_KEYS = {"report-card", "aadhaar-card", "birth-certificate", "passport", "national-id-card"}
+REQUIRED_DOCUMENT_KEYS = {"report-card", "aadhaar-card", "birth-certificate"}
 LEGACY_DOCUMENT_STATUSES = {"submitted": "uploaded", "approved": "verified"}
 
 
@@ -178,9 +178,9 @@ def admission_funnel(_: dict = AdminUser) -> dict:
                LEFT JOIN new_admissions n ON n.application_number = a.application_number"""
         ).fetchall()
         document_rows = database.execute(
-            """SELECT application_number, COUNT(DISTINCT document_key) AS uploaded
+            f"""SELECT application_number, COUNT(DISTINCT document_key) AS uploaded
                FROM admission_documents
-               WHERE document_key IN (?, ?, ?, ?, ?)
+               WHERE document_key IN ({", ".join("?" for _ in REQUIRED_DOCUMENT_KEYS)})
                GROUP BY application_number""",
             tuple(REQUIRED_DOCUMENT_KEYS),
         ).fetchall()

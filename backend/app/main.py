@@ -47,8 +47,19 @@ REQUIRED_ADMISSION_DOCUMENT_KEYS = {
     "report-card",
     "aadhaar-card",
     "birth-certificate",
-    "passport",
-    "national-id-card",
+}
+REQUIRED_PHOTO_DOCUMENT_KEYS = {
+    "student-photo",
+    "father-photo",
+    "mother-photo",
+}
+ADMISSION_DOCUMENT_LABELS = {
+    "report-card": "Report Card",
+    "aadhaar-card": "Aadhaar Card",
+    "birth-certificate": "Birth Certificate",
+    "student-photo": "Student Photograph",
+    "father-photo": "Father's Photograph",
+    "mother-photo": "Mother's Photograph",
 }
 LEGACY_DOCUMENT_STATUSES = {"submitted": "uploaded", "approved": "verified"}
 PARENTAL_CONSENT_VERSION = "v1.0"
@@ -157,6 +168,28 @@ def document_review_summary(database: Any, application_number: str) -> tuple[str
     return document_review_summary_for_rows(rows)
 
 
+def required_photo_document_keys(application_data: object) -> set[str]:
+    """Student and each displayed parent/guardian photograph are mandatory."""
+    student = application_data.get("student") if isinstance(application_data, dict) else {}
+    if not isinstance(student, dict) or student.get("singleParent") != "Yes":
+        return set(REQUIRED_PHOTO_DOCUMENT_KEYS)
+    responsible_parent = str(student.get("responsibleParent") or "").strip().lower()
+    if responsible_parent in {"father", "mother"}:
+        return {"student-photo", f"{responsible_parent}-photo"}
+    return set(REQUIRED_PHOTO_DOCUMENT_KEYS)
+
+
+def missing_required_submission_upload_keys(database: Any, application_number: str, application_data: object) -> list[str]:
+    """Return mandatory documents and photographs that are not stored in the database."""
+    rows = database.execute(
+        "SELECT DISTINCT document_key FROM admission_documents WHERE application_number = ?",
+        (application_number,),
+    ).fetchall()
+    uploaded_keys = {row["document_key"] for row in rows}
+    required_keys = REQUIRED_ADMISSION_DOCUMENT_KEYS | required_photo_document_keys(application_data)
+    return sorted(required_keys - uploaded_keys)
+
+
 @asynccontextmanager
 async def lifespan(_: FastAPI):
     initialize_database()
@@ -210,7 +243,7 @@ def safe_upload_filename(filename: str | None, content_type: str) -> str:
 
 def owned_application(database: Any, application_number: str, parent_id: int) -> Any:
     application = database.execute(
-        "SELECT id, status, registration_fee_status, registration_fee_paid_at FROM applications WHERE application_number = ? AND parent_id = ?",
+        "SELECT id, status, registration_fee_status, registration_fee_paid_at, application_data FROM applications WHERE application_number = ? AND parent_id = ?",
         (application_number, parent_id),
     ).fetchone()
     if not application:
@@ -524,9 +557,14 @@ def initiate_registration_fee(application_number: str, user: Annotated[dict[str,
         consent = active_parental_consent(database, application_number, user["id"])
         if not consent:
             raise HTTPException(status_code=409, detail="Parent or guardian consent must be confirmed before payment.")
-        _, document_counts = document_review_summary(database, application_number)
-        if document_counts["uploaded"] < document_counts["required"]:
-            raise HTTPException(status_code=409, detail="Upload all required documents before paying the registration fee.")
+        try:
+            application_data = json.loads(application["application_data"] or "{}")
+        except (TypeError, ValueError):
+            application_data = {}
+        missing_uploads = missing_required_submission_upload_keys(database, application_number, application_data)
+        if missing_uploads:
+            names = ", ".join(ADMISSION_DOCUMENT_LABELS[key] for key in missing_uploads)
+            raise HTTPException(status_code=409, detail=f"Upload all mandatory documents and photographs before paying the registration fee: {names}.")
         latest = database.execute(
             "SELECT txnid, created_at FROM registration_fee_payments WHERE application_number = ? AND status = 'pending' ORDER BY created_at DESC LIMIT 1",
             (application_number,),
@@ -792,6 +830,13 @@ def save_application_draft(
     board = admission_value("boardOther") if admission_value("board") == "Other" else admission_value("board")
     saved_on = datetime.now(UTC).date().isoformat()
     with connection() as database:
+        if payload.status == "submitted":
+            if not admission_value("penNumber"):
+                raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail="Enter the student's PEN Number before submitting the application.")
+            missing_documents = missing_required_submission_upload_keys(database, payload.application_number, payload.data)
+            if missing_documents:
+                required_names = ", ".join(ADMISSION_DOCUMENT_LABELS[key] for key in missing_documents)
+                raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=f"Upload the mandatory documents and photographs before submitting: {required_names}.")
         referral = resolve_referral(payload.lead_source, payload.referral_code, database)
         existing = database.execute(
             """SELECT id, status, documents_status, registration_fee_status, lead_source,
