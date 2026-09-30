@@ -201,7 +201,7 @@ export default function AdmissionDetails() {
             <section className="admission-form-block" aria-labelledby="application-information-heading">
               <header className="admission-form-block-header"><div><p>APPLICATION INFORMATION</p><h2 id="application-information-heading">Admission application</h2></div><small>Fields marked <em>*</em> are required.</small></header>
               <div className="admission-fields">
-                <label>Academic Session<input value={form.session} readOnly /></label>
+                <label>Academic Year<input value={form.session} readOnly /></label>
                 <label>Class Applying For <em>*</em><select name="class" value={form.class} onChange={update} required><option value="Select class" disabled>Select class</option>{admissionClassOptions.map((className) => <option key={className} value={className}>{className}</option>)}</select></label>
                 {form.class === "Class 11" && <label>Stream <em>*</em><select name="stream" value={form.stream} onChange={update} required><option value="Select stream" disabled>Select stream</option><option value="PCMB">PCMB</option><option value="PCM">PCM</option><option value="PCB">PCB</option><option value="Commerce with Mathematics">Commerce with Mathematics</option><option value="Commerce without Mathematics">Commerce without Mathematics</option><option value="Humanities">Humanities</option></select></label>}
                 <label>Application Date<input name="date" type="date" value={form.date} readOnly /></label>

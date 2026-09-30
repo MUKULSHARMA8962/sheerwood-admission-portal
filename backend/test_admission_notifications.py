@@ -16,7 +16,8 @@ class AdmissionNotificationTests(TestCase):
     def test_submission_has_all_form_fields_and_both_attachments(self) -> None:
         form = {
             "admissionDetails": {"session": "2027-28", "class": "Class 5", "boardOther": ""},
-            "student": {"firstName": "Asha", "middleName": "", "lastName": "Singh", "howHeard": "<script>"},
+            "student": {"firstName": "Asha", "middleName": "", "lastName": "Singh", "birthDate": "2017-04-10", "howHeard": "<script>"},
+            "addresses": {"communication": "12 School Road", "permanent": "34 Home Lane"},
             "guardians": {"Father": {"fullName": "Mr Singh", "email": "father@example.com"}},
             "studentPhoto": {"file": "asha.png", "storageId": "private-id"},
             "parentPhotos": {"Father": {"file": "father.png"}},
@@ -65,6 +66,9 @@ class AdmissionNotificationTests(TestCase):
                 )
                 self.assertIn("Extra Column: Extra value", slide_text)
                 self.assertIn("Middle Name: Not provided", slide_text)
+                self.assertIn("Date of Birth: 10-04-2017", slide_text)
+                self.assertIn("Address for Communication: 12 School Road", slide_text)
+                self.assertIn("Permanent Address: 34 Home Lane", slide_text)
 
         messages = {call.kwargs["recipient"]: call.kwargs for call in send.call_args_list}
         parent_message = messages["parent@example.com"]
@@ -75,6 +79,9 @@ class AdmissionNotificationTests(TestCase):
         admin_message = messages["admin@example.com"]
         self.assertEqual(admin_message["subject"], "New paid admission application — APP/2027/1")
         self.assertIn("Middle Name: Not provided", admin_message["body"])
+        self.assertIn("Date of Birth: 10-04-2017", admin_message["body"])
+        self.assertIn("Address for Communication: 12 School Road", admin_message["body"])
+        self.assertIn("Permanent Address: 34 Home Lane", admin_message["body"])
         self.assertIn("PEN Number: Not provided", admin_message["body"])
         self.assertIn("Extra Column: Extra value", admin_message["body"])
         self.assertIn("Student Photograph: asha.png", admin_message["body"])

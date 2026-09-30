@@ -14,6 +14,7 @@ const families = {
   Father: { ...emptyGuardian },
   Mother: { ...emptyGuardian },
 };
+const emptyAddresses = { communication: "", permanent: "" };
 
 const fieldLabels = [["fullName", "Full Name"], ["occupation", "Occupation"], ["mobile", "Mobile Number"], ["email", "Email Address"], ["aadhaar", "Aadhaar Number"]];
 
@@ -22,6 +23,7 @@ export default function ParentGuardian() {
   const location = useLocation();
   const { session } = useCognitoAuth();
   const [family, setFamily] = useState(() => ({ ...families, ...getAdmissionData().guardians }));
+  const [addresses, setAddresses] = useState(() => ({ ...emptyAddresses, ...getAdmissionData().addresses }));
   const [photos, setPhotos] = useState({ Father: "", Mother: "" });
   const [message, setMessage] = useState("");
   const [savingDraft, setSavingDraft] = useState(false);
@@ -39,17 +41,23 @@ export default function ParentGuardian() {
     if (!hasEditedRef.current || !session?.accessToken) return undefined;
     const saveTimer = window.setTimeout(() => {
       setSavingDraft(true);
-      saveAdmissionDraft(session.accessToken, { guardians: family })
+      saveAdmissionDraft(session.accessToken, { guardians: family, addresses })
         .catch((error) => setMessage(error.message || "Parent details could not be saved."))
         .finally(() => setSavingDraft(false));
     }, 700);
     return () => window.clearTimeout(saveTimer);
-  }, [family, session?.accessToken]);
+  }, [family, addresses, session?.accessToken]);
 
   function update(event, parentType) {
     const { name, value } = event.target;
     hasEditedRef.current = true;
     setFamily((details) => ({ ...details, [parentType]: { ...details[parentType], [name]: value } }));
+  }
+
+  function updateAddress(event) {
+    const { name, value } = event.target;
+    hasEditedRef.current = true;
+    setAddresses((current) => ({ ...current, [name]: value }));
   }
 
   async function selectPhoto(event, parentType) {
@@ -64,7 +72,7 @@ export default function ParentGuardian() {
 
     try {
       setMessage(`Uploading ${parentType.toLowerCase()}'s photograph…`);
-      await saveAdmissionDraft(session?.accessToken, { guardians: family });
+      await saveAdmissionDraft(session?.accessToken, { guardians: family, addresses });
       const uploaded = await uploadAdmissionDocument(session?.accessToken, `${parentType.toLowerCase()}-photo`, file);
       await saveAdmissionDraft(session?.accessToken, {
         parentPhotos: {
@@ -109,7 +117,11 @@ export default function ParentGuardian() {
         return;
       }
     }
-    saveAdmissionDraft(session?.accessToken, { guardians: family })
+    if (!addresses.communication.trim() || !addresses.permanent.trim()) {
+      setMessage("Please enter both the address for communication and the permanent address.");
+      return;
+    }
+    saveAdmissionDraft(session?.accessToken, { guardians: family, addresses })
       .then(() => navigate("/application/documents"))
       .catch((error) => setMessage(error.message));
   }
@@ -152,6 +164,13 @@ export default function ParentGuardian() {
 
           <form className="guardian-form" onSubmit={saveAndContinue}>
             {parentTypes.map(renderParentSection)}
+            <section className="guardian-address-section" aria-labelledby="guardian-address-heading">
+              <h2 id="guardian-address-heading">Address Details</h2>
+              <div className="guardian-address-fields">
+                <label>Address for Communication <em>*</em><textarea name="communication" value={addresses.communication} onChange={updateAddress} placeholder="Enter the address for all admission communication" required /></label>
+                <label>Permanent Address <em>*</em><textarea name="permanent" value={addresses.permanent} onChange={updateAddress} placeholder="Enter the permanent residential address" required /></label>
+              </div>
+            </section>
             <div className="guardian-actions"><button type="button" className="guardian-back" onClick={() => navigate("/student-information")}>← Back</button><button className="guardian-next" type="submit">Save &amp; Next <span>→</span></button></div>
           </form>
         </div>

@@ -46,6 +46,7 @@ export default function AdmissionStageCards({ application, documents = [] }) {
   const formData = application.form_data && typeof application.form_data === "object" ? application.form_data : {};
   const admission = formData.admissionDetails && typeof formData.admissionDetails === "object" ? formData.admissionDetails : formData;
   const student = formData.student && typeof formData.student === "object" ? formData.student : {};
+  const addresses = formData.addresses && typeof formData.addresses === "object" ? formData.addresses : {};
   const guardians = guardiansFrom(formData);
   const documentsByKey = new Map(documents.map((document) => [document.document_key, document]));
   const otp = formData.otpVerification && typeof formData.otpVerification === "object" ? formData.otpVerification : {};
@@ -65,7 +66,7 @@ export default function AdmissionStageCards({ application, documents = [] }) {
 
       <StageCard number="2" title="Admission Details" caption="Academic and school information">
         <FieldGrid fields={[
-          { label: "Academic Session", value: admission.session },
+          { label: "Academic Year", value: admission.session },
           { label: "Class Applying For", value: admission.class || application.desired_class },
           { label: "Stream", value: (admission.class || application.desired_class) === "Class 11" ? admission.stream : "Not applicable" },
           { label: "Application Date", value: admission.date ? formatDate(admission.date) : application.submitted_on ? formatDate(application.submitted_on) : "" },
@@ -112,6 +113,10 @@ export default function AdmissionStageCards({ application, documents = [] }) {
           { label: "Aadhaar Number", value: guardian.aadhaar, sensitive: true },
           { label: "Photograph", value: formData.parentPhotos?.[type]?.file || "Not uploaded" },
         ]} /></section>)}</div> : <p className="admission-stage-not-filled">Parent details have not been saved yet.</p>}
+        <FieldGrid fields={[
+          { label: "Address for Communication", value: addresses.communication },
+          { label: "Permanent Address", value: addresses.permanent },
+        ]} />
       </StageCard>
 
       <StageCard number="5" title="Documents" caption="Files uploaded for verification">

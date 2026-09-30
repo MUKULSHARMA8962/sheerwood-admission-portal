@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { decideAdminAdmission, deleteAdminDocument, downloadAdminDocument, getAdminAdmissions, reviewAdminDocument } from "../../services/api";
+import { decideAdminAdmission, deleteAdminAdmission, deleteAdminDocument, downloadAdminDocument, getAdminAdmissions, reviewAdminDocument } from "../../services/api";
 import { useCognitoAuth } from "../../auth/useCognitoAuth";
 import AdmissionDetailCard from "./AdmissionDetailCard";
 import DocumentPreviewModal from "../DocumentPreviewModal";
@@ -148,6 +148,25 @@ export default function NewAdmissionTable({ setNotice }) {
     });
   }
 
+  async function deleteAdmission(application) {
+    if (!session?.accessToken || savingId) return;
+    const applicationName = application.student_name || application.application_number || "this application";
+    if (!window.confirm(`Delete ${applicationName}? This permanently removes the admission application and all of its uploaded documents.`)) return;
+
+    setSavingId(application.id);
+    setError("");
+    try {
+      await deleteAdminAdmission(session.accessToken, application.id);
+      setApplications((current) => current.filter((item) => item.id !== application.id));
+      setSelectedApplication((current) => current?.id === application.id ? null : current);
+      setNotice(`${applicationName}: admission application deleted.`);
+    } catch (reason) {
+      setError(reason.message || "The admission application could not be deleted.");
+    } finally {
+      setSavingId(null);
+    }
+  }
+
   async function refreshSelectedApplication(applicationNumber) {
     const refreshed = await loadApplications();
     const refreshedApplication = refreshed.find((item) => item.application_number === applicationNumber);
@@ -267,7 +286,7 @@ export default function NewAdmissionTable({ setNotice }) {
                 <td><Badge value={application.documents_status} /></td>
                 <td><Badge value={application.status} exceptionalApproval={Number(application.approval_exception) === 1} /></td>
                 <td><b>{application.submitted_at ? "Yes" : "No"}</b><small>{application.submitted_at ? formatDate(application.submitted_at) : "Not submitted"}</small></td>
-                <td><button type="button" className="new-admission-view" onClick={() => setSelectedApplication(application)}>View details</button></td>
+                <td><div className="new-admission-row-actions"><button type="button" className="new-admission-view" onClick={() => setSelectedApplication(application)}>View details</button><button type="button" className="new-admission-delete" onClick={() => void deleteAdmission(application)} disabled={savingId === application.id}>{savingId === application.id ? "Deleting…" : "Delete"}</button></div></td>
               </tr>;
           })}
         </tbody>

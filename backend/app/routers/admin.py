@@ -167,6 +167,24 @@ def admissions(_: dict = AdminUser) -> list[dict]:
     return result
 
 
+@router.delete("/admissions/{application_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_admission(application_id: int, _: dict = AdminUser) -> Response:
+    """Permanently remove an admission application and its uploaded documents."""
+    with connection() as database:
+        application = database.execute(
+            "SELECT application_number FROM applications WHERE id = ?",
+            (application_id,),
+        ).fetchone()
+        if not application:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Admission application was not found.")
+
+        application_number = application["application_number"]
+        database.execute("DELETE FROM admission_documents WHERE application_number = ?", (application_number,))
+        database.execute("DELETE FROM new_admissions WHERE application_number = ?", (application_number,))
+        database.execute("DELETE FROM applications WHERE id = ?", (application_id,))
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
 @router.get("/admission-funnel")
 def admission_funnel(_: dict = AdminUser) -> dict:
     """Return the live parent-to-submission funnel for the admin dashboard."""

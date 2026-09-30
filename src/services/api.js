@@ -149,6 +149,17 @@ export async function getAdminAdmissions(accessToken) {
   return data;
 }
 
+export async function deleteAdminAdmission(accessToken, applicationId) {
+  const response = await fetch(API_ROUTES.adminAdmission(applicationId), {
+    method: "DELETE",
+    headers: { Authorization: `Bearer ${accessToken}` },
+  });
+  if (!response.ok) {
+    const data = await response.json().catch(() => ({}));
+    throw new Error(data.detail || "Admission application could not be deleted.");
+  }
+}
+
 export function getAdminAdmissionFunnel(accessToken) {
   return getAdminData(API_ROUTES.adminAdmissionFunnel, accessToken, "Admission tracking could not be loaded.");
 }

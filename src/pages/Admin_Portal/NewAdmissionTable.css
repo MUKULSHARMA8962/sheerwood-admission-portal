@@ -23,6 +23,10 @@
 .new-admission-student-button:hover { color: #08783f; text-decoration: underline; }
 .new-admission-admin-table .new-admission-view { padding: 7px 10px; border: 1px solid #b9ddc2; border-radius: 7px; color: #08783f; background: #fff; font-size: 10px; font-weight: 800; cursor: pointer; }
 .new-admission-admin-table .new-admission-view:hover { background: #edf8ef; }
+.new-admission-row-actions { display: flex; flex-wrap: wrap; gap: 6px; min-width: 146px; }
+.new-admission-admin-table .new-admission-delete { padding: 7px 10px; border: 1px solid #e9bdb9; border-radius: 7px; color: #a52d26; background: #fff7f6; font-size: 10px; font-weight: 800; cursor: pointer; }
+.new-admission-admin-table .new-admission-delete:hover { background: #fee9e6; }
+.new-admission-admin-table .new-admission-delete:disabled { opacity: .55; cursor: not-allowed; }
 .new-admission-empty { padding: 30px !important; color: #718078; text-align: center; }
 .new-admission-badge { display: inline-flex; padding: 5px 8px; border-radius: 999px; font-size: 10px; font-weight: 800; white-space: nowrap; }
 .new-admission-badge.pending { color: #7c5700; background: #fff3c4; }.new-admission-badge.uploaded, .new-admission-badge.under-verification { color: #145d94; background: #dceffd; }.new-admission-badge.documents-verified { color: #14683b; background: #ddf3e3; }.new-admission-badge.approved { color: #fff; background: #075d33; }.new-admission-badge.needs-information { color: #a54d00; background: #ffe4c5; }.new-admission-badge.re-upload-required, .new-admission-badge.rejected { color: #a52d26; background: #fee0dc; }.new-admission-badge.draft { color: #596b61; background: #edf2ee; }

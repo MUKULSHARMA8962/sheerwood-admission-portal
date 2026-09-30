@@ -19,11 +19,13 @@ logger = logging.getLogger(__name__)
 FORM_SECTION_LABELS = {
     "admissionDetails": "Admission Details",
     "student": "Student Details",
+    "addresses": "Address Details",
     "guardians": "Parent / Guardian Details",
 }
 FORM_SECTION_FIELDS = {
     "admissionDetails": ("session", "date", "class", "stream", "penNumber", "previousSchool", "currentClass", "board", "boardOther", "medium"),
     "student": ("firstName", "middleName", "lastName", "birthDate", "placeOfBirth", "gender", "bloodGroup", "motherTongue", "nationality", "nationalityOther", "nationalityCountryId", "religion", "religionOther", "category", "sld", "adhd", "singleParent", "responsibleParent", "howHeard", "howHeardOther", "aadhaar"),
+    "addresses": ("communication", "permanent"),
 }
 FORM_FIELD_LABELS = {
     "aadhaar": "Aadhaar Number",
@@ -36,7 +38,10 @@ FORM_FIELD_LABELS = {
     "placeOfBirth": "Place of Birth",
     "previousSchool": "Previous School",
     "responsibleParent": "Responsible Parent",
+    "session": "Academic Year",
     "sld": "Specific Learning Disability (SLD)",
+    "communication": "Address for Communication",
+    "permanent": "Permanent Address",
 }
 FORM_METADATA_FIELDS = {"otpVerification", "storageId", "contentType", "sizeBytes", "uploadedDocuments"}
 
@@ -48,12 +53,16 @@ def _form_label(value: str) -> str:
     return readable.replace("_", " ").replace("-", " ").strip().title()
 
 
-def _form_value(value: Any) -> str:
+def _form_value(value: Any, field_name: str = "") -> str:
     if isinstance(value, bool):
         return "Yes" if value else "No"
     if isinstance(value, (list, tuple)):
-        return ", ".join(part for item in value if (part := _form_value(item)))
-    return str(value if value is not None else "").replace("\r", " ").replace("\n", " ").strip()
+        return ", ".join(part for item in value if (part := _form_value(item, field_name)))
+    text = str(value if value is not None else "").replace("\r", " ").replace("\n", " ").strip()
+    if field_name == "birthDate" and re.fullmatch(r"\d{4}-\d{2}-\d{2}", text):
+        year, month, day = text.split("-")
+        return f"{day}-{month}-{year}"
+    return text
 
 
 def _append_form_entries(lines: list[str], values: dict[str, Any], indent: str = "") -> None:
@@ -69,7 +78,7 @@ def _append_form_entries(lines: list[str], values: dict[str, Any], indent: str =
             continue
         if key == "file":
             continue
-        lines.append(f"{indent}{_form_label(key)}: {_form_value(value) or 'Not provided'}")
+        lines.append(f"{indent}{_form_label(key)}: {_form_value(value, key) or 'Not provided'}")
 
 
 def _completed_application_form(application_data: dict[str, Any] | None, documents: list[dict[str, Any]] | None) -> list[str]:
@@ -222,16 +231,17 @@ def _application_pdf(*, application_number: str, student_name: str, desired_clas
         *form_lines,
     ]
     wrapped_lines = [part for line in lines for part in (wrap(str(line), 92) or [""])]
-    pages = [wrapped_lines[index:index + 48] for index in range(0, len(wrapped_lines), 48)] or [[]]
+    # Use a readable 12-point type size while keeping a safe bottom margin.
+    pages = [wrapped_lines[index:index + 42] for index in range(0, len(wrapped_lines), 42)] or [[]]
     objects: list[bytes] = []
     page_ids: list[int] = []
     font_id = 3
     next_id = 4
     for page_lines in pages:
-        commands = ["BT", "/F1 10 Tf", "50 760 Td"]
+        commands = ["BT", "/F1 12 Tf", "50 760 Td"]
         for index, line in enumerate(page_lines):
             if index:
-                commands.append("0 -15 Td")
+                commands.append("0 -17 Td")
             commands.append(f"({_pdf_escape(line)}) Tj")
         commands.append("ET")
         stream = "\n".join(commands).encode("latin-1", "replace")

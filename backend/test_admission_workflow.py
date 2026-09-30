@@ -193,7 +193,31 @@ def main():
             assert saved_admission["section_allocation"] == "A"
             assert document_count == len(all_upload_keys)
 
-    print("PASS: parent form, uploads, admin review/re-upload/verification, approval, and database persistence.")
+            # An administrator can remove a duplicate or test application,
+            # including every uploaded document associated with it.
+            deletable_application_number = "TEST-ADM-2027-000003"
+            expect(client.put("/api/applications/draft", headers=parent_headers, json={
+                "application_number": deletable_application_number,
+                "data": application_data,
+                "documents": document_metadata,
+                "status": "draft",
+            }), 200)
+            expect(client.post(
+                f"/api/applications/{deletable_application_number}/documents/report-card",
+                headers=parent_headers,
+                files={"file": ("report-card.pdf", b"%PDF-1.4\ndelete workflow document\n", "application/pdf")},
+            ), 201)
+            applications = expect(client.get("/api/admin/admissions", headers=admin_headers), 200)
+            deletable_application = next(item for item in applications if item["application_number"] == deletable_application_number)
+            expect(client.delete(f"/api/admin/admissions/{deletable_application['id']}", headers=admin_headers), 204)
+            applications = expect(client.get("/api/admin/admissions", headers=admin_headers), 200)
+            assert all(item["application_number"] != deletable_application_number for item in applications)
+            with connection() as database:
+                assert not database.execute("SELECT 1 FROM applications WHERE application_number = ?", (deletable_application_number,)).fetchone()
+                assert not database.execute("SELECT 1 FROM new_admissions WHERE application_number = ?", (deletable_application_number,)).fetchone()
+                assert not database.execute("SELECT 1 FROM admission_documents WHERE application_number = ?", (deletable_application_number,)).fetchone()
+
+    print("PASS: parent form, uploads, admin review/re-upload/verification, approval, deletion, and database persistence.")
 
 
 if __name__ == "__main__":

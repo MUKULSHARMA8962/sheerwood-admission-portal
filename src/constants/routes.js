@@ -33,6 +33,7 @@ export const API_ROUTES = {
   adminAttendance: `${API_BASE_URL}/admin/attendance`,
   adminDocuments: `${API_BASE_URL}/admin/documents`,
   adminAdmissions: `${API_BASE_URL}/admin/admissions`,
+  adminAdmission: (applicationId) => `${API_BASE_URL}/admin/admissions/${encodeURIComponent(applicationId)}`,
   adminAdmissionFunnel: `${API_BASE_URL}/admin/admission-funnel`,
   adminVendors: `${API_BASE_URL}/admin/vendors`,
   adminSettings: `${API_BASE_URL}/admin/settings`,
