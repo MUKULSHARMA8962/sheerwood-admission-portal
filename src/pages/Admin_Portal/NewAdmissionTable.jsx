@@ -23,6 +23,7 @@ const statusLabels = {
   rejected: "Rejected",
   draft: "Draft",
 };
+const pageSizeOptions = [20, 50, 100, 200, 300, 400, 500, 1000];
 
 function label(value) {
   return statusLabels[value] || String(value || "pending").replaceAll("_", " ");
@@ -60,6 +61,8 @@ export default function NewAdmissionTable({ setNotice }) {
   const [applications, setApplications] = useState([]);
   const [query, setQuery] = useState("");
   const [vendorFilter, setVendorFilter] = useState("all");
+  const [pageSize, setPageSize] = useState(20);
+  const [page, setPage] = useState(1);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
   const [savingId, setSavingId] = useState(null);
@@ -96,6 +99,14 @@ export default function NewAdmissionTable({ setNotice }) {
     const matchesVendor = vendorFilter === "all" || application.vendor_id === vendorFilter;
     return matchesSearch && matchesVendor;
   }), [applications, query, vendorFilter]);
+
+  useEffect(() => { setPage(1); }, [query, vendorFilter, pageSize]);
+
+  const totalPages = Math.max(1, Math.ceil(visibleApplications.length / pageSize));
+  const currentPage = Math.min(page, totalPages);
+  const firstVisibleRow = visibleApplications.length ? (currentPage - 1) * pageSize + 1 : 0;
+  const lastVisibleRow = Math.min(currentPage * pageSize, visibleApplications.length);
+  const paginatedApplications = useMemo(() => visibleApplications.slice((currentPage - 1) * pageSize, currentPage * pageSize), [currentPage, pageSize, visibleApplications]);
 
   const vendorOptions = useMemo(() => {
     const sources = new Map([["DIRECT", "Direct Website"]]);
@@ -277,7 +288,7 @@ export default function NewAdmissionTable({ setNotice }) {
         <tbody>
           {loading && <tr><td colSpan="11" className="new-admission-empty">Loading applications…</td></tr>}
           {!loading && !visibleApplications.length && <tr><td colSpan="11" className="new-admission-empty">No real admission records found.</td></tr>}
-          {!loading && visibleApplications.map((application) => {
+          {!loading && paginatedApplications.map((application) => {
             const summary = application.document_summary || {};
             return <tr key={application.id}>
                 <td><button type="button" className="new-admission-student-button" onClick={() => setSelectedApplication(application)}>{application.application_number}</button></td>
@@ -296,6 +307,17 @@ export default function NewAdmissionTable({ setNotice }) {
         </tbody>
       </table>
     </div>
+    {!loading && visibleApplications.length > 0 && <footer className="new-admission-pagination" aria-label="Admission table pagination">
+      <label>Rows per page <select value={pageSize} onChange={(event) => setPageSize(Number(event.target.value))}>{pageSizeOptions.map((size) => <option key={size} value={size}>{size}</option>)}</select></label>
+      <span>{firstVisibleRow}–{lastVisibleRow} of {visibleApplications.length} applications</span>
+      <div>
+        <button type="button" onClick={() => setPage(1)} disabled={currentPage === 1}>First</button>
+        <button type="button" onClick={() => setPage((current) => Math.max(1, current - 1))} disabled={currentPage === 1}>Previous</button>
+        <b>Page {currentPage} of {totalPages}</b>
+        <button type="button" onClick={() => setPage((current) => Math.min(totalPages, current + 1))} disabled={currentPage === totalPages}>Next</button>
+        <button type="button" onClick={() => setPage(totalPages)} disabled={currentPage === totalPages}>Last</button>
+      </div>
+    </footer>}
     <AdmissionDetailCard application={selectedApplication} onClose={() => setSelectedApplication(null)} onApprove={() => approve(selectedApplication)} onApproveWithException={() => approveWithException(selectedApplication)} onReject={() => updateAdmission(selectedApplication, "rejected")} onPrint={() => void printApplication(selectedApplication)} saving={savingId === selectedApplication?.id} documentBusyId={documentBusyId} onOpenDocument={(document) => void openDocumentPreview(document)} onReviewDocument={(document, decision) => void reviewDocument(document, decision)} onDeleteDocument={(document) => void deleteDocument(document)} />
     <DocumentPreviewModal preview={documentPreview} deleting={documentBusyId === documentPreview?.document?.id} onClose={() => setDocumentPreview(null)} onDownload={downloadPreview} onDelete={() => void deleteDocument(documentPreview?.document)} actions={[
       { label: "Mark under review", className: "admission-document-review", onClick: () => void reviewDocument(documentPreview?.document, "under_verification"), disabled: documentBusyId !== null },
