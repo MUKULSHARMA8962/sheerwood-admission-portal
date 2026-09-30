@@ -8,6 +8,9 @@ import "./NewAdmissionTable.css";
 
 const statusLabels = {
   pending: "Pending",
+  paid: "Paid",
+  failed: "Failed",
+  expired: "Expired",
   submitted: "Pending",
   uploaded: "Uploaded",
   under_verification: "Under Verification",
@@ -270,10 +273,10 @@ export default function NewAdmissionTable({ setNotice }) {
     {error && <p className="new-admission-table-error" role="alert">{error}</p>}
     <div className="new-admission-table-scroll">
       <table className="new-admission-admin-table">
-        <thead><tr><th>Application ID</th><th>Student Name</th><th>Lead Source</th><th>Class</th><th>Parent / Mobile</th><th>Documents</th><th>Verification</th><th>Admission Status</th><th>Form Submitted</th><th>Action</th></tr></thead>
+        <thead><tr><th>Application ID</th><th>Student Name</th><th>Lead Source</th><th>Class</th><th>Parent / Mobile</th><th>Documents</th><th>Verification</th><th>Admission Status</th><th>Payment Status</th><th>Form Submitted</th><th>Action</th></tr></thead>
         <tbody>
-          {loading && <tr><td colSpan="10" className="new-admission-empty">Loading applications…</td></tr>}
-          {!loading && !visibleApplications.length && <tr><td colSpan="10" className="new-admission-empty">No real admission records found.</td></tr>}
+          {loading && <tr><td colSpan="11" className="new-admission-empty">Loading applications…</td></tr>}
+          {!loading && !visibleApplications.length && <tr><td colSpan="11" className="new-admission-empty">No real admission records found.</td></tr>}
           {!loading && visibleApplications.map((application) => {
             const summary = application.document_summary || {};
             return <tr key={application.id}>
@@ -285,6 +288,7 @@ export default function NewAdmissionTable({ setNotice }) {
                 <td>{summary.uploaded || 0}/{summary.required || 5} uploaded<br /><small>{summary.verified || 0}/{summary.required || 5} verified</small></td>
                 <td><Badge value={application.documents_status} /></td>
                 <td><Badge value={application.status} exceptionalApproval={Number(application.approval_exception) === 1} /></td>
+                <td><Badge value={application.registration_fee_status || "pending"} /></td>
                 <td><b>{application.submitted_at ? "Yes" : "No"}</b><small>{application.submitted_at ? formatDate(application.submitted_at) : "Not submitted"}</small></td>
                 <td><div className="new-admission-row-actions"><button type="button" className="new-admission-view" onClick={() => setSelectedApplication(application)}>View details</button><button type="button" className="new-admission-delete" onClick={() => void deleteAdmission(application)} disabled={savingId === application.id}>{savingId === application.id ? "Deleting…" : "Delete"}</button></div></td>
               </tr>;
