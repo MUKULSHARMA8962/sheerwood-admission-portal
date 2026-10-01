@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { decideAdminAdmission, deleteAdminAdmission, deleteAdminDocument, downloadAdminDocument, getAdminAdmissionPayments, getAdminAdmissions, reviewAdminDocument } from "../../services/api";
 import { useCognitoAuth } from "../../auth/useCognitoAuth";
 import AdmissionDetailCard from "./AdmissionDetailCard";
+import DocumentChecklistModal from "./DocumentChecklistModal";
 import PaymentDetailsModal from "./PaymentDetailsModal";
 import DocumentPreviewModal from "../DocumentPreviewModal";
 import { applicationPrintHtml, blobToDataUrl } from "./printApplication";
@@ -68,6 +69,7 @@ export default function NewAdmissionTable({ setNotice }) {
   const [loading, setLoading] = useState(true);
   const [savingId, setSavingId] = useState(null);
   const [selectedApplication, setSelectedApplication] = useState(null);
+  const [documentChecklistApplication, setDocumentChecklistApplication] = useState(null);
   const [paymentDetail, setPaymentDetail] = useState(null);
   const [documentPreview, setDocumentPreview] = useState(null);
   const [documentBusyId, setDocumentBusyId] = useState(null);
@@ -309,7 +311,7 @@ export default function NewAdmissionTable({ setNotice }) {
                 <td className="new-admission-source-cell"><b>{vendorName(application)}</b><small>{application.vendor_id || "No vendor ID"}</small></td>
                 <td>{application.desired_class || "—"}</td>
                 <td className="new-admission-parent-cell"><b>{parentDisplayName(application.parent_name)}</b><small>Mobile: {application.parent_mobile || "Not saved"}</small></td>
-                <td>{summary.uploaded || 0}/{summary.required || 5} uploaded<br /><small>{summary.verified || 0}/{summary.required || 5} verified</small></td>
+                <td><button type="button" className="new-admission-documents-button" onClick={() => setDocumentChecklistApplication(application)} aria-label={`View document checklist for ${application.application_number}`}><b>{summary.uploaded || 0}/{summary.required || 5} uploaded</b><small>{summary.verified || 0}/{summary.required || 5} verified</small><em>View documents</em></button></td>
                 <td><Badge value={application.documents_status} /></td>
                 <td><Badge value={application.status} exceptionalApproval={Number(application.approval_exception) === 1} /></td>
                 <td><button type="button" className="new-admission-payment-button" onClick={() => void openPaymentDetails(application)} aria-label={`View payment details for ${application.application_number}`}><Badge value={application.registration_fee_status || "pending"} /><small>View transaction</small></button></td>
@@ -331,6 +333,7 @@ export default function NewAdmissionTable({ setNotice }) {
         <button type="button" onClick={() => setPage(totalPages)} disabled={currentPage === totalPages}>Last</button>
       </div>
     </footer>}
+    <DocumentChecklistModal application={documentChecklistApplication} onClose={() => setDocumentChecklistApplication(null)} />
     <PaymentDetailsModal detail={paymentDetail} onClose={() => setPaymentDetail(null)} />
     <AdmissionDetailCard application={selectedApplication} onClose={() => setSelectedApplication(null)} onApprove={() => approve(selectedApplication)} onApproveWithException={() => approveWithException(selectedApplication)} onReject={() => updateAdmission(selectedApplication, "rejected")} onPrint={() => void printApplication(selectedApplication)} saving={savingId === selectedApplication?.id} documentBusyId={documentBusyId} onOpenDocument={(document) => void openDocumentPreview(document)} onReviewDocument={(document, decision) => void reviewDocument(document, decision)} onDeleteDocument={(document) => void deleteDocument(document)} />
     <DocumentPreviewModal preview={documentPreview} deleting={documentBusyId === documentPreview?.document?.id} onClose={() => setDocumentPreview(null)} onDownload={downloadPreview} onDelete={() => void deleteDocument(documentPreview?.document)} actions={[
