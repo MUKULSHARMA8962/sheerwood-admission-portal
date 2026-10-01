@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { decideAdminAdmission, deleteAdminAdmission, deleteAdminDocument, downloadAdminDocument, getAdminAdmissions, reviewAdminDocument } from "../../services/api";
+import { decideAdminAdmission, deleteAdminAdmission, deleteAdminDocument, downloadAdminDocument, getAdminAdmissionPayments, getAdminAdmissions, reviewAdminDocument } from "../../services/api";
 import { useCognitoAuth } from "../../auth/useCognitoAuth";
 import AdmissionDetailCard from "./AdmissionDetailCard";
+import PaymentDetailsModal from "./PaymentDetailsModal";
 import DocumentPreviewModal from "../DocumentPreviewModal";
 import { applicationPrintHtml, blobToDataUrl } from "./printApplication";
 import "./NewAdmissionTable.css";
@@ -67,6 +68,7 @@ export default function NewAdmissionTable({ setNotice }) {
   const [loading, setLoading] = useState(true);
   const [savingId, setSavingId] = useState(null);
   const [selectedApplication, setSelectedApplication] = useState(null);
+  const [paymentDetail, setPaymentDetail] = useState(null);
   const [documentPreview, setDocumentPreview] = useState(null);
   const [documentBusyId, setDocumentBusyId] = useState(null);
 
@@ -178,6 +180,17 @@ export default function NewAdmissionTable({ setNotice }) {
       setError(reason.message || "The admission application could not be deleted.");
     } finally {
       setSavingId(null);
+    }
+  }
+
+  async function openPaymentDetails(application) {
+    if (!session?.accessToken) return;
+    setPaymentDetail({ application, data: null, loading: true, error: "" });
+    try {
+      const data = await getAdminAdmissionPayments(session.accessToken, application.id);
+      setPaymentDetail((current) => current?.application.id === application.id ? { ...current, data, loading: false } : current);
+    } catch (reason) {
+      setPaymentDetail((current) => current?.application.id === application.id ? { ...current, loading: false, error: reason.message || "Payment details could not be loaded." } : current);
     }
   }
 
@@ -299,7 +312,7 @@ export default function NewAdmissionTable({ setNotice }) {
                 <td>{summary.uploaded || 0}/{summary.required || 5} uploaded<br /><small>{summary.verified || 0}/{summary.required || 5} verified</small></td>
                 <td><Badge value={application.documents_status} /></td>
                 <td><Badge value={application.status} exceptionalApproval={Number(application.approval_exception) === 1} /></td>
-                <td><Badge value={application.registration_fee_status || "pending"} /></td>
+                <td><button type="button" className="new-admission-payment-button" onClick={() => void openPaymentDetails(application)} aria-label={`View payment details for ${application.application_number}`}><Badge value={application.registration_fee_status || "pending"} /><small>View transaction</small></button></td>
                 <td><b>{application.submitted_at ? "Yes" : "No"}</b><small>{application.submitted_at ? formatDate(application.submitted_at) : "Not submitted"}</small></td>
                 <td><div className="new-admission-row-actions"><button type="button" className="new-admission-view" onClick={() => setSelectedApplication(application)}>View details</button><button type="button" className="new-admission-delete" onClick={() => void deleteAdmission(application)} disabled={savingId === application.id}>{savingId === application.id ? "Deleting…" : "Delete"}</button></div></td>
               </tr>;
@@ -318,6 +331,7 @@ export default function NewAdmissionTable({ setNotice }) {
         <button type="button" onClick={() => setPage(totalPages)} disabled={currentPage === totalPages}>Last</button>
       </div>
     </footer>}
+    <PaymentDetailsModal detail={paymentDetail} onClose={() => setPaymentDetail(null)} />
     <AdmissionDetailCard application={selectedApplication} onClose={() => setSelectedApplication(null)} onApprove={() => approve(selectedApplication)} onApproveWithException={() => approveWithException(selectedApplication)} onReject={() => updateAdmission(selectedApplication, "rejected")} onPrint={() => void printApplication(selectedApplication)} saving={savingId === selectedApplication?.id} documentBusyId={documentBusyId} onOpenDocument={(document) => void openDocumentPreview(document)} onReviewDocument={(document, decision) => void reviewDocument(document, decision)} onDeleteDocument={(document) => void deleteDocument(document)} />
     <DocumentPreviewModal preview={documentPreview} deleting={documentBusyId === documentPreview?.document?.id} onClose={() => setDocumentPreview(null)} onDownload={downloadPreview} onDelete={() => void deleteDocument(documentPreview?.document)} actions={[
       { label: "Mark under review", className: "admission-document-review", onClick: () => void reviewDocument(documentPreview?.document, "under_verification"), disabled: documentBusyId !== null },

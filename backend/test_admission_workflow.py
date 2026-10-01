@@ -152,6 +152,11 @@ def main():
             assert fee_payment["registration_fee_status"] == "paid"
             assert expect(client.post("/api/payments/easebuzz/webhook", json={"txnid": started["txnid"]}), 200)["status"] == "paid"
             assert expect(client.post(f"/api/applications/{application_number}/registration-fee/verify", headers=parent_headers), 200)["registration_fee_status"] == "paid"
+            paid_application = next(item for item in expect(client.get("/api/admin/admissions", headers=admin_headers), 200) if item["application_number"] == application_number)
+            payment_details = expect(client.get(f"/api/admin/admissions/{paid_application['id']}/payments", headers=admin_headers), 200)
+            assert payment_details["payment_status"] == "paid"
+            assert payment_details["transactions"][0]["txnid"] == started["txnid"]
+            assert payment_details["transactions"][0]["amount"] == "1500.00"
             paid_funnel = expect(client.get("/api/admin/admission-funnel", headers=admin_headers), 200)
             assert paid_funnel["pending_registration_fee"] == 0
 

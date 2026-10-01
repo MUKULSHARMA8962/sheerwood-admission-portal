@@ -185,6 +185,32 @@ def delete_admission(application_id: int, _: dict = AdminUser) -> Response:
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
+@router.get("/admissions/{application_id}/payments")
+def admission_payment_details(application_id: int, _: dict = AdminUser) -> dict:
+    """Return the payment ledger for one admission application to an administrator."""
+    with connection() as database:
+        application = database.execute(
+            """SELECT application_number, student_name, registration_fee_status, registration_fee_paid_at
+               FROM applications WHERE id = ?""",
+            (application_id,),
+        ).fetchone()
+        if not application:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Admission application was not found.")
+        transactions = database.execute(
+            """SELECT txnid, amount, status, easebuzz_id, created_at, updated_at, paid_at
+               FROM registration_fee_payments WHERE application_number = ?
+               ORDER BY created_at DESC""",
+            (application["application_number"],),
+        ).fetchall()
+    return {
+        "application_number": application["application_number"],
+        "student_name": application["student_name"],
+        "payment_status": application["registration_fee_status"],
+        "paid_at": application["registration_fee_paid_at"],
+        "transactions": [dict(transaction) for transaction in transactions],
+    }
+
+
 @router.get("/admission-funnel")
 def admission_funnel(_: dict = AdminUser) -> dict:
     """Return the live parent-to-submission funnel for the admin dashboard."""

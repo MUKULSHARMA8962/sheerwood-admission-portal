@@ -34,6 +34,7 @@ export const API_ROUTES = {
   adminDocuments: `${API_BASE_URL}/admin/documents`,
   adminAdmissions: `${API_BASE_URL}/admin/admissions`,
   adminAdmission: (applicationId) => `${API_BASE_URL}/admin/admissions/${encodeURIComponent(applicationId)}`,
+  adminAdmissionPayments: (applicationId) => `${API_BASE_URL}/admin/admissions/${encodeURIComponent(applicationId)}/payments`,
   adminAdmissionFunnel: `${API_BASE_URL}/admin/admission-funnel`,
   adminVendors: `${API_BASE_URL}/admin/vendors`,
   adminSettings: `${API_BASE_URL}/admin/settings`,

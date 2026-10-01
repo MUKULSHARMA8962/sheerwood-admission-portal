@@ -160,6 +160,15 @@ export async function deleteAdminAdmission(accessToken, applicationId) {
   }
 }
 
+export async function getAdminAdmissionPayments(accessToken, applicationId) {
+  const response = await fetch(API_ROUTES.adminAdmissionPayments(applicationId), {
+    headers: { Authorization: `Bearer ${accessToken}` },
+  });
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(data.detail || "Payment details could not be loaded.");
+  return data;
+}
+
 export function getAdminAdmissionFunnel(accessToken) {
   return getAdminData(API_ROUTES.adminAdmissionFunnel, accessToken, "Admission tracking could not be loaded.");
 }
