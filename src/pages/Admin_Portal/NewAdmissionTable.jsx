@@ -333,7 +333,7 @@ export default function NewAdmissionTable({ setNotice }) {
         <button type="button" onClick={() => setPage(totalPages)} disabled={currentPage === totalPages}>Last</button>
       </div>
     </footer>}
-    <DocumentChecklistModal application={documentChecklistApplication} onClose={() => setDocumentChecklistApplication(null)} />
+    <DocumentChecklistModal application={documentChecklistApplication} onClose={() => setDocumentChecklistApplication(null)} onOpenDocument={(document) => { setDocumentChecklistApplication(null); void openDocumentPreview(document); }} />
     <PaymentDetailsModal detail={paymentDetail} onClose={() => setPaymentDetail(null)} />
     <AdmissionDetailCard application={selectedApplication} onClose={() => setSelectedApplication(null)} onApprove={() => approve(selectedApplication)} onApproveWithException={() => approveWithException(selectedApplication)} onReject={() => updateAdmission(selectedApplication, "rejected")} onPrint={() => void printApplication(selectedApplication)} saving={savingId === selectedApplication?.id} documentBusyId={documentBusyId} onOpenDocument={(document) => void openDocumentPreview(document)} onReviewDocument={(document, decision) => void reviewDocument(document, decision)} onDeleteDocument={(document) => void deleteDocument(document)} />
     <DocumentPreviewModal preview={documentPreview} deleting={documentBusyId === documentPreview?.document?.id} onClose={() => setDocumentPreview(null)} onDownload={downloadPreview} onDelete={() => void deleteDocument(documentPreview?.document)} actions={[

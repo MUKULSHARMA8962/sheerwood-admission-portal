@@ -32,6 +32,7 @@ class AdmissionNotificationTests(TestCase):
              patch.object(notifications, "send_email") as send:
             notifications.send_admission_submission_notifications(
                 parent_email="parent@example.com",
+                account_email="new-user@example.com",
                 parent_name="Mr Singh",
                 student_name="Asha Singh",
                 application_number="APP/2027/1",
@@ -42,7 +43,7 @@ class AdmissionNotificationTests(TestCase):
                 transaction_id="SHW123",
             )
 
-        self.assertEqual(send.call_count, 2)
+        self.assertEqual(send.call_count, 3)
         for call in send.call_args_list:
             message = call.kwargs
             self.assertIn("REGISTRATION FEE PAYMENT CONFIRMED", message["body"])
@@ -75,6 +76,10 @@ class AdmissionNotificationTests(TestCase):
         self.assertEqual(parent_message["subject"], "Registration payment received — APP/2027/1")
         self.assertIn("Admissions Office for review", parent_message["body"])
         self.assertNotIn("Aadhaar Number", parent_message["body"])
+
+        account_message = messages["new-user@example.com"]
+        self.assertEqual(account_message["subject"], "Registration payment received — APP/2027/1")
+        self.assertIn("Admissions Office for review", account_message["body"])
 
         admin_message = messages["admin@example.com"]
         self.assertEqual(admin_message["subject"], "New paid admission application — APP/2027/1")

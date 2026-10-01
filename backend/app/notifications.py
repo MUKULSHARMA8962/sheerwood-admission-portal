@@ -204,6 +204,11 @@ def _valid_email(address: str | None) -> str:
     return value if local_part and "." in domain else ""
 
 
+def _unique_recipients(*addresses: str) -> list[str]:
+    """Return valid recipient addresses once, preserving the supplied order."""
+    return list(dict.fromkeys(email for address in addresses if (email := _valid_email(address))))
+
+
 def _additional_admin_emails() -> set[str]:
     configured = os.getenv("ADMISSION_NOTIFICATION_EMAILS", "")
     return {email for value in configured.split(",") if (email := _valid_email(value))}
@@ -295,6 +300,7 @@ def _send_messages(messages: list[tuple[str, str, str, str | None, list[tuple[st
 def send_admission_submission_notifications(
     *,
     parent_email: str,
+    account_email: str = "",
     parent_name: str,
     student_name: str,
     application_number: str,
@@ -305,7 +311,7 @@ def send_admission_submission_notifications(
     transaction_id: str = "",
 ) -> None:
     """Notify the applicant and every configured admin after confirmed payment."""
-    parent_recipient = _valid_email(parent_email)
+    parent_recipients = _unique_recipients(parent_email, account_email)
     parent_display_name = parent_name.strip() or "Parent"
     student_display_name = student_name.strip() or "Applicant"
     application_display = application_number.strip()
@@ -330,7 +336,7 @@ def send_admission_submission_notifications(
         logger.exception("Admission PowerPoint attachment could not be created.")
     messages: list[tuple[str, str, str, str | None, list[tuple[str, bytes, str]]]] = []
 
-    if parent_recipient:
+    for parent_recipient in parent_recipients:
         messages.append((
             parent_recipient,
             f"Registration payment received — {application_display}",
@@ -389,10 +395,10 @@ def send_admission_submission_notifications(
         _send_messages(messages)
 
 
-def send_admission_approval_notification(*, parent_email: str, parent_name: str, student_name: str, application_number: str) -> None:
+def send_admission_approval_notification(*, parent_email: str, account_email: str = "", parent_name: str, student_name: str, application_number: str) -> None:
     """Send the acceptance letter and current entrance-test syllabus."""
-    recipient = _valid_email(parent_email)
-    if not recipient:
+    recipients = _unique_recipients(parent_email, account_email)
+    if not recipients:
         return
     with connection() as database:
         rows = database.execute("SELECT subject, details FROM entrance_syllabus WHERE active = 1 ORDER BY sort_order, id").fetchall()
@@ -426,4 +432,4 @@ def send_admission_approval_notification(*, parent_email: str, parent_name: str,
             closing="Please keep the attached syllabus for entrance-test preparation. Sign in to the parent admission portal or contact the Admissions Office for further instructions.",
         ),
         attachment,
-    )])
+    ) for recipient in recipients])

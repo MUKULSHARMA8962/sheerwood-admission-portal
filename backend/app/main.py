@@ -521,6 +521,7 @@ def confirm_easebuzz_transaction(database: Any, txnid: str, background_tasks: Ba
             background_tasks.add_task(
                 send_admission_submission_notifications,
                 parent_email=parent_notification_email(database, attempt["application_number"], attempt["parent_id"], parent["email"]),
+                account_email=parent["email"],
                 parent_name=parent["full_name"],
                 student_name=application["student_name"], application_number=attempt["application_number"],
                 desired_class=application["desired_class"],
@@ -979,6 +980,7 @@ def save_application_draft(
         background_tasks.add_task(
             send_admission_submission_notifications,
             parent_email=guardian_email_from_application(payload.data, user["email"]),
+            account_email=user["email"],
             parent_name=user["full_name"],
             student_name=student_name,
             application_number=payload.application_number,
@@ -1236,6 +1238,7 @@ def decide_application(application_id: int, payload: AdmissionDecisionRequest, b
         background_tasks.add_task(
             send_admission_approval_notification,
             parent_email=parent_email,
+            account_email=parent["email"],
             parent_name=parent["full_name"],
             student_name=updated["student_name"],
             application_number=updated["application_number"],
